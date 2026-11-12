@@ -104,4 +104,3 @@ export interface CustomTopic {
   description_blocks?: PostBlock[] | null;
   created_at: string;
 }
-declare module '*.css';

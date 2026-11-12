@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="dark"] {
+  --background: #09090b;
+  --surface: #121215;
+  --elevated: #18181b;
+  --border: #27272a;
+
+  --primary: #f4f4f5;
+  --secondary: #a1a1aa;
+  --muted: #71717a;
+
+  /* Azul Metálico */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.15);
+
+  --danger: #ef4444;
+  --spotify: #1db954;
+}
+
+[data-theme="light"] {
+  --background: #ffffff;
+  --surface: #f4f4f6;
+  --elevated: #e4e4e7;
+  --border: #d4d4d8;
+
+  --primary: #09090b;
+  --secondary: #52525b;
+  --muted: #71717a;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+
+  --danger: #dc2626;
+  --spotify: #1db954;
+}
+
+[data-contrast="high"] {
+  --background: #000000 !important;
+  --surface: #050505 !important;
+  --elevated: #0f0f11 !important;
+  --border: #52525b !important;
+
+  --primary: #ffffff !important;
+  --secondary: #e4e4e7 !important;
+  --muted: #a1a1aa !important;
+
+  --accent: #38bdf8 !important;
+  --accent-hover: #60a5fa !important;
+  --accent-soft: rgba(56, 189, 248, 0.2) !important;
+}
+
+html {
+  font-size: 19px;
+  background-color: var(--background);
+  color: var(--primary);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Cor padrão de borda em todos os elementos para eliminar bordas pretas */
+*,
+::before,
+::after {
+  border-color: var(--border);
+}
+
+/* Classes de Fundo do Tema */
+.bg-background { background-color: var(--background) !important; }
+.bg-surface { background-color: var(--surface) !important; }
+.bg-surface\/30 { background-color: color-mix(in srgb, var(--surface) 30%, transparent) !important; }
+.bg-surface\/40 { background-color: color-mix(in srgb, var(--surface) 40%, transparent) !important; }
+.bg-surface\/60 { background-color: color-mix(in srgb, var(--surface) 60%, transparent) !important; }
+.hover\:bg-surface:hover { background-color: var(--surface) !important; }
+.hover\:bg-surface\/30:hover { background-color: color-mix(in srgb, var(--surface) 30%, transparent) !important; }
+
+.bg-elevated { background-color: var(--elevated) !important; }
+.bg-elevated\/40 { background-color: color-mix(in srgb, var(--elevated) 40%, transparent) !important; }
+.bg-elevated\/70 { background-color: color-mix(in srgb, var(--elevated) 70%, transparent) !important; }
+.bg-elevated\/95 { background-color: color-mix(in srgb, var(--elevated) 95%, transparent) !important; }
+.hover\:bg-elevated:hover { background-color: var(--elevated) !important; }
+.hover\:bg-elevated\/40:hover { background-color: color-mix(in srgb, var(--elevated) 40%, transparent) !important; }
+
+.bg-accent { background-color: var(--accent) !important; }
+.bg-accent\/5 { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
+.bg-accent\/10 { background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
+.bg-accent\/15 { background-color: color-mix(in srgb, var(--accent) 15%, transparent) !important; }
+.hover\:bg-accent-hover:hover { background-color: var(--accent-hover) !important; }
+.bg-danger\/10 { background-color: color-mix(in srgb, var(--danger) 10%, transparent) !important; }
+
+/* Classes de Texto do Tema */
+.text-primary { color: var(--primary) !important; }
+.text-primary\/90 { color: color-mix(in srgb, var(--primary) 90%, transparent) !important; }
+.hover\:text-primary:hover { color: var(--primary) !important; }
+
+.text-secondary { color: var(--secondary) !important; }
+.hover\:text-secondary:hover { color: var(--secondary) !important; }
+
+.text-muted { color: var(--muted) !important; }
+.placeholder\:text-muted::placeholder { color: var(--muted) !important; }
+
+.text-accent { color: var(--accent) !important; }
+.hover\:text-accent:hover { color: var(--accent) !important; }
+
+.text-danger { color: var(--danger) !important; }
+.hover\:text-danger:hover { color: var(--danger) !important; }
+
+.text-background { color: var(--background) !important; }
+.fill-accent { fill: var(--accent) !important; }
+
+/* Classes de Borda do Tema */
+.border-border { border-color: var(--border) !important; }
+.border-accent { border-color: var(--accent) !important; }
+.border-accent\/40 { border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important; }
+.hover\:border-accent:hover { border-color: var(--accent) !important; }
+.focus\:border-accent:focus { border-color: var(--accent) !important; }
+.border-danger\/30 { border-color: color-mix(in srgb, var(--danger) 30%, transparent) !important; }
+.hover\:border-danger:hover { border-color: var(--danger) !important; }
+.hover\:border-muted:hover { border-color: var(--muted) !important; }
+
+/* Editor estilo Notion - Placeholders e Grifos */
+.notion-editable:empty:before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.notion-editable span[style*="background-color"],
+.notion-content span[style*="background-color"] {
+  border-radius: 4px;
+  padding: 1px 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}

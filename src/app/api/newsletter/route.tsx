@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 import { PostBlock } from '@/types/database';
 
 interface NewsletterPayload {
@@ -20,13 +21,31 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-// Rota GET de diagnóstico: basta abrir /api/newsletter no navegador para verificar a chave
+function resolveSiteUrl() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3000';
+}
+
+// Rota GET de diagnóstico: basta abrir /api/newsletter no navegador para verificar a configuração
 export async function GET() {
   const apiKey = process.env.RESEND_API_KEY;
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
   return NextResponse.json({
     status: 'API Newsletter Online',
+    provider: gmailUser && gmailPass ? 'Gmail SMTP (Liberado para qualquer e-mail)' : 'Resend API',
+    gmailConfigured: Boolean(gmailUser && gmailPass),
     resendKeyConfigured: Boolean(apiKey),
-    resendKeyPrefix: apiKey ? `${apiKey.slice(0, 6)}...` : 'NÃO ENCONTRADA NO .env.local',
+    resendFrom: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
   });
 }
 
@@ -219,16 +238,50 @@ function buildMasterEmailTemplate({
   `;
 }
 
-async function sendEmailViaResend(to: string[], subject: string, html: string) {
+async function sendEmailDispatcher(to: string[], subject: string, html: string) {
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
+  // 1. MODO GMAIL SMTP: Envia para qualquer e-mail gratuitamente sem precisar de domínio próprio
+  if (gmailUser && gmailPass) {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser.trim(),
+        pass: gmailPass.trim(),
+      },
+    });
+
+    const errors: string[] = [];
+
+    for (const recipient of to) {
+      try {
+        await transporter.sendMail({
+          from: `"Insight*" <${gmailUser.trim()}>`,
+          to: recipient.trim(),
+          subject,
+          html,
+        });
+        console.log('✅ [E-mail enviado via Gmail SMTP]:', recipient);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('❌ [Erro Gmail SMTP]:', msg);
+        errors.push(msg);
+      }
+    }
+
+    return { ok: errors.length === 0, errors };
+  }
+
+  // 2. MODO RESEND API: Usa RESEND_FROM_EMAIL (se tiver domínio verificado) ou onboarding@resend.dev
   const apiKey = process.env.RESEND_API_KEY;
-  // Remetente oficial de testes do Resend
-  const fromEmail = 'onboarding@resend.dev';
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Insight* <onboarding@resend.dev>';
 
   if (!apiKey) {
     return {
       ok: false,
       errors: [
-        'RESEND_API_KEY não encontrada no .env.local (ou o servidor precisa ser reiniciado com Ctrl+C e npm run dev).',
+        'Configure GMAIL_USER + GMAIL_APP_PASSWORD ou RESEND_API_KEY nas variáveis de ambiente.',
       ],
     };
   }
@@ -267,7 +320,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as NewsletterPayload;
     const supabase = getSupabaseClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const siteUrl = resolveSiteUrl();
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -354,7 +407,7 @@ export async function POST(request: Request) {
         recipientEmail: body.email,
       });
 
-      const sendResult = await sendEmailViaResend(
+      const sendResult = await sendEmailDispatcher(
         [body.email],
         'Bem-vindo(a) ao Insight* — Sua inscrição está ativa!',
         html
@@ -394,7 +447,7 @@ export async function POST(request: Request) {
         siteUrl,
       });
 
-      const sendResult = await sendEmailViaResend(
+      const sendResult = await sendEmailDispatcher(
         recipients,
         `[Atualização Oficial] ${body.postTitle || 'Novidades no Insight*'}`,
         html
@@ -461,7 +514,7 @@ export async function POST(request: Request) {
         siteUrl,
       });
 
-      const sendResult = await sendEmailViaResend(
+      const sendResult = await sendEmailDispatcher(
         matchedRecipients,
         `${isPinned ? '[Destaque] ' : ''}Novo Insight de Victor Poiani`,
         html

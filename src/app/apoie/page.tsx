@@ -214,7 +214,6 @@ export default function ApoiePage() {
 
     loadPixSettings();
 
-    // Atualiza na hora se você logar ou sair do modo Admin pela LeftSidebar
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -308,19 +307,19 @@ export default function ApoiePage() {
   }
 
   return (
-    <div className="p-5 sm:p-7 space-y-6">
+    <div className="w-full max-w-full min-w-0 overflow-x-hidden p-4 sm:p-7 space-y-6 box-border">
       {/* Cabeçalho */}
-      <header className="space-y-3 border-b border-border pb-5">
+      <header className="w-full min-w-0 space-y-3 border-b border-border pb-5">
         <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-accent uppercase tracking-wider">
-          <Heart className="w-4 h-4" />
-          <span>Financiamento Independente</span>
+          <Heart className="w-4 h-4 shrink-0" />
+          <span className="truncate">Financiamento Independente</span>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-primary">
+        <h1 className="text-2xl sm:text-3xl font-black text-primary break-words">
           Apoie o Insight<span className="text-accent">*</span>
         </h1>
 
-        <p className="text-xs sm:text-sm text-secondary max-w-xl leading-relaxed">
+        <p className="text-xs sm:text-sm text-secondary max-w-xl leading-relaxed break-words">
           Contribua diretamente para manter o servidor, o domínio e o
           desenvolvimento de novos recursos da plataforma.
         </p>
@@ -331,10 +330,10 @@ export default function ApoiePage() {
             <button
               type="button"
               onClick={() => setExpandConfig(!expandConfig)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-border hover:border-accent text-xs font-bold text-primary transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-border hover:border-accent text-xs font-bold text-primary transition-colors max-w-full"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-accent" />
-              <span>Configurar Chave PIX</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="truncate">Configurar Chave PIX</span>
             </button>
           </div>
         )}
@@ -343,22 +342,22 @@ export default function ApoiePage() {
         {isAdmin && expandConfig && (
           <form
             onSubmit={handleSavePixConfig}
-            className="mt-4 p-4 sm:p-5 rounded-2xl bg-surface border border-border space-y-4"
+            className="mt-4 p-4 sm:p-5 rounded-2xl bg-surface border border-border space-y-4 w-full min-w-0 overflow-hidden"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-accent uppercase tracking-wider">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-extrabold text-accent uppercase tracking-wider truncate">
                 Configurar Recebimento PIX (Padrão Banco Central)
               </span>
               <button
                 type="button"
                 onClick={() => setExpandConfig(false)}
-                className="text-muted hover:text-primary"
+                className="text-muted hover:text-primary shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full min-w-0">
               {(
                 [
                   { id: 'cpf', label: 'CPF / CNPJ' },
@@ -371,7 +370,7 @@ export default function ApoiePage() {
                   key={t.id}
                   type="button"
                   onClick={() => setEditKeyType(t.id)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-colors ${
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-colors truncate min-w-0 ${
                     editKeyType === t.id
                       ? 'bg-accent text-white border-accent'
                       : 'bg-elevated border-border text-secondary hover:text-primary'
@@ -382,9 +381,9 @@ export default function ApoiePage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-1">
-                <label className="text-[11px] text-muted block mb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full min-w-0">
+              <div className="sm:col-span-1 min-w-0">
+                <label className="text-[11px] text-muted block mb-1 truncate">
                   {editKeyType === 'cpf'
                     ? 'Seu CPF (apenas números ou com pontos)'
                     : editKeyType === 'phone'
@@ -399,12 +398,12 @@ export default function ApoiePage() {
                   value={editKey}
                   onChange={(e) => setEditKey(e.target.value)}
                   placeholder="Digite sua chave PIX real..."
-                  className="w-full bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
+                  className="w-full min-w-0 bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] text-muted block mb-1">
+              <div className="min-w-0">
+                <label className="text-[11px] text-muted block mb-1 truncate">
                   Nome do Beneficiário (sem acentos)
                 </label>
                 <input
@@ -413,12 +412,12 @@ export default function ApoiePage() {
                   maxLength={25}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
+                  className="w-full min-w-0 bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] text-muted block mb-1">
+              <div className="min-w-0">
+                <label className="text-[11px] text-muted block mb-1 truncate">
                   Cidade (sem acentos, máx. 15 letras)
                 </label>
                 <input
@@ -427,12 +426,12 @@ export default function ApoiePage() {
                   maxLength={15}
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
-                  className="w-full bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
+                  className="w-full min-w-0 bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setExpandConfig(false)}
@@ -453,13 +452,13 @@ export default function ApoiePage() {
       </header>
 
       {/* Card Principal de Doação (Público para Visitantes) */}
-      <section className="p-5 sm:p-6 rounded-3xl bg-surface border border-border space-y-6 overflow-hidden">
-        <div className="space-y-3">
+      <section className="w-full max-w-full min-w-0 p-4 sm:p-6 rounded-3xl bg-surface border border-border space-y-6 overflow-hidden box-border">
+        <div className="space-y-3 w-full min-w-0">
           <h2 className="text-sm font-extrabold text-primary">
             1. Escolha um valor de apoio
           </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full min-w-0">
             {PRESET_AMOUNTS.map((item) => {
               const Icon = item.icon;
               const isSelected = selectedPreset === item.value;
@@ -468,28 +467,30 @@ export default function ApoiePage() {
                   key={item.label}
                   type="button"
                   onClick={() => setSelectedPreset(item.value)}
-                  className={`p-4 rounded-2xl border text-left transition-all space-y-1.5 ${
+                  className={`min-w-0 p-3.5 sm:p-4 rounded-2xl border text-left transition-all space-y-1.5 overflow-hidden ${
                     isSelected
                       ? 'bg-accent/15 border-accent text-primary shadow-md'
                       : 'bg-elevated border-border text-secondary hover:text-primary hover:border-muted'
                   }`}
                 >
                   <Icon
-                    className={`w-4 h-4 ${
+                    className={`w-4 h-4 shrink-0 ${
                       isSelected ? 'text-accent' : 'text-muted'
                     }`}
                   />
-                  <p className="text-base sm:text-lg font-black text-primary">
+                  <p className="text-base sm:text-lg font-black text-primary truncate">
                     {item.label}
                   </p>
-                  <p className="text-[11px] text-muted">{item.desc}</p>
+                  <p className="text-[11px] text-muted leading-tight break-words">
+                    {item.desc}
+                  </p>
                 </button>
               );
             })}
           </div>
 
           {selectedPreset === 0 && (
-            <div className="pt-2 flex flex-wrap items-center gap-3">
+            <div className="pt-2 flex flex-wrap items-center gap-3 w-full min-w-0">
               <label className="text-xs font-bold text-secondary">
                 Digite o valor desejado (R$) ou deixe 0 para definir no app do
                 banco:
@@ -501,7 +502,7 @@ export default function ApoiePage() {
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
                 placeholder="Ex: 15,00"
-                className="w-36 bg-elevated border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-primary focus:outline-none focus:border-accent"
+                className="w-36 max-w-full bg-elevated border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-primary focus:outline-none focus:border-accent"
               />
             </div>
           )}
@@ -509,28 +510,28 @@ export default function ApoiePage() {
 
         <hr className="border-border" />
 
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-          <div className="p-3.5 rounded-2xl bg-white shrink-0 shadow-md">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-5 sm:gap-6 w-full min-w-0">
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white shrink-0 shadow-md">
             <img
               src={qrCodeUrl}
               alt="QR Code PIX"
               width={190}
               height={190}
-              className="w-44 h-44 sm:w-48 sm:h-48 object-contain block"
+              className="w-40 h-40 sm:w-44 sm:h-44 object-contain block"
             />
           </div>
 
-          <div className="flex-1 min-w-0 w-full space-y-3.5">
-            <div>
+          <div className="flex-1 min-w-0 w-full space-y-3.5 overflow-hidden">
+            <div className="min-w-0">
               <p className="text-[11px] font-extrabold text-accent uppercase tracking-wider">
                 2. Escaneie ou copie o código
               </p>
-              <h3 className="text-lg sm:text-xl font-black text-primary mt-0.5">
+              <h3 className="text-lg sm:text-xl font-black text-primary mt-0.5 break-words">
                 {effectiveAmount > 0
                   ? `Doação de R$ ${effectiveAmount.toFixed(2).replace('.', ',')}`
                   : 'Doação de Valor Livre'}
               </h3>
-              <p className="text-xs text-secondary mt-0.5">
+              <p className="text-xs text-secondary mt-0.5 truncate">
                 Destinatário:{' '}
                 <strong className="text-primary">
                   {pixConfig.merchantName}
@@ -538,27 +539,28 @@ export default function ApoiePage() {
               </p>
             </div>
 
-            <div className="w-full p-3 rounded-xl bg-elevated border border-border overflow-hidden">
-              <p className="font-mono text-[11px] text-secondary truncate select-all">
+            {/* w-0 min-w-full impede que a string longa do PIX estique o cálculo intrínseco do Flexbox */}
+            <div className="w-full min-w-0 p-3 rounded-xl bg-elevated border border-border overflow-hidden">
+              <p className="w-0 min-w-full font-mono text-[11px] text-secondary truncate select-all">
                 {pixPayload}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <div className="flex flex-wrap items-center gap-2.5 pt-1 w-full min-w-0">
               <button
                 type="button"
                 onClick={handleCopyPayload}
-                className="px-4 py-2.5 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-hover flex items-center gap-2 shadow-md transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-hover flex items-center gap-2 shadow-md transition-colors max-w-full min-w-0"
               >
                 {copiedPayload ? (
                   <>
-                    <Check className="w-4 h-4" />
-                    <span>Código PIX Copiado!</span>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Código PIX Copiado!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-4 h-4" />
-                    <span>Copiar PIX Copia e Cola</span>
+                    <Copy className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Copiar PIX Copia e Cola</span>
                   </>
                 )}
               </button>
@@ -566,17 +568,19 @@ export default function ApoiePage() {
               <button
                 type="button"
                 onClick={handleCopyRawKey}
-                className="px-3.5 py-2.5 rounded-xl bg-elevated border border-border hover:border-accent text-xs font-semibold text-primary flex items-center gap-2 max-w-full transition-colors"
+                className="px-3.5 py-2.5 rounded-xl bg-elevated border border-border hover:border-accent text-xs font-semibold text-primary flex items-center gap-2 max-w-full min-w-0 transition-colors"
               >
                 {copiedRawKey ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
-                    <span className="text-[#1DB954]">Chave Copiada!</span>
+                    <span className="text-[#1DB954] truncate">
+                      Chave Copiada!
+                    </span>
                   </>
                 ) : (
                   <>
                     <KeyRound className="w-3.5 h-3.5 text-accent shrink-0" />
-                    <span className="truncate max-w-[210px]">
+                    <span className="truncate max-w-[180px] sm:max-w-[210px]">
                       Copiar Chave ({formattedBacenKey})
                     </span>
                   </>
@@ -584,9 +588,9 @@ export default function ApoiePage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 text-[11px] text-muted pt-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
-              <span>
+            <div className="flex items-start sm:items-center gap-1.5 text-[11px] text-muted pt-1 min-w-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#1DB954] shrink-0 mt-0.5 sm:mt-0" />
+              <span className="break-words leading-relaxed">
                 Código gerado no padrão oficial EMVCo / Banco Central do Brasil
                 (sem taxas intermediárias).
               </span>

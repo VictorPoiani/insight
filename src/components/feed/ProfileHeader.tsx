@@ -110,37 +110,37 @@ const KNOWN_PLATFORMS: {
   name: string;
   slug: string;
 }[] = [
-  { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
-  { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
-  { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
-  {
-    match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
-    name: 'Steam',
-    slug: 'steam',
-  },
-  { match: ['github.com'], name: 'GitHub', slug: 'github' },
-  { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
-  { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
-  { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
-  { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
-  { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
-  { match: ['threads.net'], name: 'Threads', slug: 'threads' },
-  { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
-  { match: ['behance.net'], name: 'Behance', slug: 'behance' },
-  { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
-  { match: ['figma.com'], name: 'Figma', slug: 'figma' },
-  { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
-  { match: ['medium.com'], name: 'Medium', slug: 'medium' },
-  { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
-  { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
-  { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
-  { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
-  { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
-  { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
-  { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
-  { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
-  { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
-];
+    { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
+    { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
+    { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
+    {
+      match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
+      name: 'Steam',
+      slug: 'steam',
+    },
+    { match: ['github.com'], name: 'GitHub', slug: 'github' },
+    { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
+    { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
+    { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
+    { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
+    { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
+    { match: ['threads.net'], name: 'Threads', slug: 'threads' },
+    { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
+    { match: ['behance.net'], name: 'Behance', slug: 'behance' },
+    { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
+    { match: ['figma.com'], name: 'Figma', slug: 'figma' },
+    { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
+    { match: ['medium.com'], name: 'Medium', slug: 'medium' },
+    { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
+    { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
+    { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
+    { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
+    { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
+    { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
+    { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
+    { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
+    { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
+  ];
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -241,19 +241,18 @@ function SmartPlatformIcon({
   const iconSrc = meta.slug
     ? `https://cdn.simpleicons.org/${meta.slug}/8e8e93`
     : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-        meta.domain
-      )}&sz=128`;
+      meta.domain
+    )}&sz=128`;
 
   return (
     <img
       src={iconSrc}
       alt={meta.name}
       onError={() => setImgError(true)}
-      className={`${className} object-contain transition-all duration-200 ${
-        meta.slug
+      className={`${className} object-contain transition-all duration-200 ${meta.slug
           ? 'opacity-80 group-hover/slink:opacity-100 group-hover/slink:scale-105'
           : 'rounded-sm grayscale opacity-75 group-hover/slink:grayscale-0 group-hover/slink:opacity-100'
-      }`}
+        }`}
     />
   );
 }
@@ -541,13 +540,13 @@ export function ProfileHeader({
     Array.isArray(profile.tags) && profile.tags.length > 0
       ? profile.tags
       : [
-          'Full-Stack',
-          'Guitarrista',
-          'Rock',
-          'Marvel',
-          'Lider',
-          'Sistemas de Informação',
-        ]
+        'Full-Stack',
+        'Guitarrista',
+        'Rock',
+        'Marvel',
+        'Lider',
+        'Sistemas de Informação',
+      ]
   );
   const [savingTags, setSavingTags] = useState(false);
   const [spotifyTrackId, setSpotifyTrackId] = useState(
@@ -618,7 +617,7 @@ export function ProfileHeader({
         .then((sub) => {
           setPushSubscribed(Boolean(sub));
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -687,9 +686,8 @@ export function ProfileHeader({
 
         const newSub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(DEFAULT_VAPID_PUBLIC_KEY),
+          applicationServerKey: urlBase64ToUint8Array(DEFAULT_VAPID_PUBLIC_KEY) as unknown as BufferSource,
         });
-
         const res = await fetch('/api/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -990,7 +988,7 @@ export function ProfileHeader({
         notifyMode: 'all',
         interestedTags: [],
       }),
-    }).catch(() => {});
+    }).catch(() => { });
 
     setSubmittingSub(false);
     setSubSuccess(true);
@@ -1015,9 +1013,8 @@ export function ProfileHeader({
       {/* 1. Banner / Capa do Perfil */}
       <div
         onClick={() => isAdmin && coverInputRef.current?.click()}
-        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${
-          isAdmin ? 'cursor-pointer' : ''
-        }`}
+        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${isAdmin ? 'cursor-pointer' : ''
+          }`}
       >
         {coverUrl ? (
           <img
@@ -1060,9 +1057,8 @@ export function ProfileHeader({
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div
               onClick={() => isAdmin && avatarInputRef.current?.click()}
-              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${
-                isAdmin ? 'cursor-pointer' : ''
-              }`}
+              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${isAdmin ? 'cursor-pointer' : ''
+                }`}
             >
               <img
                 src={avatarUrl}
@@ -1099,11 +1095,10 @@ export function ProfileHeader({
                     ? 'Clique para alterar seu status atual'
                     : `Status: ${currentStatus.label}`
                 }
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${
-                  isAdmin
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${isAdmin
                     ? 'cursor-pointer hover:scale-[1.02] active:scale-95'
                     : 'cursor-default'
-                }`}
+                  }`}
               >
                 <span className="relative flex h-1.5 w-1.5 shrink-0">
                   {currentStatus.pulse && (
@@ -1165,16 +1160,15 @@ export function ProfileHeader({
                           style={
                             isSelected
                               ? {
-                                  backgroundColor: `${opt.color}22`,
-                                  borderColor: opt.color,
-                                }
+                                backgroundColor: `${opt.color}22`,
+                                borderColor: opt.color,
+                              }
                               : undefined
                           }
-                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${
-                            isSelected
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${isSelected
                               ? 'text-primary'
                               : 'bg-elevated/80 border-border text-secondary hover:text-primary'
-                          }`}
+                            }`}
                         >
                           <span
                             style={{ backgroundColor: opt.color }}
@@ -1265,11 +1259,10 @@ export function ProfileHeader({
             <button
               type="button"
               onClick={() => setExpandSubscribe(!expandSubscribe)}
-              className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${
-                pushSubscribed
+              className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${pushSubscribed
                   ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
                   : 'bg-accent text-white hover:bg-accent-hover'
-              }`}
+                }`}
             >
               {pushSubscribed ? (
                 <>
@@ -1373,11 +1366,10 @@ export function ProfileHeader({
                     type="button"
                     onClick={() => setNicknameColor(color)}
                     style={{ backgroundColor: color }}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                      nicknameColor.toLowerCase() === color.toLowerCase()
+                    className={`w-6 h-6 rounded-full border-2 transition-transform ${nicknameColor.toLowerCase() === color.toLowerCase()
                         ? 'border-white scale-110'
                         : 'border-transparent opacity-75'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -1476,11 +1468,10 @@ export function ProfileHeader({
                     type="button"
                     disabled={loadingPush}
                     onClick={handleToggleWebPush}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                      pushSubscribed
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${pushSubscribed
                         ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-danger/15 hover:border-danger/40 hover:text-danger'
                         : 'bg-accent text-white hover:bg-accent-hover shadow-sm'
-                    }`}
+                      }`}
                   >
                     {loadingPush ? (
                       <span>Configurando...</span>
@@ -1611,11 +1602,10 @@ export function ProfileHeader({
               type="button"
               onClick={() => setExpandTags(!expandTags)}
               title="Configurar Tags do Perfil"
-              className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${
-                expandTags
+              className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${expandTags
                   ? 'bg-accent text-white border-accent'
                   : 'bg-elevated border-border text-secondary hover:text-accent hover:border-accent'
-              }`}
+                }`}
             >
               {expandTags ? (
                 <X className="w-3.5 h-3.5" />
@@ -1668,11 +1658,10 @@ export function ProfileHeader({
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('all')}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                  activeCategoryTab === 'all'
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${activeCategoryTab === 'all'
                     ? 'bg-primary text-background border-primary'
                     : 'bg-elevated text-secondary border-border hover:text-primary'
-                }`}
+                  }`}
               >
                 Todas ({TAG_CATEGORIES.reduce((acc, c) => acc + c.tags.length, 0)})
               </button>
@@ -1688,17 +1677,16 @@ export function ProfileHeader({
                     style={
                       isTabActive
                         ? {
-                            backgroundColor: `${cat.color}22`,
-                            borderColor: cat.color,
-                            color: cat.color,
-                          }
+                          backgroundColor: `${cat.color}22`,
+                          borderColor: cat.color,
+                          color: cat.color,
+                        }
                         : undefined
                     }
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                      isTabActive
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${isTabActive
                         ? ''
                         : 'bg-elevated text-secondary border-border hover:text-primary'
-                    }`}
+                      }`}
                   >
                     <CatIcon
                       className="w-3 h-3 shrink-0"
@@ -1742,16 +1730,15 @@ export function ProfileHeader({
                           style={
                             active
                               ? {
-                                  backgroundColor: `${cat.color}24`,
-                                  borderColor: cat.color,
-                                }
+                                backgroundColor: `${cat.color}24`,
+                                borderColor: cat.color,
+                              }
                               : undefined
                           }
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${
-                            active
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${active
                               ? 'text-primary shadow-sm scale-[1.02]'
                               : 'bg-elevated/80 text-secondary border-border hover:text-primary hover:border-muted'
-                          }`}
+                            }`}
                         >
                           <ItemIcon
                             className="w-3.5 h-3.5 shrink-0"

@@ -324,7 +324,7 @@ export default function ApoiePage() {
           desenvolvimento de novos recursos da plataforma.
         </p>
 
-        {/* Botão visível SOMENTE para o Admin autenticado */}
+        {/* Botão visível somente para autenticados */}
         {isAdmin && (
           <div className="pt-1">
             <button
@@ -338,7 +338,7 @@ export default function ApoiePage() {
           </div>
         )}
 
-        {/* Painel Expansível de Configuração da Chave PIX (Exclusivo Admin) */}
+        {/* Painel Expansível de Configuração da Chave pix */}
         {isAdmin && expandConfig && (
           <form
             onSubmit={handleSavePixConfig}
@@ -451,7 +451,7 @@ export default function ApoiePage() {
         )}
       </header>
 
-      {/* Card Principal de Doação (Público para Visitantes) */}
+      {/* Card Principal de Doação*/}
       <section className="w-full max-w-full min-w-0 p-4 sm:p-6 rounded-3xl bg-surface border border-border space-y-6 overflow-hidden box-border">
         <div className="space-y-3 w-full min-w-0">
           <h2 className="text-sm font-extrabold text-primary">

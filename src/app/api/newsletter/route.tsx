@@ -1,7 +1,24 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { setVapidDetails, sendNotification } from 'web-push';
 import { PostBlock } from '@/types/database';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
+const VAPID_PUBLIC_KEY =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+  'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
+
+const VAPID_PRIVATE_KEY =
+  process.env.VAPID_PRIVATE_KEY ||
+  'vbhLMvBahKwhghOIIzE7GlTXBi8X0kBmZJvVQsP2AMo';
+
+const VAPID_SUBJECT =
+  process.env.VAPID_SUBJECT || 'mailto:contato.insightproject@gmail.com';
+
+setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 interface NewsletterPayload {
   action: 'welcome' | 'new_post' | 'official_update';
@@ -17,8 +34,13 @@ interface NewsletterPayload {
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  return createClient(url, key);
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    '';
+  return createClient(url, key, {
+    auth: { persistSession: false },
+  });
 }
 
 function resolveSiteUrl() {
@@ -34,18 +56,103 @@ function resolveSiteUrl() {
   return 'http://localhost:3000';
 }
 
-// Rota GET de diagnóstico: basta abrir /api/newsletter no navegador para verificar a configuração
+function createBrevoTransporter() {
+  const user = process.env.BREVO_SMTP_USER?.trim();
+  const pass = process.env.BREVO_SMTP_KEY?.trim();
+  if (!user || !pass) return null;
+
+  return nodemailer.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false },
+  });
+}
+
+function createGmailTransporter() {
+  const gmailUser = process.env.GMAIL_USER?.trim();
+  const gmailPass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+  if (!gmailUser || !gmailPass) return null;
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: gmailUser, pass: gmailPass },
+    tls: { rejectUnauthorized: false },
+  });
+}
+
+function sanitizeEmailList(emails: string[]): string[] {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const unique = new Set<string>();
+
+  for (const raw of emails) {
+    if (!raw || typeof raw !== 'string') continue;
+    const clean = raw.trim().toLowerCase();
+    if (emailRegex.test(clean)) {
+      unique.add(clean);
+    }
+  }
+  return Array.from(unique);
+}
+
+function chunkArray<T>(list: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// Diagnóstico ao vivo: abra http://localhost:3000/api/newsletter no navegador
 export async function GET() {
-  const apiKey = process.env.RESEND_API_KEY;
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  const brevoTransporter = createBrevoTransporter();
+  const gmailTransporter = createGmailTransporter();
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+
+  let brevoVerified = false;
+  let brevoError: string | null = null;
+  if (brevoTransporter) {
+    try {
+      await brevoTransporter.verify();
+      brevoVerified = true;
+    } catch (err: any) {
+      brevoError = err?.message || String(err);
+    } finally {
+      brevoTransporter.close();
+    }
+  }
+
+  let gmailVerified = false;
+  let gmailError: string | null = null;
+  if (gmailTransporter) {
+    try {
+      await gmailTransporter.verify();
+      gmailVerified = true;
+    } catch (err: any) {
+      gmailError = err?.message || String(err);
+    } finally {
+      gmailTransporter.close();
+    }
+  }
 
   return NextResponse.json({
-    status: 'API Newsletter Online',
-    provider: gmailUser && gmailPass ? 'Gmail SMTP (Liberado para qualquer e-mail)' : 'Resend API',
-    gmailConfigured: Boolean(gmailUser && gmailPass),
-    resendKeyConfigured: Boolean(apiKey),
-    resendFrom: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+    status: brevoVerified || gmailVerified ? '100% Operacional' : 'Aguardando configuração SMTP',
+    activeProvider: brevoVerified
+      ? 'Brevo SMTP Relay (300 e-mails/dia grátis)'
+      : gmailVerified
+      ? 'Gmail SMTP'
+      : 'Resend Sandbox',
+    brevoConfigured: Boolean(brevoTransporter),
+    brevoVerified,
+    brevoError,
+    gmailConfigured: Boolean(gmailTransporter),
+    gmailVerified,
+    gmailError,
+    resendConfigured: Boolean(resendKey),
   });
 }
 
@@ -79,7 +186,6 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
       if (b.type === 'callout') {
         return `
           <div style="margin: 14px 0; padding: 14px 16px; background-color: #18181b; border: 1px solid rgba(37, 99, 235, 0.4); border-radius: 12px; color: #f4f4f5; font-size: 14px;">
-            <span style="font-size: 18px; margin-right: 8px;">${b.calloutIcon || '💡'}</span>
             <span>${b.html || ''}</span>
           </div>
         `;
@@ -105,6 +211,55 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
                 ? `<p style="margin: 6px 0 0 0; font-size: 12px; color: #71717a;">${b.imageCaption}</p>`
                 : ''
             }
+          </div>
+        `;
+      }
+      if (b.type === 'table' && Array.isArray(b.tableData)) {
+        const rowsHtml = b.tableData
+          .map(
+            (row, rIdx) => `
+            <tr>
+              ${(Array.isArray(row) ? row : [])
+                .map(
+                  (cell) => `
+                  <td style="padding: 8px 12px; border: 1px solid #27272a; font-size: 13px; color: ${
+                    rIdx === 0 ? '#ffffff' : '#d4d4d8'
+                  }; font-weight: ${rIdx === 0 ? '700' : '400'}; background-color: ${
+                    rIdx === 0 ? '#18181b' : '#09090b'
+                  };">
+                    ${cell || ''}
+                  </td>`
+                )
+                .join('')}
+            </tr>`
+          )
+          .join('');
+        return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 16px 0; border-radius: 10px; overflow: hidden;">${rowsHtml}</table>`;
+      }
+      if (b.type === 'roadmap' && Array.isArray(b.roadmapSteps)) {
+        const stepsHtml = b.roadmapSteps
+          .map(
+            (s) => `
+            <div style="margin-bottom: 10px; padding: 12px; background-color: #18181b; border: 1px solid #27272a; border-radius: 10px;">
+              <div style="font-family: monospace; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">${s.phase}</div>
+              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 2px;">${s.title}</div>
+              <div style="font-size: 13px; color: #a1a1aa; margin-top: 4px;">${s.description}</div>
+            </div>`
+          )
+          .join('');
+        return `<div style="margin: 16px 0;">${stepsHtml}</div>`;
+      }
+      if (b.type === 'poll' && b.pollQuestion) {
+        const optsHtml = (b.pollOptions || [])
+          .map(
+            (o) =>
+              `<div style="padding: 8px 12px; margin-top: 6px; background-color: #09090b; border: 1px solid #27272a; border-radius: 8px; font-size: 13px; color: #e4e4e7;">• ${o.text}</div>`
+          )
+          .join('');
+        return `
+          <div style="margin: 16px 0; padding: 14px; background-color: #18181b; border: 1px solid #27272a; border-radius: 12px;">
+            <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">📊 Enquete: ${b.pollQuestion}</div>
+            ${optsHtml}
           </div>
         `;
       }
@@ -238,82 +393,178 @@ function buildMasterEmailTemplate({
   `;
 }
 
-async function sendEmailDispatcher(to: string[], subject: string, html: string) {
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD;
-
-  // 1. MODO GMAIL SMTP: Envia para qualquer e-mail gratuitamente sem precisar de domínio próprio
-  if (gmailUser && gmailPass) {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailUser.trim(),
-        pass: gmailPass.trim(),
-      },
-    });
-
-    const errors: string[] = [];
-
-    for (const recipient of to) {
-      try {
-        await transporter.sendMail({
-          from: `"Insight*" <${gmailUser.trim()}>`,
-          to: recipient.trim(),
-          subject,
-          html,
-        });
-        console.log('✅ [E-mail enviado via Gmail SMTP]:', recipient);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('❌ [Erro Gmail SMTP]:', msg);
-        errors.push(msg);
-      }
-    }
-
-    return { ok: errors.length === 0, errors };
-  }
-
-  // 2. MODO RESEND API: Usa RESEND_FROM_EMAIL (se tiver domínio verificado) ou onboarding@resend.dev
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Insight* <onboarding@resend.dev>';
-
-  if (!apiKey) {
-    return {
-      ok: false,
-      errors: [
-        'Configure GMAIL_USER + GMAIL_APP_PASSWORD ou RESEND_API_KEY nas variáveis de ambiente.',
-      ],
-    };
+async function sendEmailDispatcher(
+  rawRecipients: string[],
+  subject: string,
+  html: string
+) {
+  const recipients = sanitizeEmailList(rawRecipients);
+  if (recipients.length === 0) {
+    return { ok: true, sent: 0, errors: [] };
   }
 
   const errors: string[] = [];
 
-  for (const recipient of to) {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey.trim()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [recipient.trim()],
-        subject,
-        html,
-      }),
-    });
+  // CAMADA 1: BREVO SMTP RELAY (Gratuito, 300/dia, sem domínio próprio e sem bloqueio WebLoginRequired)
+  const brevoTransporter = createBrevoTransporter();
+  const brevoSender =
+    process.env.BREVO_SENDER_EMAIL?.trim() ||
+    process.env.GMAIL_USER?.trim() ||
+    'contato.insightproject@gmail.com';
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('❌ [Erro Resend]:', data);
-      errors.push(data?.message || JSON.stringify(data));
-    } else {
-      console.log('✅ [E-mail enviado no Resend]:', data.id);
+  if (brevoTransporter) {
+    try {
+      if (recipients.length === 1) {
+        await brevoTransporter.sendMail({
+          from: `"Insight* — Victor Poiani" <${brevoSender}>`,
+          to: recipients[0],
+          subject,
+          html,
+        });
+      } else {
+        const batches = chunkArray(recipients, 45);
+        for (const batch of batches) {
+          await brevoTransporter.sendMail({
+            from: `"Insight* — Victor Poiani" <${brevoSender}>`,
+            to: brevoSender,
+            bcc: batch,
+            subject,
+            html,
+          });
+        }
+      }
+      console.log('✅ [Brevo SMTP] E-mail entregue com sucesso para:', recipients);
+      brevoTransporter.close();
+      return { ok: true, sent: recipients.length, errors: [] };
+    } catch (brevoErr: any) {
+      const msg = brevoErr?.message || String(brevoErr);
+      console.error('❌ [Erro Brevo SMTP]:', msg);
+      errors.push(`Brevo: ${msg}`);
+      brevoTransporter.close();
     }
   }
 
-  return { ok: errors.length === 0, errors };
+  // CAMADA 2: GMAIL SMTP (Caso configurado e destravado)
+  const gmailTransporter = createGmailTransporter();
+  const gmailUser = process.env.GMAIL_USER?.trim();
+
+  if (gmailTransporter && gmailUser) {
+    try {
+      if (recipients.length === 1) {
+        await gmailTransporter.sendMail({
+          from: `"Insight* — Victor Poiani" <${gmailUser}>`,
+          to: recipients[0],
+          subject,
+          html,
+        });
+      } else {
+        const batches = chunkArray(recipients, 45);
+        for (const batch of batches) {
+          await gmailTransporter.sendMail({
+            from: `"Insight* — Victor Poiani" <${gmailUser}>`,
+            to: gmailUser,
+            bcc: batch,
+            subject,
+            html,
+          });
+        }
+      }
+      console.log('✅ [Gmail SMTP] E-mail entregue com sucesso para:', recipients);
+      gmailTransporter.close();
+      return { ok: true, sent: recipients.length, errors: [] };
+    } catch (smtpErr: any) {
+      const msg = smtpErr?.message || String(smtpErr);
+      console.error('❌ [Erro Gmail SMTP]:', msg);
+      errors.push(`Gmail SMTP: ${msg}`);
+      gmailTransporter.close();
+    }
+  }
+
+  // CAMADA 3: RESEND API
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromEmail =
+    process.env.RESEND_FROM_EMAIL?.trim() || 'Insight* <onboarding@resend.dev>';
+
+  if (!apiKey) {
+    return { ok: false, sent: 0, errors };
+  }
+
+  let sentViaResend = 0;
+
+  for (const recipient of recipients) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [recipient],
+          subject,
+          html,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        errors.push(`Resend (${recipient}): ${data?.message || JSON.stringify(data)}`);
+      } else {
+        sentViaResend++;
+      }
+    } catch (err: any) {
+      errors.push(err?.message || String(err));
+    }
+  }
+
+  return {
+    ok: sentViaResend > 0,
+    sent: sentViaResend,
+    errors,
+  };
+}
+
+async function triggerWebPushForOfficialUpdate(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  title: string,
+  message: string
+) {
+  try {
+    const { data: pushSubs } = await supabase
+      .from('push_subscriptions')
+      .select('*');
+
+    if (!pushSubs || pushSubs.length === 0) return;
+
+    await Promise.allSettled(
+      pushSubs.map(async (sub: any) => {
+        try {
+          await sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            JSON.stringify({
+              title,
+              body: message.slice(0, 160),
+              url: '/notificacoes',
+              tag: 'insight-official-update',
+            })
+          );
+        } catch (err: any) {
+          if (err?.statusCode === 404 || err?.statusCode === 410) {
+            await supabase
+              .from('push_subscriptions')
+              .delete()
+              .eq('endpoint', sub.endpoint);
+          }
+        }
+      })
+    );
+  } catch {
+    // Ignora falha silenciosa
+  }
 }
 
 export async function POST(request: Request) {
@@ -413,20 +664,20 @@ export async function POST(request: Request) {
         html
       );
 
-      if (!sendResult.ok) {
-        return NextResponse.json(
-          { ok: false, error: sendResult.errors.join(' | ') },
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(
+        {
+          ok: sendResult.ok,
+          sent: sendResult.sent,
+          error: sendResult.errors.join(' | '),
+          errors: sendResult.errors,
+        },
+        { status: sendResult.ok ? 200 : 400 }
+      );
     }
 
     if (body.action === 'official_update') {
       const { data: subs } = await supabase.from('subscribers').select('email');
       const recipients = (subs || []).map((s) => s.email);
-      if (recipients.length === 0) return NextResponse.json({ ok: true, sent: 0 });
 
       const richBody = renderBlocksForEmail(body.postBlocks, body.postContent);
 
@@ -447,13 +698,26 @@ export async function POST(request: Request) {
         siteUrl,
       });
 
-      const sendResult = await sendEmailDispatcher(
-        recipients,
-        `[Atualização Oficial] ${body.postTitle || 'Novidades no Insight*'}`,
-        html
-      );
+      const [, sendResult] = await Promise.all([
+        triggerWebPushForOfficialUpdate(
+          supabase,
+          body.postTitle || '📣 Nova Atualização Oficial — Insight*',
+          body.postContent || 'Confira as novidades publicadas no Mural Oficial.'
+        ),
+        recipients.length > 0
+          ? sendEmailDispatcher(
+              recipients,
+              `[Atualização Oficial] ${body.postTitle || 'Novidades no Insight*'}`,
+              html
+            )
+          : Promise.resolve({ ok: true, sent: 0, errors: [] }),
+      ]);
 
-      return NextResponse.json({ ok: sendResult.ok, errors: sendResult.errors });
+      return NextResponse.json({
+        ok: sendResult.ok,
+        sent: sendResult.sent,
+        errors: sendResult.errors,
+      });
     }
 
     if (body.action === 'new_post') {
@@ -461,14 +725,16 @@ export async function POST(request: Request) {
         .from('subscribers')
         .select('email, notify_mode, interested_tags');
 
-      if (!subs || subs.length === 0) return NextResponse.json({ ok: true, sent: 0 });
+      if (!subs || subs.length === 0) {
+        return NextResponse.json({ ok: true, sent: 0 });
+      }
 
       const postTagsLower = (body.postTags || []).map((t) => t.toLowerCase());
       const isPinned = Boolean(body.isPinned);
 
       const matchedRecipients = subs
         .filter((sub) => {
-          if (sub.notify_mode === 'all') return true;
+          if (!sub.notify_mode || sub.notify_mode === 'all') return true;
           if (sub.notify_mode === 'pinned') return isPinned;
           if (sub.notify_mode === 'tags') {
             const userTags = Array.isArray(sub.interested_tags)
@@ -480,7 +746,9 @@ export async function POST(request: Request) {
         })
         .map((sub) => sub.email);
 
-      if (matchedRecipients.length === 0) return NextResponse.json({ ok: true, sent: 0 });
+      if (matchedRecipients.length === 0) {
+        return NextResponse.json({ ok: true, sent: 0 });
+      }
 
       const richPostHtml = renderBlocksForEmail(body.postBlocks, body.postContent);
 
@@ -520,13 +788,16 @@ export async function POST(request: Request) {
         html
       );
 
-      return NextResponse.json({ ok: sendResult.ok, errors: sendResult.errors });
+      return NextResponse.json({
+        ok: sendResult.ok,
+        sent: sendResult.sent,
+        errors: sendResult.errors,
+      });
     }
 
     return NextResponse.json({ ok: false, error: 'Ação inválida' }, { status: 400 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido na rota';
-    console.error('[Newsletter API Error]:', msg);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

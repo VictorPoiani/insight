@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
+// @ts-ignore
 import './globals.css';
 import { LeftSidebar } from '@/components/layout/LeftSidebar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
+import { ReleaseNotesModal } from '@/components/layout/ReleaseNotesModal';
 
 export const metadata: Metadata = {
   title: 'Insighter — Victor Poiani',
   description: 'Microblog autoral de ideias, engenharia de software e projetos por Victor Poiani.',
 };
 
-// Script executado imediatamente antes da página renderizar para restaurar o tema salvo
 const themeInitScript = `
   (function() {
     try {
@@ -42,12 +43,15 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="bg-background text-primary antialiased selection:bg-accent selection:text-background transition-colors duration-200">
-        <div className="max-w-[1600px] mx-auto flex min-h-screen justify-center">
+        {/* Modal de Anúncio da Atualização v1.5 */}
+        <ReleaseNotesModal />
+
+        <div className="max-w-[1920px] mx-auto flex min-h-screen justify-center">
           {/* Coluna 1: Navegação Esquerda */}
           <LeftSidebar />
 
-          {/* Coluna 2: Conteúdo Central */}
-          <main className="flex-1 max-w-3xl min-h-screen border-x border-border">
+          {/* Coluna 2: Conteúdo Central Dinâmico */}
+          <main className="flex-1 min-w-0 min-h-screen border-x border-border">
             {children}
           </main>
 

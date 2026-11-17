@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { TopicWorkspaceView } from './TopicWorkspaceView';
 import {
   CustomTopic,
   PostBlock,
-  PostBlockType,
-  FontStyleType,
+  PostVisibility,
+  TopicTemplateType,
+  TopicWorkspaceData,
 } from '@/types/database';
 import {
   Plus,
@@ -14,128 +16,248 @@ import {
   Trash2,
   Hash,
   ImagePlus,
-  Bold,
-  Italic,
-  Underline,
-  Highlighter,
-  Type,
-  Heading2,
-  Quote,
-  Sparkles,
   Check,
-  GripVertical,
+  Lock,
+  Globe,
+  ChevronDown,
+  Search,
+  FileText,
+  Table2,
+  ArrowUpRight,
+  Shapes,
+  Target,
+  Activity,
+  CheckCircle2,
+  Compass,
+  Network,
+  Apple,
+  Calendar,
+  ArrowLeft,
+  Code2,
+  Layers,
+  Database,
+  Terminal,
+  BookOpen,
 } from 'lucide-react';
 
 export interface FeedTabItem {
   id: string;
   label: string;
-  tag: string | null; // null para 'Principal' e 'Reposts'
+  tag: string | null;
   color: string;
   isDefault: boolean;
+  icon?: string | null;
+  visibility?: PostVisibility;
+  templateType?: TopicTemplateType;
   bannerUrl?: string | null;
+  bannerR2Key?: string | null;
   descriptionBlocks?: PostBlock[] | null;
+  workspaceData?: TopicWorkspaceData | null;
+  inDevelopment?: boolean;
 }
 
 export const DEFAULT_TABS: FeedTabItem[] = [
   { id: 'principal', label: 'Principal', tag: null, color: '#2563eb', isDefault: true },
-  { id: 'artigue', label: 'Artigue', tag: 'artigue', color: '#2563eb', isDefault: true },
-  { id: 'professional', label: 'Professional', tag: 'professional', color: '#2563eb', isDefault: true },
-  { id: 'reposts', label: 'Reposts', tag: null, color: '#2563eb', isDefault: true },
-  { id: 'jardim', label: 'Jardim', tag: 'jardim', color: '#2563eb', isDefault: true },
+  { id: 'professional', label: 'Professional', tag: 'professional', color: '#71717a', isDefault: true, inDevelopment: true },
+  { id: 'jardim', label: 'Jardim', tag: 'jardim', color: '#71717a', isDefault: true, inDevelopment: true },
+  { id: 'reposts', label: 'Reposts', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
 ];
 
 const TOPIC_COLORS = [
-  '#2563eb', // Azul Metálico
-  '#E63946', // Vermelho Targaryen / Crimson
-  '#fbbc05', // Amarelo Vibrante
-  '#1DB954', // Verde Esmeralda
-  '#a855f7', // Roxo Real
-  '#fb923c', // Laranja Fogo
-  '#38bdf8', // Azul Gelo
+  '#2563eb', 
+  '#38bdf8',
+  '#10b981',
+  '#a855f7', 
+  '#f59e0b',
+  '#E63946',
+  '#71717a',
 ];
 
-const HIGHLIGHT_COLORS = [
-  { name: 'Azul', color: 'rgba(37, 99, 235, 0.42)' },
-  { name: 'Amarelo', color: 'rgba(250, 204, 21, 0.35)' },
-  { name: 'Vermelho', color: 'rgba(239, 68, 68, 0.38)' },
-  { name: 'Verde', color: 'rgba(29, 185, 84, 0.35)' },
+export type TopicIconKey =
+  | 'file'
+  | 'target'
+  | 'activity'
+  | 'check'
+  | 'compass'
+  | 'network'
+  | 'nutrition'
+  | 'calendar'
+  | 'database'
+  | 'code'
+  | 'layers'
+  | 'book';
+
+const TOPIC_ICON_OPTIONS: {
+  key: TopicIconKey;
+  label: string;
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+}[] = [
+  { key: 'file', label: 'Página', Icon: FileText },
+  { key: 'target', label: 'Metas', Icon: Target },
+  { key: 'activity', label: 'Hábitos', Icon: Activity },
+  { key: 'check', label: 'Tarefas', Icon: CheckCircle2 },
+  { key: 'compass', label: 'Roadmap', Icon: Compass },
+  { key: 'network', label: 'Brainstorm', Icon: Network },
+  { key: 'database', label: 'Dados', Icon: Database },
+  { key: 'code', label: 'Código', Icon: Code2 },
+  { key: 'layers', label: 'Sistema', Icon: Layers },
+  { key: 'book', label: 'Estudos', Icon: BookOpen },
+  { key: 'nutrition', label: 'Nutrição', Icon: Apple },
+  { key: 'calendar', label: 'Agenda', Icon: Calendar },
 ];
 
-function createDescBlock(type: PostBlockType = 'paragraph'): PostBlock {
-  return {
-    id: `tblk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    type,
-    html: '',
-    fontStyle: 'sans',
-    align: 'left',
-    calloutIcon: '🐉',
-  };
+export function renderTopicVectorIcon(
+  iconKey?: string | null,
+  className = 'w-3.5 h-3.5',
+  color?: string
+) {
+  const found = TOPIC_ICON_OPTIONS.find((item) => item.key === iconKey);
+  if (!found) {
+    return (
+      <span
+        style={{ backgroundColor: color || '#2563eb' }}
+        className="w-2 h-2 rounded-full shrink-0 inline-block"
+      />
+    );
+  }
+  const IconComponent = found.Icon;
+  return <IconComponent className={className} style={{ color }} />;
 }
 
-interface MiniNotionBlockProps {
-  block: PostBlock;
-  onFocus: () => void;
-  onChangeHtml: (html: string) => void;
-  onEnter: () => void;
-  onBackspaceEmpty: () => void;
-}
+export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWorkspaceData {
+  const uid = () => Math.random().toString(36).slice(2, 8);
 
-function MiniNotionEditable({
-  block,
-  onFocus,
-  onChangeHtml,
-  onEnter,
-  onBackspaceEmpty,
-}: MiniNotionBlockProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  switch (template) {
+    case 'goals':
+      return {
+        goals: [
+          {
+            id: `goal-${uid()}`,
+            title: 'Lançamento da versão 2.0 da plataforma',
+            targetValue: '100% concluído',
+            priority: 'high',
+            progress: 65,
+          },
+        ],
+      };
 
-  useEffect(() => {
-    if (!ref.current) return;
-    if (document.activeElement !== ref.current && ref.current.innerHTML !== (block.html || '')) {
-      ref.current.innerHTML = block.html || '';
+    case 'habits':
+      return {
+        habitColumns: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+        habits: [
+          { id: `hab-${uid()}`, name: 'Estudo técnico', checks: [true, true, true, false, false, false, false] },
+        ],
+      };
+
+    case 'tasks':
+      return {
+        tasks: [
+          {
+            id: `tsk-${uid()}`,
+            title: 'Estruturar arquitetura modular de blocos',
+            status: 'done',
+            assignee: 'Victor Poiani',
+            priority: 'high',
+          },
+        ],
+      };
+
+    case 'diet':
+      return {
+        waterGlasses: 4,
+        dietMeals: [
+          {
+            id: `meal-${uid()}`,
+            time: '07:30 · Café da Manhã',
+            foods: 'Ovos mexidos e aveia',
+            calories: 420,
+            proteinGrams: 28,
+            completed: true,
+          },
+        ],
+      };
+
+    case 'agenda':
+      return {
+        agendaEvents: [
+          {
+            id: `evt-${uid()}`,
+            date: new Date().toISOString().slice(0, 10),
+            time: '19:00',
+            title: 'Sistemas de Informação — UFV-CRP',
+            location: 'Campus Rio Paranaíba',
+            category: 'Académico',
+            color: '#38bdf8',
+          },
+        ],
+      };
+
+    case 'roadmap':
+      return {
+        roadmapSteps: [
+          {
+            id: `step-${uid()}`,
+            phase: 'Fase 01 · Fundação',
+            title: 'Arquitetura & Design System',
+            description: 'Definição da base visual.',
+            status: 'completed',
+          },
+        ],
+      };
+
+    case 'mindmap': {
+      const centerId = 'node-center';
+      return {
+        mindMapNodes: [
+          {
+            id: centerId,
+            label: 'Conceito Central',
+            note: 'Núcleo principal',
+            x: 50,
+            y: 45,
+            color: '#2563eb',
+            icon: '00',
+          },
+        ],
+        mindMapEdges: [],
+      };
     }
-  }, [block.html, block.type]);
 
-  const fontCls =
-    block.fontStyle === 'serif'
-      ? 'font-serif'
-      : block.fontStyle === 'mono'
-      ? 'font-mono text-xs'
-      : 'font-sans';
+    case 'blank_db':
+      return {
+        customTable: [
+          ['Registo', 'Categoria', 'Status', 'Observações'],
+          ['Item 01', 'Arquitetura', 'Ativo', 'Especificação inicial'],
+        ],
+      };
 
-  const typeCls =
-    block.type === 'h2'
-      ? 'text-base font-extrabold text-primary'
-      : block.type === 'quote'
-      ? 'border-l-3 border-accent pl-3 italic text-secondary text-xs sm:text-sm'
-      : 'text-xs sm:text-sm text-primary leading-relaxed';
+    default:
+      return {};
+  }
+}
 
-  return (
-    <div
-      ref={ref}
-      contentEditable
-      suppressContentEditableWarning
-      data-placeholder="Escreva a introdução ou regras deste tópico (selecione o texto para grifar ou formatar)..."
-      onFocus={onFocus}
-      onInput={(e) => {
-        const html = e.currentTarget.innerHTML;
-        onChangeHtml(html === '<br>' ? '' : html);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          onEnter();
-        } else if (
-          e.key === 'Backspace' &&
-          e.currentTarget.innerText.replace(/\n/g, '').trim().length === 0
-        ) {
-          e.preventDefault();
-          onBackspaceEmpty();
-        }
-      }}
-      className={`notion-editable w-full focus:outline-none break-words ${fontCls} ${typeCls}`}
-    />
-  );
+function extractTopicMetadata(ct: CustomTopic): {
+  icon: string | null;
+  visibility: PostVisibility;
+  templateType: TopicTemplateType;
+  workspaceData: TopicWorkspaceData;
+} {
+  const firstBlockMeta = (ct.description_blocks?.[0] as any)?._topicMeta;
+  const icon = ct.icon || firstBlockMeta?.icon || 'file';
+  const visibility: PostVisibility =
+    ct.visibility === 'private' ||
+    firstBlockMeta?.visibility === 'private' ||
+    ct.description_blocks?.[0]?.postVisibility === 'private'
+      ? 'private'
+      : 'public';
+  const templateType: TopicTemplateType =
+    ct.template_type || firstBlockMeta?.template_type || 'blank_page';
+  const workspaceData: TopicWorkspaceData =
+    ct.workspace_data && Object.keys(ct.workspace_data).length > 0
+      ? ct.workspace_data
+      : firstBlockMeta?.workspace_data || {};
+
+  return { icon, visibility, templateType, workspaceData };
 }
 
 interface TopicTabsManagerProps {
@@ -152,17 +274,26 @@ export function TopicTabsManager({
   const [customTopics, setCustomTopics] = useState<CustomTopic[]>([]);
   const [expandCreate, setExpandCreate] = useState(false);
 
-  // Estados do formulário de Novo Tópico
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibility, setVisibility] = useState<PostVisibility>('private');
+  const [showVisibilityMenu, setShowVisibilityMenu] = useState(false);
+
+  const [selectedTemplate, setSelectedTemplate] = useState<{
+    type: TopicTemplateType;
+    defaultTitle: string;
+    defaultIcon: TopicIconKey;
+    defaultColor: string;
+    subtitle: string;
+  } | null>(null);
+
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
-  const [color, setColor] = useState('#E63946');
+  const [iconKey, setIconKey] = useState<TopicIconKey>('file');
+  const [color, setColor] = useState('#2563eb');
+  const [introText, setIntroText] = useState('');
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerR2Key, setBannerR2Key] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [descBlocks, setDescBlocks] = useState<PostBlock[]>(() => [
-    createDescBlock('paragraph'),
-  ]);
-  const [activeBlockId, setActiveBlockId] = useState('');
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -183,51 +314,130 @@ export function TopicTabsManager({
     }
   }
 
+  const visibleCustomTopics = customTopics.filter((ct) => {
+    const meta = extractTopicMetadata(ct);
+    if (!isAdmin && meta.visibility === 'private') return false;
+    return true;
+  });
+
   const allTabs: FeedTabItem[] = [
     ...DEFAULT_TABS,
-    ...customTopics.map((ct) => ({
-      id: ct.id,
-      label: ct.name,
-      tag: ct.tag,
-      color: ct.color || '#2563eb',
-      isDefault: false,
-      bannerUrl: ct.banner_url,
-      descriptionBlocks: ct.description_blocks,
-    })),
+    ...visibleCustomTopics.map((ct) => {
+      const meta = extractTopicMetadata(ct);
+      return {
+        id: ct.id,
+        label: ct.name,
+        tag: ct.tag,
+        color: ct.color || '#2563eb',
+        isDefault: false,
+        icon: meta.icon,
+        visibility: meta.visibility,
+        templateType: meta.templateType,
+        bannerUrl: ct.banner_url,
+        bannerR2Key: ct.banner_r2_key,
+        descriptionBlocks: ct.description_blocks,
+        workspaceData: meta.workspaceData,
+      };
+    }),
   ];
 
   const currentTab = allTabs.find((t) => t.id === activeTabId) || DEFAULT_TABS[0];
-  const activeBlock =
-    descBlocks.find((b) => b.id === activeBlockId) || descBlocks[0];
 
-  function applyInlineFormat(command: string, value?: string) {
-    document.execCommand('styleWithCSS', false, 'true');
-    document.execCommand(command, false, value);
-  }
+  const templatesCatalog = useMemo(
+    () => [
+      {
+        type: 'goals' as TopicTemplateType,
+        section: 'data_sources',
+        title: 'Controle de metas',
+        subtitle: 'Acompanhe prioridades, indicadores finais e progresso.',
+        defaultIcon: 'target' as TopicIconKey,
+        defaultColor: '#2563eb',
+      },
+      {
+        type: 'habits' as TopicTemplateType,
+        section: 'data_sources',
+        title: 'Monitoramento de hábitos',
+        subtitle: 'Registo semanal de consistência, estudo e condicionamento.',
+        defaultIcon: 'activity' as TopicIconKey,
+        defaultColor: '#10b981',
+      },
+      {
+        type: 'tasks' as TopicTemplateType,
+        section: 'models',
+        title: 'Controle de tarefas',
+        subtitle: 'Gestão direta de entregas, status de execução e responsáveis.',
+        defaultIcon: 'check' as TopicIconKey,
+        defaultColor: '#10b981',
+      },
+      {
+        type: 'roadmap' as TopicTemplateType,
+        section: 'models',
+        title: 'Projetos & Roadmaps',
+        subtitle: 'Planeamento estruturado por fases, marcos técnicos e status.',
+        defaultIcon: 'compass' as TopicIconKey,
+        defaultColor: '#38bdf8',
+      },
+      {
+        type: 'mindmap' as TopicTemplateType,
+        section: 'models',
+        title: 'Mapa Mental & Brainstorm',
+        subtitle: 'Quadro espacial 2D para arquitetura de ideias, nós e mídias.',
+        defaultIcon: 'network' as TopicIconKey,
+        defaultColor: '#a855f7',
+      },
+      {
+        type: 'diet' as TopicTemplateType,
+        section: 'models',
+        title: 'Plano Nutricional',
+        subtitle: 'Controlo diário de refeições, macronutrientes e hidratação.',
+        defaultIcon: 'nutrition' as TopicIconKey,
+        defaultColor: '#f59e0b',
+      },
+      {
+        type: 'agenda' as TopicTemplateType,
+        section: 'models',
+        title: 'Agenda & Cronograma',
+        subtitle: 'Registo cronológico de aulas, reuniões, prazos e eventos.',
+        defaultIcon: 'calendar' as TopicIconKey,
+        defaultColor: '#E63946',
+      },
+    ],
+    []
+  );
 
-  function updateDescBlock(id: string, patch: Partial<PostBlock>) {
-    setDescBlocks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...patch } : b))
+  const q = searchQuery.trim().toLowerCase();
+  const filteredCatalog = templatesCatalog.filter(
+    (item) =>
+      !q ||
+      item.title.toLowerCase().includes(q) ||
+      item.subtitle.toLowerCase().includes(q)
+  );
+
+  const dataSourceItems = filteredCatalog.filter((i) => i.section === 'data_sources');
+  const modelItems = filteredCatalog.filter((i) => i.section === 'models');
+
+  function handleChooseTemplate(
+    type: TopicTemplateType,
+    defaultTitle: string,
+    defaultIcon: TopicIconKey,
+    defaultColor: string,
+    subtitle: string
+  ) {
+    setSelectedTemplate({ type, defaultTitle, defaultIcon, defaultColor, subtitle });
+    setName(defaultTitle === 'Página vazia' ? '' : defaultTitle);
+    setTag(
+      defaultTitle === 'Página vazia'
+        ? ''
+        : defaultTitle
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '')
+            .slice(0, 22)
     );
-  }
-
-  function insertDescBlockAfter(id: string, type: PostBlockType = 'paragraph') {
-    const next = createDescBlock(type);
-    setDescBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id);
-      const copy = [...prev];
-      copy.splice(idx + 1, 0, next);
-      return copy;
-    });
-    setActiveBlockId(next.id);
-  }
-
-  function removeDescBlock(id: string) {
-    setDescBlocks((prev) =>
-      prev.length <= 1
-        ? [createDescBlock('paragraph')]
-        : prev.filter((b) => b.id !== id)
-    );
+    setIconKey(defaultIcon);
+    setColor(defaultColor);
+    setIntroText(subtitle);
   }
 
   async function handleBannerUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -235,91 +445,181 @@ export function TopicTabsManager({
     if (!file) return;
 
     setUploadingBanner(true);
-    const ext = file.name.split('.').pop();
-    const fileName = `topics/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    try {
+      const presignRes = await fetch('/api/upload/r2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type || 'image/jpeg',
+          originalSize: file.size,
+          compressedSize: file.size,
+          isGif: file.type === 'image/gif',
+        }),
+      });
 
-    let bucket = 'cover';
-    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-    if (error) {
-      bucket = 'posts';
-      const { error: fallbackErr } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file);
-      if (fallbackErr) {
-        setUploadingBanner(false);
-        alert('Erro ao enviar banner: ' + fallbackErr.message);
-        return;
+      const presignData = await presignRes.json();
+
+      if (presignRes.ok && presignData.uploadUrl) {
+        const putRes = await fetch(presignData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'image/jpeg' },
+          body: file,
+        });
+
+        if (putRes.ok) {
+          setBannerUrl(presignData.publicUrl);
+          setBannerR2Key(presignData.r2Key || null);
+          setUploadingBanner(false);
+          return;
+        }
       }
-    }
 
-    setUploadingBanner(false);
-    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    setBannerUrl(data.publicUrl);
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `topics/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      let bucket = 'cover';
+      const { error } = await supabase.storage.from(bucket).upload(fileName, file);
+      if (error) {
+        bucket = 'posts';
+        await supabase.storage.from(bucket).upload(fileName, file);
+      }
+      const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+      setBannerUrl(data.publicUrl);
+    } catch {
+      alert('Erro ao enviar imagem de capa.');
+    } finally {
+      setUploadingBanner(false);
+    }
   }
 
   async function handleCreateTopic(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedTemplate || saving) return;
+
     const cleanName = name.trim();
     const cleanTag = (tag.trim() || cleanName)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/^#/, '')
-      .replace(/\s+/g, '');
+      .replace(/[^a-z0-9]/g, '');
 
-    if (!cleanName || !cleanTag || saving) return;
+    if (!cleanName || !cleanTag) return;
 
     setSaving(true);
 
-    const validBlocks = descBlocks.filter(
-      (b) => (b.html || '').replace(/<[^>]*>/g, '').trim().length > 0
-    );
+    const workspaceData = buildInitialWorkspaceData(selectedTemplate.type);
 
-    const { data, error } = await supabase
+    const descBlocks: PostBlock[] = [
+      {
+        id: `tblk-meta-${Date.now()}`,
+        type: 'callout',
+        calloutIcon: iconKey,
+        html: introText.trim() || selectedTemplate.subtitle,
+        fontStyle: 'sans',
+        align: 'left',
+        postVisibility: visibility,
+        ...({
+          _topicMeta: {
+            icon: iconKey,
+            visibility,
+            template_type: selectedTemplate.type,
+            workspace_data: workspaceData,
+          },
+        } as any),
+      },
+    ];
+
+    const fullPayload = {
+      name: cleanName,
+      tag: cleanTag,
+      color,
+      icon: iconKey,
+      visibility,
+      template_type: selectedTemplate.type,
+      banner_url: bannerUrl,
+      banner_r2_key: bannerR2Key,
+      description_blocks: descBlocks,
+      workspace_data: workspaceData,
+    };
+
+    let { data, error } = await supabase
       .from('custom_topics')
-      .insert({
-        name: cleanName,
-        tag: cleanTag,
-        color,
-        banner_url: bannerUrl,
-        description_blocks: validBlocks,
-      })
+      .insert(fullPayload)
       .select()
       .single();
 
+    if (error) {
+      const legacyRetry = await supabase
+        .from('custom_topics')
+        .insert({
+          name: cleanName,
+          tag: cleanTag,
+          color,
+          banner_url: bannerUrl,
+          description_blocks: descBlocks,
+        })
+        .select()
+        .single();
+
+      data = legacyRetry.data;
+      error = legacyRetry.error;
+    }
+
     setSaving(false);
 
-    if (error) {
-      alert('Erro ao criar tópico: ' + error.message);
+    if (error || !data) {
+      alert('Erro ao criar tópico: ' + (error?.message || 'Erro desconhecido'));
       return;
     }
 
-    if (data) {
-      const created = data as CustomTopic;
-      setCustomTopics((prev) => [...prev, created]);
-      setName('');
-      setTag('');
-      setBannerUrl(null);
-      setDescBlocks([createDescBlock('paragraph')]);
-      setExpandCreate(false);
+    const created: CustomTopic = {
+      ...(data as CustomTopic),
+      icon: iconKey,
+      visibility,
+      template_type: selectedTemplate.type,
+      workspace_data: workspaceData,
+    };
 
-      onSelectTab({
-        id: created.id,
-        label: created.name,
-        tag: created.tag,
-        color: created.color,
-        isDefault: false,
-        bannerUrl: created.banner_url,
-        descriptionBlocks: created.description_blocks,
-      });
-    }
+    setCustomTopics((prev) => [...prev, created]);
+    setSelectedTemplate(null);
+    setName('');
+    setTag('');
+    setBannerUrl(null);
+    setBannerR2Key(null);
+    setExpandCreate(false);
+
+    onSelectTab({
+      id: created.id,
+      label: created.name,
+      tag: created.tag,
+      color: created.color,
+      isDefault: false,
+      icon: iconKey,
+      visibility,
+      templateType: selectedTemplate.type,
+      bannerUrl: created.banner_url,
+      bannerR2Key: created.banner_r2_key,
+      descriptionBlocks: created.description_blocks,
+      workspaceData,
+    });
   }
 
   async function handleDeleteTopic(topicToDelete: FeedTabItem) {
-    if (topicToDelete.isDefault) return; // Proteção absoluta para tópicos padrão
+    if (topicToDelete.isDefault) return;
 
     const confirmed = confirm(
-      `Excluir o tópico "${topicToDelete.label}" (#${topicToDelete.tag})? Os posts com essa tag continuarão salvos no feed Principal.`
+      `Excluir a página "${topicToDelete.label}" (#${topicToDelete.tag})? Os posts com essa tag continuarão salvos no feed Principal.`
     );
     if (!confirmed) return;
+
+    if (topicToDelete.bannerR2Key) {
+      fetch('/api/upload/r2', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ r2Key: topicToDelete.bannerR2Key }),
+      }).catch(() => {});
+    }
 
     const { error } = await supabase
       .from('custom_topics')
@@ -338,35 +638,52 @@ export function TopicTabsManager({
 
   return (
     <div className="border-b border-border bg-background">
-      {/* 1. Barra de Abas Horizontais Responsiva + Botão '+' */}
+      {/* 1. Barra de Abas Horizontai */}
       <div className="flex items-center justify-between px-4 sm:px-6 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-5 sm:gap-7 min-w-max">
           {allTabs.map((tab) => {
             const isActive = tab.id === currentTab.id;
+            const isDev = (tab as any).inDevelopment;
+
             return (
               <div key={tab.id} className="relative flex items-center group">
                 <button
                   type="button"
-                  onClick={() => onSelectTab(tab)}
+                  onClick={() => {
+                    if (isDev) {
+                      alert(`A aba "${tab.label}" está atualmente em desenvolvimento.`);
+                      return;
+                    }
+                    onSelectTab(tab);
+                  }}
                   style={{
                     color: isActive ? tab.color : undefined,
                   }}
                   className={`py-3.5 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                    isActive
+                    isDev
+                      ? 'opacity-60 cursor-not-allowed text-secondary hover:text-secondary'
+                      : isActive
                       ? 'text-primary'
                       : 'text-secondary hover:text-primary'
                   }`}
                 >
-                  {!tab.isDefault && (
-                    <span
-                      style={{ backgroundColor: tab.color }}
-                      className="w-2 h-2 rounded-full shrink-0"
-                    />
-                  )}
+                  {!tab.isDefault &&
+                    renderTopicVectorIcon(tab.icon, 'w-3.5 h-3.5 shrink-0', tab.color)}
                   <span>{tab.label}</span>
+                  
+                  {isDev && (
+                    <span className="px-1.5 py-0.2 rounded bg-elevated border border-border text-[9px] font-mono font-medium text-muted">
+                      Em breve
+                    </span>
+                  )}
+
+                  {!tab.isDefault && tab.visibility === 'private' && !isDev && (
+                    <span title="Página Particular" className="inline-flex items-center">
+                      <Lock className="w-3 h-3 text-muted shrink-0" />
+                    </span>
+                  )}
                 </button>
 
-                {/* Botão rápido de excluir nas abas criadas pelo usuário (exceto padrão) */}
                 {isAdmin && !tab.isDefault && (
                   <button
                     type="button"
@@ -374,415 +691,852 @@ export function TopicTabsManager({
                       e.stopPropagation();
                       handleDeleteTopic(tab);
                     }}
-                    title={`Excluir tópico ${tab.label}`}
+                    title={`Excluir página ${tab.label}`}
                     className="ml-1 p-0.5 rounded text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 )}
 
-                {/* Indicador inferior colorido ativo */}
-                {isActive && (
+                {isActive && !isDev && (
                   <span
                     style={{ backgroundColor: tab.color }}
-                    className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
                   />
                 )}
               </div>
             );
           })}
 
-          {/* Botão '+' para Criar Novo Tópico (Mesma dinâmica de card expansível) */}
           {isAdmin && (
             <button
               type="button"
-              onClick={() => setExpandCreate(!expandCreate)}
-              title="Criar novo tópico personalizado"
-              className={`w-7 h-7 my-2 rounded-full border flex items-center justify-center transition-colors shrink-0 ${
-                expandCreate
-                  ? 'bg-accent text-white border-accent'
-                  : 'bg-elevated border-border text-secondary hover:text-accent hover:border-accent'
-              }`}
+              onClick={() => {
+                setSelectedTemplate(null);
+                setExpandCreate(true);
+              }}
+              title="Nova página ou workspace"
+              className="w-7 h-7 my-2 rounded-full border bg-elevated border-border text-secondary hover:text-accent hover:border-accent flex items-center justify-center transition-colors shrink-0"
             >
-              {expandCreate ? (
-                <X className="w-3.5 h-3.5" />
-              ) : (
-                <Plus className="w-3.5 h-3.5" />
-              )}
+              <Plus className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. Card Expansível Inline: Criar Novo Tópico (Sem Modal) */}
+      {/* modal adaptadoa */}
       {isAdmin && expandCreate && (
-        <form
-          onSubmit={handleCreateTopic}
-          className="mx-4 sm:mx-6 my-4 p-4 sm:p-5 rounded-2xl bg-surface border border-border space-y-4 shadow-xl"
+        <div
+          onClick={() => setExpandCreate(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-accent uppercase tracking-wider">
-              Criar Novo Tópico no Feed
-            </span>
-            <button
-              type="button"
-              onClick={() => setExpandCreate(false)}
-              className="text-muted hover:text-primary"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-3xl rounded-2xl bg-surface border border-border text-primary shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-colors"
+          >
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-surface shrink-0">
+              <div className="flex items-center gap-2">
+                {selectedTemplate ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate(null)}
+                    className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Modelos</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setExpandCreate(false)}
+                    title="Fechar"
+                    className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
 
-          {/* Nome, Hashtag específica e Cor de destaque */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] text-muted block mb-1">
-                Nome da Aba (ex: Game of Thrones)
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={32}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (!tag) {
-                    setTag(
-                      e.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]/g, '')
-                    );
-                  }
-                }}
-                placeholder="Ex: Game of Thrones"
-                className="w-full bg-elevated border border-border rounded-xl px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
-              />
-            </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowVisibilityMenu(!showVisibilityMenu)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-elevated text-xs text-secondary transition-colors"
+                  >
+                    <span className="text-muted">Adicionar a</span>
+                    {visibility === 'private' ? (
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-primary">
+                        <Lock className="w-3.5 h-3.5 text-secondary" />
+                        Particular
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-primary">
+                        <Globe className="w-3.5 h-3.5 text-accent" />
+                        Público
+                      </span>
+                    )}
+                    <ChevronDown className="w-3.5 h-3.5 text-muted" />
+                  </button>
 
-            <div>
-              <label className="text-[11px] text-muted block mb-1">
-                Hashtag vinculada (filtra os posts deste tópico)
-              </label>
-              <div className="flex items-center bg-elevated border border-border rounded-xl px-3 py-2 focus-within:border-accent">
-                <Hash className="w-3.5 h-3.5 text-accent mr-1 shrink-0" />
-                <input
-                  type="text"
-                  required
-                  maxLength={28}
-                  value={tag}
-                  onChange={(e) =>
-                    setTag(
-                      e.target.value
-                        .toLowerCase()
-                        .replace(/^#/, '')
-                        .replace(/\s+/g, '')
-                    )
-                  }
-                  placeholder="gameofthrones"
-                  className="w-full bg-transparent text-xs text-primary focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
+                  {showVisibilityMenu && (
+                    <div className="absolute left-0 top-full mt-1.5 w-60 p-1.5 rounded-xl bg-surface border border-border shadow-2xl z-30 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVisibility('private');
+                          setShowVisibilityMenu(false);
+                        }}
+                        className={`w-full flex items-start gap-2.5 p-2 rounded-lg text-left transition-colors ${
+                          visibility === 'private'
+                            ? 'bg-elevated'
+                            : 'hover:bg-elevated/60'
+                        }`}
+                      >
+                        <Lock className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-primary">
+                            Particular
+                          </p>
+                          <p className="text-[10px] text-muted">
+                            Visível exclusivamente na sua sessão de autor.
+                          </p>
+                        </div>
+                        {visibility === 'private' && (
+                          <Check className="w-3.5 h-3.5 text-accent shrink-0 mt-1" />
+                        )}
+                      </button>
 
-          {/* Seletor de Cor de Destaque */}
-          <div>
-            <label className="text-[11px] text-muted block mb-1.5">
-              Cor de destaque do tópico
-            </label>
-            <div className="flex flex-wrap items-center gap-2.5">
-              {TOPIC_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  style={{ backgroundColor: c }}
-                  className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                    color.toLowerCase() === c.toLowerCase()
-                      ? 'border-white scale-110'
-                      : 'border-transparent opacity-75 hover:opacity-100'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Upload de Banner Opcional do Tópico */}
-          <div>
-            <label className="text-[11px] text-muted block mb-1.5">
-              Banner superior do tópico (opcional)
-            </label>
-            {!bannerUrl ? (
-              <div
-                onClick={() => bannerInputRef.current?.click()}
-                className="h-28 rounded-xl bg-elevated border border-dashed border-border hover:border-accent flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <ImagePlus className="w-5 h-5 text-accent" />
-                <span className="text-xs font-semibold text-secondary">
-                  {uploadingBanner
-                    ? 'Enviando banner...'
-                    : 'Clique para adicionar uma imagem de capa ao tópico'}
-                </span>
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBannerUpload}
-                  className="hidden"
-                />
-              </div>
-            ) : (
-              <div className="relative h-36 rounded-xl overflow-hidden border border-border group">
-                <img
-                  src={bannerUrl}
-                  alt="Preview do banner"
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => setBannerUrl(null)}
-                  className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/70 text-white text-[11px] font-semibold flex items-center gap-1 hover:bg-black"
-                >
-                  <X className="w-3 h-3" />
-                  <span>Remover capa</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Mini Editor Estilo Notion para a Descrição do Tópico */}
-          <div className="space-y-2">
-            <label className="text-[11px] text-muted block">
-              Apresentação do Tópico (Editor Estilo Notion — opcional)
-            </label>
-
-            <div className="flex flex-wrap items-center gap-1 p-1.5 rounded-xl bg-elevated border border-border">
-              {(
-                [
-                  { key: 'sans', label: 'Sans' },
-                  { key: 'serif', label: 'Serif' },
-                  { key: 'mono', label: 'Mono' },
-                ] as { key: FontStyleType; label: string }[]
-              ).map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    if (activeBlock)
-                      updateDescBlock(activeBlock.id, { fontStyle: f.key });
-                  }}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                    (activeBlock?.fontStyle || 'sans') === f.key
-                      ? 'bg-accent text-white'
-                      : 'text-secondary hover:text-primary'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-
-              <div className="h-3.5 w-px bg-border mx-1" />
-
-              <button
-                type="button"
-                title="Negrito"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  applyInlineFormat('bold');
-                }}
-                className="p-1 rounded text-secondary hover:text-primary"
-              >
-                <Bold className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Itálico"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  applyInlineFormat('italic');
-                }}
-                className="p-1 rounded text-secondary hover:text-primary"
-              >
-                <Italic className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Sublinhar"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  applyInlineFormat('underline');
-                }}
-                className="p-1 rounded text-secondary hover:text-primary"
-              >
-                <Underline className="w-3.5 h-3.5" />
-              </button>
-
-              {HIGHLIGHT_COLORS.map((hc) => (
-                <button
-                  key={hc.name}
-                  type="button"
-                  title={`Grifar ${hc.name}`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    applyInlineFormat('hiliteColor', hc.color);
-                  }}
-                  style={{ backgroundColor: hc.color }}
-                  className="w-4 h-4 rounded-full border border-white/20 mx-0.5"
-                />
-              ))}
-
-              <div className="h-3.5 w-px bg-border mx-1" />
-
-              <button
-                type="button"
-                title="Subtítulo"
-                onClick={() =>
-                  activeBlock &&
-                  updateDescBlock(activeBlock.id, {
-                    type: activeBlock.type === 'h2' ? 'paragraph' : 'h2',
-                  })
-                }
-                className="p-1 rounded text-secondary hover:text-accent"
-              >
-                <Heading2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Citação"
-                onClick={() =>
-                  activeBlock &&
-                  updateDescBlock(activeBlock.id, {
-                    type: activeBlock.type === 'quote' ? 'paragraph' : 'quote',
-                  })
-                }
-                className="p-1 rounded text-secondary hover:text-accent"
-              >
-                <Quote className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Callout"
-                onClick={() =>
-                  activeBlock &&
-                  updateDescBlock(activeBlock.id, {
-                    type:
-                      activeBlock.type === 'callout' ? 'paragraph' : 'callout',
-                  })
-                }
-                className="p-1 rounded text-secondary hover:text-accent"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="p-3 rounded-xl bg-elevated border border-border space-y-2">
-              {descBlocks.map((b, idx) => (
-                <div
-                  key={b.id}
-                  draggable
-                  onDragStart={() => setDraggedIdx(idx)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (draggedIdx === null || draggedIdx === idx) return;
-                    setDescBlocks((prev) => {
-                      const copy = [...prev];
-                      const [moved] = copy.splice(draggedIdx, 1);
-                      copy.splice(idx, 0, moved);
-                      return copy;
-                    });
-                    setDraggedIdx(null);
-                  }}
-                  className="flex items-start gap-2 group"
-                >
-                  <GripVertical className="w-3.5 h-3.5 text-muted mt-1 cursor-grab opacity-40 group-hover:opacity-100 shrink-0" />
-                  {b.type === 'callout' ? (
-                    <div className="flex-1 p-2.5 rounded-lg bg-surface border border-border flex items-start gap-2">
-                      <input
-                        type="text"
-                        maxLength={2}
-                        value={b.calloutIcon || '🐉'}
-                        onChange={(e) =>
-                          updateDescBlock(b.id, { calloutIcon: e.target.value })
-                        }
-                        className="w-6 bg-transparent text-center focus:outline-none"
-                      />
-                      <MiniNotionEditable
-                        block={b}
-                        onFocus={() => setActiveBlockId(b.id)}
-                        onChangeHtml={(html) => updateDescBlock(b.id, { html })}
-                        onEnter={() => insertDescBlockAfter(b.id)}
-                        onBackspaceEmpty={() => removeDescBlock(b.id)}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1">
-                      <MiniNotionEditable
-                        block={b}
-                        onFocus={() => setActiveBlockId(b.id)}
-                        onChangeHtml={(html) => updateDescBlock(b.id, { html })}
-                        onEnter={() => insertDescBlockAfter(b.id)}
-                        onBackspaceEmpty={() => removeDescBlock(b.id)}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVisibility('public');
+                          setShowVisibilityMenu(false);
+                        }}
+                        className={`w-full flex items-start gap-2.5 p-2 rounded-lg text-left transition-colors ${
+                          visibility === 'public'
+                            ? 'bg-elevated'
+                            : 'hover:bg-elevated/60'
+                        }`}
+                      >
+                        <Globe className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-primary">
+                            Público
+                          </p>
+                          <p className="text-[10px] text-muted">
+                            Disponível na navegação principal do seu perfil.
+                          </p>
+                        </div>
+                        {visibility === 'public' && (
+                          <Check className="w-3.5 h-3.5 text-accent shrink-0 mt-1" />
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
-              ))}
+              </div>
+
+              {!selectedTemplate && (
+                <div className="relative w-44 sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar modelo..."
+                    className="w-full bg-elevated border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+                  />
+                </div>
+              )}
+
+              <div className="w-6 hidden sm:block" />
+            </div>
+
+            {/* Corpo da janela */}
+            <div className="p-5 sm:p-8 overflow-y-auto space-y-7 flex-1 bg-background/40">
+              {!selectedTemplate ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleChooseTemplate(
+                          'blank_page',
+                          'Página vazia',
+                          'file',
+                          '#2563eb',
+                          'Tópico livre com editor em grade de 12 colunas e publicações.'
+                        )
+                      }
+                      className="group p-4 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-accent/60 text-left transition-all flex flex-col justify-between h-24 shadow-sm"
+                    >
+                      <FileText className="w-5 h-5 text-secondary group-hover:text-accent transition-colors" />
+                      <div>
+                        <p className="text-sm font-semibold text-primary">
+                          Página vazia
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          Feed de publicações com editor em grade
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleChooseTemplate(
+                          'blank_db',
+                          'Nova base de dados',
+                          'database',
+                          '#38bdf8',
+                          'Tabela estruturada editável com pesquisa e exportação CSV.'
+                        )
+                      }
+                      className="group p-4 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-accent/60 text-left transition-all flex flex-col justify-between h-24 shadow-sm"
+                    >
+                      <Table2 className="w-5 h-5 text-secondary group-hover:text-accent transition-colors" />
+                      <div>
+                        <p className="text-sm font-semibold text-primary">
+                          Nova base de dados vazia
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          Tabela dinâmica de página inteira
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {dataSourceItems.length > 0 && (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-secondary">
+                        <ArrowUpRight className="w-4 h-4 text-accent" />
+                        <span>Fontes de dados existentes</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {dataSourceItems.some((i) => i.type === 'goals') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'goals',
+                                'Controle de metas',
+                                'target',
+                                '#2563eb',
+                                'Acompanhamento de objetivos, prioridades e progresso.'
+                              )
+                            }
+                            className="group rounded-2xl bg-blue-500/[0.08] hover:bg-blue-500/[0.14] border border-blue-500/25 hover:border-blue-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-56 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Controle de metas
+                              </h3>
+                              <p className="text-[11px] text-secondary mt-0.5">
+                                Indicadores de prioridade e barra de conclusão.
+                              </p>
+                            </div>
+                            <div className="mt-3 rounded-xl bg-surface border border-border p-3 space-y-2 shadow-sm">
+                              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-500">
+                                <Target className="w-3.5 h-3.5" />
+                                <span>Controle de metas</span>
+                              </div>
+                              <div className="grid grid-cols-3 text-[9px] text-muted border-b border-border pb-1">
+                                <span>Valor final</span>
+                                <span>Prioridade</span>
+                                <span>Progresso</span>
+                              </div>
+                              <div className="space-y-1.5 text-[9px]">
+                                <div className="grid grid-cols-3 items-center">
+                                  <span className="h-1.5 w-10 rounded bg-border" />
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold w-fit">
+                                    Alta
+                                  </span>
+                                  <div className="w-full h-1.5 rounded-full bg-elevated overflow-hidden">
+                                    <div className="w-3/4 h-full bg-emerald-500" />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 items-center">
+                                  <span className="h-1.5 w-12 rounded bg-border" />
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-semibold w-fit">
+                                    Média
+                                  </span>
+                                  <div className="w-full h-1.5 rounded-full bg-elevated overflow-hidden">
+                                    <div className="w-1/2 h-full bg-emerald-500" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        {dataSourceItems.some((i) => i.type === 'habits') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'habits',
+                                'Monitoramento de hábitos',
+                                'activity',
+                                '#10b981',
+                                'Registo semanal de consistência e disciplina.'
+                              )
+                            }
+                            className="group rounded-2xl bg-emerald-500/[0.08] hover:bg-emerald-500/[0.14] border border-emerald-500/25 hover:border-emerald-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-56 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Monitoramento de hábitos
+                              </h3>
+                              <p className="text-[11px] text-secondary mt-0.5">
+                                Matriz semanal de rotina e taxa de consistência.
+                              </p>
+                            </div>
+                            <div className="mt-3 rounded-xl bg-surface border border-border p-3 space-y-2 shadow-sm">
+                              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-500">
+                                <Activity className="w-3.5 h-3.5" />
+                                <span>Monitoramento de hábitos</span>
+                              </div>
+                              <div className="grid grid-cols-3 text-[9px] text-muted border-b border-border pb-1">
+                                <span>Estudo</span>
+                                <span>Alongamento</span>
+                                <span>Cardio</span>
+                              </div>
+                              <div className="space-y-1.5 pt-0.5">
+                                {[
+                                  [false, false, false],
+                                  [true, true, true],
+                                ].map((row, rIdx) => (
+                                  <div key={rIdx} className="grid grid-cols-3 items-center">
+                                    {row.map((checked, cIdx) => (
+                                      <span
+                                        key={cIdx}
+                                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                                          checked
+                                            ? 'bg-accent border-accent text-white'
+                                            : 'border-border bg-elevated'
+                                        }`}
+                                      >
+                                        {checked && <Check className="w-2.5 h-2.5" />}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {modelItems.length > 0 && (
+                    <div className="space-y-3.5 pt-2 border-t border-border">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-secondary">
+                        <Shapes className="w-4 h-4 text-accent" />
+                        <span>Modelos</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {modelItems.some((i) => i.type === 'tasks') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'tasks',
+                                'Controle de tarefas',
+                                'check',
+                                '#10b981',
+                                'Mantenha-se organizado com as tarefas, do seu jeito.'
+                              )
+                            }
+                            className="group rounded-2xl bg-emerald-500/[0.08] hover:bg-emerald-500/[0.14] border border-emerald-500/25 hover:border-emerald-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Controle de tarefas
+                              </h3>
+                              <p className="text-xs text-secondary mt-1">
+                                Mantenha-se organizado com as tarefas, do seu jeito.
+                              </p>
+                            </div>
+
+                            <div className="mt-4 rounded-xl bg-surface border border-border p-3 space-y-2 shadow-sm">
+                              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-500">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Controle de tarefas</span>
+                              </div>
+                              <div className="grid grid-cols-3 text-[9px] text-muted border-b border-border pb-1">
+                                <span>Tarefa</span>
+                                <span>Status</span>
+                                <span>Responsável</span>
+                              </div>
+                              <div className="space-y-1.5 text-[9px]">
+                                <div className="grid grid-cols-3 items-center">
+                                  <span className="h-1.5 w-12 rounded bg-border" />
+                                  <span className="px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 font-semibold w-fit">
+                                    Em andamento
+                                  </span>
+                                  <span className="w-4 h-4 rounded-full bg-elevated border border-border text-primary flex items-center justify-center font-semibold text-[8px]">
+                                    VP
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        {modelItems.some((i) => i.type === 'roadmap') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'roadmap',
+                                'Projetos & Roadmap',
+                                'compass',
+                                '#38bdf8',
+                                'Gerencie os projetos do início ao fim.'
+                              )
+                            }
+                            className="group rounded-2xl bg-sky-500/[0.08] hover:bg-sky-500/[0.14] border border-sky-500/25 hover:border-sky-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Projetos & Roadmaps
+                              </h3>
+                              <p className="text-xs text-secondary mt-1">
+                                Gerencie os projetos em Kanban ou Linha do Tempo.
+                              </p>
+                            </div>
+
+                            <div className="mt-4 rounded-xl bg-surface border border-border p-3 space-y-2.5 shadow-sm">
+                              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-500">
+                                <Compass className="w-3.5 h-3.5" />
+                                <span>Projetos</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[9px]">
+                                <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500 font-semibold">
+                                  Em andamento
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-semibold">
+                                  Done
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                                <div className="h-8 rounded bg-elevated border border-border p-1.5">
+                                  <div className="h-1.5 w-8 rounded bg-border" />
+                                </div>
+                                <div className="h-8 rounded bg-elevated border border-border p-1.5">
+                                  <div className="h-1.5 w-10 rounded bg-sky-500/70" />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        {modelItems.some((i) => i.type === 'mindmap') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'mindmap',
+                                'Mapa Mental & Arquitetura',
+                                'network',
+                                '#a855f7',
+                                'Quadro espacial 2D para estruturação de conceitos e conexões.'
+                              )
+                            }
+                            className="group rounded-2xl bg-purple-500/[0.08] hover:bg-purple-500/[0.14] border border-purple-500/25 hover:border-purple-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-primary">
+                                  Mapa Mental & Brainstorm
+                                </h3>
+                                <span className="px-2 py-0.5 rounded bg-surface border border-border text-secondary text-[9px] font-mono uppercase">
+                                  2D Canvas
+                                </span>
+                              </div>
+                              <p className="text-xs text-secondary mt-1">
+                                Estruture nós interligados, código, checklists e mídias.
+                              </p>
+                            </div>
+
+                            <div className="mt-4 rounded-xl bg-surface border border-border p-3 relative h-28 flex items-center justify-center overflow-hidden shadow-sm">
+                              <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                                <line
+                                  x1="50%"
+                                  y1="50%"
+                                  x2="22%"
+                                  y2="25%"
+                                  stroke="#a855f7"
+                                  strokeWidth="1.2"
+                                  strokeDasharray="3 3"
+                                  opacity="0.6"
+                                />
+                                <line
+                                  x1="50%"
+                                  y1="50%"
+                                  x2="78%"
+                                  y2="28%"
+                                  stroke="#38bdf8"
+                                  strokeWidth="1.2"
+                                  opacity="0.6"
+                                />
+                              </svg>
+                              <span className="relative z-10 px-2.5 py-1 rounded-md bg-elevated border border-purple-500/60 text-primary text-[10px] font-semibold shadow-sm flex items-center gap-1.5">
+                                <Network className="w-3 h-3 text-purple-500" /> Núcleo
+                              </span>
+                              <span className="absolute left-3 top-2.5 px-2 py-0.5 rounded bg-elevated border border-border text-[9px] text-secondary">
+                                Código
+                              </span>
+                              <span className="absolute right-3 top-3 px-2 py-0.5 rounded bg-elevated border border-border text-[9px] text-secondary">
+                                Mídia R2
+                              </span>
+                            </div>
+                          </button>
+                        )}
+
+                        {modelItems.some((i) => i.type === 'diet') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'diet',
+                                'Plano Nutricional',
+                                'nutrition',
+                                '#f59e0b',
+                                'Registo diário de refeições, macronutrientes e hidratação.'
+                              )
+                            }
+                            className="group rounded-2xl bg-amber-500/[0.08] hover:bg-amber-500/[0.14] border border-amber-500/25 hover:border-amber-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Plano Nutricional
+                              </h3>
+                              <p className="text-xs text-secondary mt-1">
+                                Controlo diário de refeições, proteínas e meta hídrica.
+                              </p>
+                            </div>
+
+                            <div className="mt-4 rounded-xl bg-surface border border-border p-3 space-y-2 text-[9px] shadow-sm">
+                              <div className="flex items-center justify-between text-amber-500 font-semibold text-[11px]">
+                                <span className="flex items-center gap-1.5">
+                                  <Apple className="w-3.5 h-3.5" /> Nutrição & Macros
+                                </span>
+                                <span className="text-[9px] text-muted font-mono">
+                                  4/8 copos
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between py-1 border-b border-border text-secondary">
+                                <span>07:30 · Café da Manhã</span>
+                                <span className="text-emerald-500 font-mono font-semibold">
+                                  28g P
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        {modelItems.some((i) => i.type === 'agenda') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'agenda',
+                                'Agenda & Cronograma',
+                                'calendar',
+                                '#E63946',
+                                'Registo cronológico de disciplinas, reuniões e prazos.'
+                              )
+                            }
+                            className="group rounded-2xl bg-rose-500/[0.08] hover:bg-rose-500/[0.14] border border-rose-500/25 hover:border-rose-500/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 sm:col-span-2 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">
+                                Agenda & Cronograma
+                              </h3>
+                              <p className="text-xs text-secondary mt-1">
+                                Organize datas académicas, reuniões e eventos com filtros por categoria.
+                              </p>
+                            </div>
+
+                            <div className="mt-4 rounded-xl bg-surface border border-border p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] shadow-sm">
+                              <div className="flex items-center gap-2.5 p-2 rounded-lg bg-elevated border border-border">
+                                <Calendar className="w-4 h-4 text-rose-500 shrink-0" />
+                                <div>
+                                  <p className="font-semibold text-primary">
+                                    19:00 · Sistemas de Informação
+                                  </p>
+                                  <p className="text-[9px] text-muted">
+                                    UFV-CRP · Académico
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <form onSubmit={handleCreateTopic} className="space-y-5">
+                  <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-elevated border border-border">
+                    <div
+                      style={{
+                        backgroundColor: `${color}15`,
+                        borderColor: `${color}40`,
+                      }}
+                      className="w-11 h-11 rounded-xl border flex items-center justify-center shrink-0"
+                    >
+                      {renderTopicVectorIcon(iconKey, 'w-5 h-5', color)}
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                        Modelo · {selectedTemplate.defaultTitle}
+                      </span>
+                      <h2 className="text-base font-bold text-primary">
+                        Configurar nova página
+                      </h2>
+                      <p className="text-xs text-secondary">
+                        {selectedTemplate.subtitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-primary block">
+                      Ícone da página
+                    </label>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {TOPIC_ICON_OPTIONS.map((item) => {
+                        const IconComp = item.Icon;
+                        const active = iconKey === item.key;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            title={item.label}
+                            onClick={() => setIconKey(item.key)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                              active
+                                ? 'bg-elevated border-accent text-primary shadow-sm'
+                                : 'bg-surface border-border text-secondary hover:text-primary'
+                            }`}
+                          >
+                            <IconComp
+                              className="w-3.5 h-3.5"
+                              style={{ color: active ? color : undefined }}
+                            />
+                            <span>{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-primary block mb-1">
+                        Título da Página
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={36}
+                        value={name}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          setTag(
+                            e.target.value
+                              .normalize('NFD')
+                              .replace(/[\u0300-\u036f]/g, '')
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]/g, '')
+                              .slice(0, 24)
+                          );
+                        }}
+                        placeholder="Ex: Arquitetura, Estudos, Roadmap..."
+                        className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-primary block mb-1">
+                        Identificador (Hashtag)
+                      </label>
+                      <div className="flex items-center bg-elevated border border-border rounded-xl px-3.5 py-2.5 focus-within:border-accent">
+                        <Hash className="w-3.5 h-3.5 text-muted mr-1.5 shrink-0" />
+                        <input
+                          type="text"
+                          required
+                          maxLength={24}
+                          value={tag}
+                          onChange={(e) =>
+                            setTag(
+                              e.target.value
+                                .toLowerCase()
+                                .replace(/^#/, '')
+                                .replace(/[^a-z0-9]/g, '')
+                            )
+                          }
+                          placeholder="arquitetura"
+                          className="w-full bg-transparent text-xs text-primary font-mono focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-primary block mb-1.5">
+                        Cor de acento
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {TOPIC_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setColor(c)}
+                            style={{ backgroundColor: c }}
+                            className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                              color.toLowerCase() === c.toLowerCase()
+                                ? 'border-primary scale-110'
+                                : 'border-transparent opacity-70 hover:opacity-100'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-primary block mb-1">
+                        Descrição da página
+                      </label>
+                      <input
+                        type="text"
+                        value={introText}
+                        onChange={(e) => setIntroText(e.target.value)}
+                        placeholder="Objetivo ou diretriz desta página..."
+                        className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-primary block mb-1.5">
+                      Imagem de capa
+                    </label>
+                    {!bannerUrl ? (
+                      <div
+                        onClick={() => bannerInputRef.current?.click()}
+                        className="h-24 rounded-xl bg-elevated/60 border border-dashed border-border hover:border-accent flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <ImagePlus className="w-4 h-4 text-accent" />
+                        <span className="text-xs font-medium text-secondary">
+                          {uploadingBanner
+                            ? 'A carregar imagem para Cloudflare R2...'
+                            : 'Selecionar imagem de capa'}
+                        </span>
+                        <input
+                          ref={bannerInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleBannerUpload}
+                          className="hidden"
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative h-36 rounded-xl overflow-hidden border border-border">
+                        <img
+                          src={bannerUrl}
+                          alt="Capa"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBannerUrl(null);
+                            setBannerR2Key(null);
+                          }}
+                          className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/75 text-white text-[11px] font-medium flex items-center gap-1 hover:bg-black"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>Remover</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplate(null)}
+                      className="px-4 py-2 rounded-xl bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving || uploadingBanner}
+                      style={{ backgroundColor: color }}
+                      className="px-5 py-2 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 shadow hover:opacity-95 disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>
+                        {saving
+                          ? 'A guardar...'
+                          : `Criar Página (${
+                              visibility === 'private' ? 'Particular' : 'Pública'
+                            })`}
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <button
-              type="button"
-              onClick={() => setExpandCreate(false)}
-              className="px-3.5 py-1.5 rounded-xl bg-elevated text-xs text-secondary hover:text-primary"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{ backgroundColor: color }}
-              className="px-4 py-1.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 shadow-md hover:opacity-95 disabled:opacity-50"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>{saving ? 'Criando...' : 'Criar Tópico'}</span>
-            </button>
-          </div>
-        </form>
+        </div>
       )}
 
-      {/* 3. Banner Superior e Apresentação do Tópico Ativo (Apenas para Tópicos Personalizados) */}
+      {/* 3. Cabeçalho do topico ligado */}
       {!currentTab.isDefault && (
         <div className="mx-4 sm:mx-6 my-4 rounded-2xl overflow-hidden border border-border bg-surface">
           {currentTab.bannerUrl && (
-            <div className="relative w-full h-36 sm:h-48 bg-elevated overflow-hidden border-b border-border">
+            <div className="relative w-full h-36 sm:h-44 bg-elevated overflow-hidden border-b border-border">
               <img
                 src={currentTab.bannerUrl}
                 alt={currentTab.label}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
               <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
                 <div>
-                  <span
-                    style={{ backgroundColor: currentTab.color }}
-                    className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold text-white uppercase tracking-wider mb-1"
-                  >
-                    #{currentTab.tag}
-                  </span>
-                  <h2 className="text-lg sm:text-xl font-black text-white drop-shadow">
-                    {currentTab.label}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="inline-block px-2 py-0.5 rounded bg-black/60 border border-white/15 font-mono text-[10px] font-semibold text-zinc-200">
+                      #{currentTab.tag}
+                    </span>
+                    {currentTab.visibility === 'private' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/60 border border-white/15 text-zinc-300 text-[10px] font-medium">
+                        <Lock className="w-2.5 h-2.5" /> Particular
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow flex items-center gap-2">
+                    {renderTopicVectorIcon(currentTab.icon, 'w-5 h-5', currentTab.color)}
+                    <span>{currentTab.label}</span>
                   </h2>
                 </div>
                 {isAdmin && (
                   <button
                     type="button"
                     onClick={() => handleDeleteTopic(currentTab)}
-                    className="px-2.5 py-1 rounded-lg bg-black/60 hover:bg-danger text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                    className="px-2.5 py-1 rounded-lg bg-black/60 hover:bg-danger text-white text-[11px] font-medium flex items-center gap-1 transition-colors"
                   >
                     <Trash2 className="w-3 h-3" />
-                    <span>Excluir tópico</span>
+                    <span>Excluir</span>
                   </button>
                 )}
               </div>
@@ -792,20 +1546,19 @@ export function TopicTabsManager({
           <div className="p-4 space-y-2.5">
             {!currentTab.bannerUrl && (
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    style={{ backgroundColor: currentTab.color }}
-                    className="w-3 h-3 rounded-full shrink-0"
-                  />
-                  <h2 className="text-base sm:text-lg font-extrabold text-primary">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {renderTopicVectorIcon(currentTab.icon, 'w-4 h-4', currentTab.color)}
+                  <h2 className="text-base sm:text-lg font-bold text-primary">
                     {currentTab.label}
                   </h2>
-                  <span
-                    style={{ color: currentTab.color }}
-                    className="text-xs font-bold"
-                  >
+                  <span className="text-xs font-mono text-muted">
                     #{currentTab.tag}
                   </span>
+                  {currentTab.visibility === 'private' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary text-[10px] font-medium">
+                      <Lock className="w-2.5 h-2.5" /> Particular
+                    </span>
+                  )}
                 </div>
 
                 {isAdmin && (
@@ -815,7 +1568,7 @@ export function TopicTabsManager({
                     className="px-2.5 py-1 rounded-lg bg-elevated border border-border hover:border-danger text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Excluir tópico</span>
+                    <span>Excluir</span>
                   </button>
                 )}
               </div>
@@ -823,61 +1576,43 @@ export function TopicTabsManager({
 
             {Array.isArray(currentTab.descriptionBlocks) &&
               currentTab.descriptionBlocks.length > 0 && (
-                <div className="notion-content space-y-2 text-xs sm:text-sm text-primary/90 leading-relaxed">
-                  {currentTab.descriptionBlocks.map((b, i) => {
-                    const fontCls =
-                      b.fontStyle === 'serif'
-                        ? 'font-serif'
-                        : b.fontStyle === 'mono'
-                        ? 'font-mono text-xs'
-                        : 'font-sans';
-
-                    if (b.type === 'h2') {
-                      return (
-                        <h3
-                          key={b.id || i}
-                          className={`${fontCls} text-sm sm:text-base font-extrabold text-primary`}
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
-                        />
-                      );
-                    }
-                    if (b.type === 'quote') {
-                      return (
-                        <blockquote
-                          key={b.id || i}
-                          style={{ borderColor: currentTab.color }}
-                          className={`${fontCls} border-l-3 pl-3 italic text-secondary`}
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
-                        />
-                      );
-                    }
-                    if (b.type === 'callout') {
-                      return (
-                        <div
-                          key={b.id || i}
-                          className="p-2.5 rounded-xl bg-elevated border border-border flex items-start gap-2"
-                        >
-                          <span>{b.calloutIcon || '🐉'}</span>
-                          <div
-                            className={`${fontCls} flex-1`}
-                            dangerouslySetInnerHTML={{ __html: b.html || '' }}
-                          />
-                        </div>
-                      );
-                    }
-                    return (
-                      <div
-                        key={b.id || i}
-                        className={fontCls}
-                        dangerouslySetInnerHTML={{ __html: b.html || '' }}
-                      />
-                    );
-                  })}
+                <div className="notion-content space-y-2 text-xs sm:text-sm text-secondary leading-relaxed">
+                  {currentTab.descriptionBlocks.map((b, i) => (
+                    <div
+                      key={b.id || i}
+                      style={{ borderLeftColor: currentTab.color }}
+                      className="pl-3 py-0.5 border-l-2"
+                      dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                    />
+                  ))}
                 </div>
               )}
           </div>
         </div>
       )}
+
+      {/* 4. Painel  de topico */}
+      {!currentTab.isDefault &&
+        currentTab.templateType &&
+        currentTab.templateType !== 'blank_page' && (
+          <TopicWorkspaceView
+            topicId={currentTab.id}
+            topicColor={currentTab.color}
+            templateType={currentTab.templateType}
+            initialData={currentTab.workspaceData || {}}
+            descriptionBlocks={currentTab.descriptionBlocks}
+            isAdmin={isAdmin}
+            onWorkspaceUpdated={(nextData) => {
+              setCustomTopics((prev) =>
+                prev.map((ct) =>
+                  ct.id === currentTab.id
+                    ? { ...ct, workspace_data: nextData }
+                    : ct
+                )
+              );
+            }}
+          />
+        )}
     </div>
   );
 }

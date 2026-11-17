@@ -433,7 +433,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 4. FERRAMENTAS TÉCNICAS E ENGENHARIA (UNDER THE HOOD) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

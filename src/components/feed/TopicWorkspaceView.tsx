@@ -1619,7 +1619,7 @@ export function TopicWorkspaceView({
                                       );
                                       persistWorkspace({
                                         ...data,
-                                        roadmapSteps: next,
+                                        roadmapSteps: next as typeof data.roadmapSteps,
                                       });
                                     }}
                                     className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
@@ -1648,7 +1648,7 @@ export function TopicWorkspaceView({
                                       );
                                       persistWorkspace({
                                         ...data,
-                                        roadmapSteps: next,
+                                        roadmapSteps: next as typeof data.roadmapSteps,
                                       });
                                     }}
                                     className={`flex-1 bg-transparent focus:outline-none ${
@@ -1703,7 +1703,7 @@ export function TopicWorkspaceView({
                                     );
                                     persistWorkspace({
                                       ...data,
-                                      roadmapSteps: next,
+                                      roadmapSteps: next as typeof data.roadmapSteps,
                                     });
                                   }}
                                   className="text-secondary hover:text-primary font-semibold"
@@ -1747,7 +1747,7 @@ export function TopicWorkspaceView({
                                       );
                                       persistWorkspace({
                                         ...data,
-                                        roadmapSteps: next,
+                                        roadmapSteps: next as typeof data.roadmapSteps,
                                       });
                                     }}
                                     className="p-1 rounded bg-elevated hover:text-primary text-muted"
@@ -1772,7 +1772,7 @@ export function TopicWorkspaceView({
                                       );
                                       persistWorkspace({
                                         ...data,
-                                        roadmapSteps: next,
+                                        roadmapSteps: next as typeof data.roadmapSteps,
                                       });
                                     }}
                                     className="p-1 rounded bg-elevated hover:text-accent text-muted"
@@ -1788,7 +1788,7 @@ export function TopicWorkspaceView({
                                     ).filter((s) => s.id !== step.id);
                                     persistWorkspace({
                                       ...data,
-                                      roadmapSteps: next,
+                                      roadmapSteps: next as typeof data.roadmapSteps,
                                     });
                                   }}
                                   className="p-1 text-muted hover:text-danger"

@@ -176,10 +176,8 @@ export function SharePostModal({
 
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
-    return `${window.location.origin}/u/${encodeURIComponent(
-      author.username
-    )}?post=${post.id}`;
-  }, [author.username, post.id]);
+    return `${window.location.origin}/post/${post.id}`;
+  }, [post.id]);
 
   const formattedDate = useMemo(() => {
     const d = new Date(post.created_at);

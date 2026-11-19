@@ -554,7 +554,7 @@ export default function NotificationsPage() {
               notif.type === 'follow'
                 ? `/u/${encodeURIComponent(actorHandle)}`
                 : notif.post_id
-                ? `/?post=${notif.post_id}`
+                ? `/post/${notif.post_id}`
                 : `/u/${encodeURIComponent(actorHandle)}`;
 
             return (

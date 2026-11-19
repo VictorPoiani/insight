@@ -293,6 +293,9 @@ export interface Reply {
   image_url: string | null;
   spotify_track_id: string | null;
   created_at: string;
+  /** Resposta a que esta resposta responde (null = resposta direta ao post). */
+  parent_reply_id?: string | null;
+  likes_count?: number | null;
 }
 
 export interface NotificationItem {

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Post,
   Profile,
-  Reply,
   FontStyleType,
   ImageAlignType,
   PostBlock,
@@ -23,9 +22,6 @@ import {
   Pencil,
   Pin,
   Check,
-  Music,
-  Send,
-  X,
   Download,
   FileText,
   Lock,
@@ -33,7 +29,6 @@ import {
   Sparkles,
   Compass,
   Network,
-  LogIn,
   Flag,
 } from 'lucide-react';
 
@@ -42,9 +37,14 @@ interface PostCardProps {
   author: Profile;
   isAdmin: boolean;
   onDelete?: (postId: string) => void;
+  /** 'feed' (padrão): botão de respostas abre a página da discussão.
+   *  'detail': usado dentro da própria página da discussão. */
+  variant?: 'feed' | 'detail';
+  /** Contagem de respostas controlada externamente (página de discussão). */
+  repliesCountOverride?: number;
+  /** Ação do botão de respostas no modo 'detail' (ex.: focar o composer). */
+  onReplyClick?: () => void;
 }
-
-const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
 function sanitizeBlockHtml(dirtyHtml?: string | null): string {
   if (!dirtyHtml) return '';
@@ -67,18 +67,6 @@ function sanitizeBlockHtml(dirtyHtml?: string | null): string {
 function getProfileHref(_profileId?: string | null, username?: string | null) {
   if (username) return `/u/${encodeURIComponent(username)}`;
   return '/';
-}
-
-function extractSpotifyTrackId(urlOrId: string): string | null {
-  if (!urlOrId) return null;
-  const trimmed = urlOrId.trim();
-  if (trimmed.includes('open.spotify.com/track/')) {
-    return trimmed.split('track/')[1]?.split('?')[0] || null;
-  }
-  if (trimmed.includes('spotify:track:')) {
-    return trimmed.split('spotify:track:')[1] || null;
-  }
-  return /^[A-Za-z0-9]{10,30}$/.test(trimmed) ? trimmed : null;
 }
 
 function getFontClass(font?: FontStyleType) {
@@ -112,7 +100,15 @@ export function resolvePostVisibility(
   return 'public';
 }
 
-export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
+export function PostCard({
+  post,
+  author,
+  isAdmin,
+  onDelete,
+  variant = 'feed',
+  repliesCountOverride,
+  onReplyClick,
+}: PostCardProps) {
   const supabase = createClient();
   const articleRef = useRef<HTMLElement>(null);
 
@@ -146,14 +142,6 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [openShareModal, setOpenShareModal] = useState(false);
 
-  // Thread / Respostas
-  const [expandReplies, setExpandReplies] = useState(false);
-  const [replies, setReplies] = useState<Reply[]>([]);
-  const [loadingReplies, setLoadingReplies] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [replySpotifyInput, setReplySpotifyInput] = useState('');
-  const [showReplySpotify, setShowReplySpotify] = useState(false);
-  const [sendingReply, setSendingReply] = useState(false);
   const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
 
   const hasRichBlocks = Array.isArray(blocksState) && blocksState.length > 0;
@@ -480,98 +468,11 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
     }
   }
 
-  // ==========================================================================
-  // RESPOSTAS / THREAD
-  // ==========================================================================
-
-  async function toggleExpandReplies() {
-    const nextState = !expandReplies;
-    setExpandReplies(nextState);
-
-    if (nextState && replies.length === 0) {
-      setLoadingReplies(true);
-      const { data } = await supabase
-        .from('replies')
-        .select('*')
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: true });
-
-      if (data) {
-        setReplies(data as Reply[]);
-        setRepliesCount(data.length);
-      }
-      setLoadingReplies(false);
-    }
-  }
-
-  async function handleSendReply(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!loggedUserProfile) {
-      window.location.href = '/login';
-      return;
-    }
-
-    const trackId = showReplySpotify ? extractSpotifyTrackId(replySpotifyInput) : null;
-    if ((!replyText.trim() && !trackId) || sendingReply) return;
-
-    setSendingReply(true);
-
-    const cleanName =
-      loggedUserProfile.display_name ||
-      loggedUserProfile.full_name ||
-      loggedUserProfile.username;
-
-    const payload = {
-      post_id: post.id,
-      profile_id: loggedUserProfile.id,
-      author_name: cleanName,
-      author_handle: loggedUserProfile.username,
-      avatar_url: loggedUserProfile.avatar_url || '/assets/net/default-perfil',
-      content: replyText.trim(),
-      spotify_track_id: trackId,
-    };
-
-    const { data, error } = await supabase
-      .from('replies')
-      .insert(payload)
-      .select()
-      .single();
-
-    setSendingReply(false);
-
-    if (!error && data) {
-      setReplies((prev) => [...prev, data as Reply]);
-      setRepliesCount((prev) => prev + 1);
-      setReplyText('');
-      setReplySpotifyInput('');
-      setShowReplySpotify(false);
-    } else if (error) {
-      alert('Erro ao publicar resposta: ' + error.message);
-    }
-  }
-
-  async function handleDeleteReply(replyId: string, replyProfileId?: string | null) {
-    const canDeleteThisReply =
-      isAdmin ||
-      loggedUserProfile?.role === 'admin' ||
-      loggedUserProfile?.role === 'moderator' ||
-      loggedUserProfile?.id === FOUNDER_PROFILE_ID ||
-      (loggedUserProfile && replyProfileId === loggedUserProfile.id);
-
-    if (!canDeleteThisReply) return;
-    if (!confirm('Excluir esta resposta?')) return;
-
-    const { error } = await supabase.from('replies').delete().eq('id', replyId);
-    if (!error) {
-      setReplies((prev) => prev.filter((r) => r.id !== replyId));
-      setRepliesCount((prev) => Math.max(0, prev - 1));
-    }
-  }
-
   if (!isAdmin && postVisibility === 'private') {
     return null;
   }
+
+  const displayedRepliesCount = repliesCountOverride ?? repliesCount;
 
   const formattedDate = new Date(post.created_at).toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -1320,17 +1221,27 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
       {/* Barra de Ações (Responsiva para Mobile e Desktop) */}
       <div className="mt-4 pt-3 flex items-center justify-between gap-2 text-xs text-secondary">
         <div className="flex items-center gap-5 sm:gap-6">
-          <button
-            type="button"
-            onClick={toggleExpandReplies}
-            aria-label="Respostas"
-            className={`flex items-center gap-1.5 py-1 transition-colors ${
-              expandReplies ? 'text-accent font-semibold' : 'hover:text-primary'
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>{repliesCount}</span>
-          </button>
+          {variant === 'detail' ? (
+            <button
+              type="button"
+              onClick={onReplyClick}
+              aria-label="Responder"
+              className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>{displayedRepliesCount}</span>
+            </button>
+          ) : (
+            <Link
+              href={`/post/${post.id}`}
+              aria-label="Abrir respostas"
+              title="Abrir discussão"
+              className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>{displayedRepliesCount}</span>
+            </Link>
+          )}
 
           <button
             type="button"
@@ -1396,201 +1307,6 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
         author={author}
       />
 
-      {/* Área Expansível da Thread / Respostas */}
-      {expandReplies && (
-        <div className="mt-4 pt-4 border-t border-border space-y-4">
-          <form
-            onSubmit={handleSendReply}
-            className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5"
-          >
-            {loggedUserProfile ? (
-              <div className="flex items-center justify-between pb-2 border-b border-border text-xs gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <img
-                    src={loggedUserProfile.avatar_url || '/assets/net/default-perfil'}
-                    alt={loggedUserProfile.full_name}
-                    className="w-5 h-5 rounded-full object-cover border border-border shrink-0"
-                  />
-                  <span className="font-bold text-primary truncate">
-                    {loggedUserProfile.display_name || loggedUserProfile.full_name}
-                  </span>
-                  <span className="text-muted truncate">
-                    @{loggedUserProfile.username}
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-400 shrink-0">
-                  ● Autenticado
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border text-xs">
-                <span className="text-secondary">
-                  Entre ou crie uma conta para responder.
-                </span>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-hover text-white font-bold text-[11px] shrink-0 transition-colors"
-                >
-                  <LogIn className="w-3 h-3" />
-                  <span>Entrar / Criar Conta</span>
-                </Link>
-              </div>
-            )}
-
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder={
-                loggedUserProfile
-                  ? isAdmin
-                    ? 'Adicionar nota ou continuar thread...'
-                    : `Responder como @${loggedUserProfile.username}...`
-                  : 'Inicie sessão para escrever uma resposta...'
-              }
-              maxLength={280}
-              rows={2}
-              className="w-full bg-transparent text-xs text-primary placeholder:text-muted resize-none focus:outline-none"
-            />
-
-            {showReplySpotify && (
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-elevated border border-border">
-                <Music className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
-                <input
-                  type="text"
-                  value={replySpotifyInput}
-                  onChange={(e) => setReplySpotifyInput(e.target.value)}
-                  placeholder="Link da faixa no Spotify..."
-                  className="flex-1 bg-transparent text-xs text-primary focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowReplySpotify(false);
-                    setReplySpotifyInput('');
-                  }}
-                  className="text-muted hover:text-primary"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowReplySpotify(!showReplySpotify)}
-                  title="Anexar faixa do Spotify"
-                  className={`p-1.5 rounded-lg border text-xs transition-colors ${
-                    showReplySpotify
-                      ? 'border-[#1DB954] text-[#1DB954]'
-                      : 'border-border text-secondary hover:text-primary'
-                  }`}
-                >
-                  <Music className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-[11px] font-mono text-muted">
-                  {replyText.length}/280
-                </span>
-              </div>
-
-              <button
-                type="submit"
-                disabled={(!replyText.trim() && !replySpotifyInput.trim()) || sendingReply}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold disabled:opacity-50"
-              >
-                <Send className="w-3 h-3" />
-                <span>{sendingReply ? 'Enviando...' : 'Responder'}</span>
-              </button>
-            </div>
-          </form>
-
-          {loadingReplies ? (
-            <p className="text-xs text-muted py-2">Carregando respostas...</p>
-          ) : replies.length === 0 ? (
-            <p className="text-xs text-muted py-2">
-              Nenhuma resposta registrada ainda.
-            </p>
-          ) : (
-            <div className="space-y-3 pl-3 border-l-2 border-border">
-              {replies.map((reply) => {
-                const canDeleteReply =
-                  isAdmin ||
-                  loggedUserProfile?.role === 'admin' ||
-                  loggedUserProfile?.role === 'moderator' ||
-                  loggedUserProfile?.id === FOUNDER_PROFILE_ID ||
-                  (loggedUserProfile && reply.profile_id === loggedUserProfile.id);
-
-                const replyAuthorHref = getProfileHref(
-                  reply.profile_id,
-                  reply.author_handle
-                );
-
-                return (
-                  <div
-                    key={reply.id}
-                    className="p-3 rounded-xl bg-surface/60 border border-border space-y-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <Link
-                        href={replyAuthorHref}
-                        className="flex items-center gap-2 group/replyauthor min-w-0"
-                      >
-                        {reply.avatar_url ? (
-                          <img
-                            src={reply.avatar_url}
-                            alt={reply.author_name || 'Autor'}
-                            className="w-6 h-6 rounded-full object-cover border border-border shrink-0"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-bold text-accent shrink-0">
-                            {(reply.author_name || 'U').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span className="text-xs font-bold text-primary group-hover/replyauthor:text-accent transition-colors truncate">
-                          {reply.author_name || 'Membro'}
-                        </span>
-                        <span className="text-[11px] text-muted truncate">
-                          @{reply.author_handle || 'membro'}
-                        </span>
-                      </Link>
-
-                      {canDeleteReply && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReply(reply.id, reply.profile_id)}
-                          title="Excluir resposta"
-                          className="text-muted hover:text-danger shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {reply.content && (
-                      <p className="text-xs text-primary whitespace-pre-line leading-relaxed break-words">
-                        {reply.content}
-                      </p>
-                    )}
-
-                    {reply.spotify_track_id && (
-                      <iframe
-                        src={`https://open.spotify.com/embed/track/${reply.spotify_track_id}?utm_source=generator&theme=0`}
-                        width="100%"
-                        height="80"
-                        frameBorder="0"
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        loading="lazy"
-                        className="rounded-lg"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </article>
   );
 }

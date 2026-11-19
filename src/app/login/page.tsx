@@ -639,7 +639,7 @@ export default function LoginPage() {
 
             <div>
               <label className={labelClass}>
-                Chave de Convite (Padrão XXXX-XXXX-XXXX)
+                Chave de Convite
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-accent absolute left-3.5 top-3" />
@@ -648,7 +648,7 @@ export default function LoginPage() {
                   required
                   value={inviteCode}
                   onChange={(e) => setInviteCode(formatInviteCode(e.target.value))}
-                  placeholder="INSG-2026-BETA"
+                  placeholder="XXXX-XXXX-XXXX"
                   maxLength={14}
                   className={`${inputClass} font-mono font-bold tracking-widest uppercase`}
                 />

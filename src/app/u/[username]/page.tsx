@@ -13,6 +13,7 @@ import {
 } from '@/components/feed/TopicTabsManager';
 import { PostComposer } from '@/components/feed/PostComposer';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
+import ContributorLevelPill from '@/components/ContributorLevelPill';
 import {
   ShieldAlert,
   Trash2,
@@ -150,7 +151,7 @@ function UserProfileContent() {
   const loadProfileAndPosts = useCallback(async () => {
     setLoading(true);
 
-    // 1. Busca o perfil pelo @username na URL
+    // 1. Busca o perfil pelo @username na URL (inclui total_donated, contributor_points e contributor_level)
     const { data: targetProfile } = await supabase
       .from('profiles')
       .select('*')
@@ -359,15 +360,24 @@ function UserProfileContent() {
       <div className="sticky top-0 z-30 px-4 sm:px-6 py-2.5 bg-background/85 backdrop-blur-md border-b border-border flex items-center justify-between gap-3">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs font-bold text-secondary hover:text-primary transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-bold text-secondary hover:text-primary transition-colors shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Explorar Comunidade</span>
         </Link>
 
-        <span className="text-xs font-mono text-muted truncate">
-          @{profile.username}
-        </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-mono text-muted truncate">
+            @{profile.username}
+          </span>
+          <ContributorLevelPill
+            points={profile.contributor_points}
+            totalDonated={profile.total_donated}
+            level={profile.contributor_level}
+            size="sm"
+            showName={false}
+          />
+        </div>
       </div>
 
       {/* BARRA EXCLUSIVA DE MODERAÇÃO (Visível para Você e sua Equipe Dev em perfis de terceiros) */}

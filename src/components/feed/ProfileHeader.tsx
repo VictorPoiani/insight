@@ -6,6 +6,7 @@ import { Profile } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
+import ContributorLevelPill from '@/components/ContributorLevelPill';
 import {
   Bolt,
   BellPlus,
@@ -114,37 +115,37 @@ const KNOWN_PLATFORMS: {
   name: string;
   slug: string;
 }[] = [
-  { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
-  { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
-  { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
-  {
-    match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
-    name: 'Steam',
-    slug: 'steam',
-  },
-  { match: ['github.com'], name: 'GitHub', slug: 'github' },
-  { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
-  { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
-  { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
-  { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
-  { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
-  { match: ['threads.net'], name: 'Threads', slug: 'threads' },
-  { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
-  { match: ['behance.net'], name: 'Behance', slug: 'behance' },
-  { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
-  { match: ['figma.com'], name: 'Figma', slug: 'figma' },
-  { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
-  { match: ['medium.com'], name: 'Medium', slug: 'medium' },
-  { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
-  { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
-  { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
-  { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
-  { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
-  { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
-  { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
-  { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
-  { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
-];
+    { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
+    { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
+    { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
+    {
+      match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
+      name: 'Steam',
+      slug: 'steam',
+    },
+    { match: ['github.com'], name: 'GitHub', slug: 'github' },
+    { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
+    { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
+    { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
+    { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
+    { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
+    { match: ['threads.net'], name: 'Threads', slug: 'threads' },
+    { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
+    { match: ['behance.net'], name: 'Behance', slug: 'behance' },
+    { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
+    { match: ['figma.com'], name: 'Figma', slug: 'figma' },
+    { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
+    { match: ['medium.com'], name: 'Medium', slug: 'medium' },
+    { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
+    { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
+    { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
+    { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
+    { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
+    { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
+    { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
+    { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
+    { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
+  ];
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -258,19 +259,18 @@ function SmartPlatformIcon({
   const iconSrc = meta.slug
     ? `https://cdn.simpleicons.org/${meta.slug}/8e8e93`
     : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-        meta.domain
-      )}&sz=128`;
+      meta.domain
+    )}&sz=128`;
 
   return (
     <img
       src={iconSrc}
       alt={meta.name}
       onError={() => setImgError(true)}
-      className={`${className} object-contain transition-all duration-200 ${
-        meta.slug
+      className={`${className} object-contain transition-all duration-200 ${meta.slug
           ? 'opacity-80 group-hover/slink:opacity-100 group-hover/slink:scale-105'
           : 'rounded-sm grayscale opacity-75 group-hover/slink:grayscale-0 group-hover/slink:opacity-100'
-      }`}
+        }`}
     />
   );
 }
@@ -568,7 +568,7 @@ export function ProfileHeader({
     Array.isArray(profile.tags) && profile.tags.length > 0
       ? profile.tags
       : isFounderProfile
-      ? [
+        ? [
           'Full-Stack',
           'Guitarrista',
           'Rock',
@@ -576,7 +576,7 @@ export function ProfileHeader({
           'Lider',
           'Sistemas de Informação',
         ]
-      : []
+        : []
   );
   const [savingTags, setSavingTags] = useState(false);
   const [spotifyTrackId, setSpotifyTrackId] = useState(
@@ -666,7 +666,7 @@ export function ProfileHeader({
         .then((sub) => {
           setPushSubscribed(Boolean(sub));
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -1199,7 +1199,7 @@ export function ProfileHeader({
         notifyMode: 'all',
         interestedTags: [],
       }),
-    }).catch(() => {});
+    }).catch(() => { });
 
     setSubmittingSub(false);
     setSubSuccess(true);
@@ -1240,9 +1240,8 @@ export function ProfileHeader({
       {/* 1. Banner / Capa do Perfil */}
       <div
         onClick={() => isAdmin && coverInputRef.current?.click()}
-        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${
-          isAdmin ? 'cursor-pointer' : ''
-        }`}
+        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${isAdmin ? 'cursor-pointer' : ''
+          }`}
       >
         {coverUrl ? (
           <img
@@ -1280,14 +1279,13 @@ export function ProfileHeader({
 
       {/* Corpo do Perfil */}
       <div className="px-6 relative">
-        {/* 2. Linha Única: Foto de Perfil + Status Compacto + Contadores + Botões */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 pt-3">
+        {/* 2. Linha Única: Foto de Perfil + Patente + Status + Contadores + Botões */}
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5 pt-3">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div
               onClick={() => isAdmin && avatarInputRef.current?.click()}
-              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${
-                isAdmin ? 'cursor-pointer' : ''
-              }`}
+              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${isAdmin ? 'cursor-pointer' : ''
+                }`}
             >
               <img
                 src={avatarUrl}
@@ -1310,151 +1308,168 @@ export function ProfileHeader({
               )}
             </div>
 
-            {/* Pílula de Status Compacta */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => isAdmin && setExpandStatusMenu(!expandStatusMenu)}
-                style={{
-                  backgroundColor: `${currentStatus.color}14`,
-                  borderColor: `${currentStatus.color}40`,
-                }}
-                title={
-                  isAdmin
-                    ? 'Clique para alterar seu status atual'
-                    : `Status: ${currentStatus.label}`
+            {/* Pills ao lado da foto: Nível de Contribuinte + Status */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+              <ContributorLevelPill
+                points={
+                  (profile as Profile & { contributor_points?: number | null })
+                    .contributor_points
                 }
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${
-                  isAdmin
-                    ? 'cursor-pointer hover:scale-[1.02] active:scale-95'
-                    : 'cursor-default'
-                }`}
-              >
-                <span className="relative flex h-1.5 w-1.5 shrink-0">
-                  {currentStatus.pulse && (
+                totalDonated={
+                  (profile as Profile & { total_donated?: number | null })
+                    .total_donated
+                }
+                level={
+                  (profile as Profile & { contributor_level?: number | null })
+                    .contributor_level
+                }
+                size="sm"
+              />
+
+              {/* Pílula de Status Compacta */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => isAdmin && setExpandStatusMenu(!expandStatusMenu)}
+                  style={{
+                    backgroundColor: `${currentStatus.color}14`,
+                    borderColor: `${currentStatus.color}40`,
+                  }}
+                  title={
+                    isAdmin
+                      ? 'Clique para alterar seu status atual'
+                      : `Status: ${currentStatus.label}`
+                  }
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${isAdmin
+                      ? 'cursor-pointer hover:scale-[1.02] active:scale-95'
+                      : 'cursor-default'
+                    }`}
+                >
+                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                    {currentStatus.pulse && (
+                      <span
+                        style={{ backgroundColor: currentStatus.color }}
+                        className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                      />
+                    )}
                     <span
                       style={{ backgroundColor: currentStatus.color }}
-                      className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                      className="relative inline-flex rounded-full h-1.5 w-1.5"
                     />
-                  )}
-                  <span
-                    style={{ backgroundColor: currentStatus.color }}
-                    className="relative inline-flex rounded-full h-1.5 w-1.5"
+                  </span>
+
+                  <StatusIcon
+                    className="w-3 h-3 shrink-0"
+                    style={{ color: currentStatus.color }}
                   />
-                </span>
 
-                <StatusIcon
-                  className="w-3 h-3 shrink-0"
-                  style={{ color: currentStatus.color }}
-                />
+                  <span className="truncate max-w-[110px] sm:max-w-[135px]">
+                    {currentStatus.label}
+                    {statusDetail ? (
+                      <span className="font-normal text-secondary">
+                        {' '}
+                        · {statusDetail}
+                      </span>
+                    ) : null}
+                  </span>
 
-                <span className="truncate max-w-[110px] sm:max-w-[135px]">
-                  {currentStatus.label}
-                  {statusDetail ? (
-                    <span className="font-normal text-secondary">
-                      {' '}
-                      · {statusDetail}
-                    </span>
-                  ) : null}
-                </span>
+                  {isAdmin && (
+                    <ChevronDown className="w-2.5 h-2.5 text-muted shrink-0" />
+                  )}
+                </button>
 
-                {isAdmin && (
-                  <ChevronDown className="w-2.5 h-2.5 text-muted shrink-0" />
-                )}
-              </button>
+                {isAdmin && expandStatusMenu && (
+                  <div className="absolute left-0 top-full mt-2 z-30 w-64 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">
+                        Definir Status
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setExpandStatusMenu(false)}
+                        className="text-muted hover:text-primary"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-              {isAdmin && expandStatusMenu && (
-                <div className="absolute left-0 top-full mt-2 z-30 w-64 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">
-                      Definir Status
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setExpandStatusMenu(false)}
-                      className="text-muted hover:text-primary"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1">
-                    {USER_STATUS_OPTIONS.map((opt) => {
-                      const OptIcon = opt.icon;
-                      const isSelected = statusId === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => handleSaveStatus(opt.id, statusDetail)}
-                          style={
-                            isSelected
-                              ? {
+                    <div className="grid grid-cols-2 gap-1">
+                      {USER_STATUS_OPTIONS.map((opt) => {
+                        const OptIcon = opt.icon;
+                        const isSelected = statusId === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => handleSaveStatus(opt.id, statusDetail)}
+                            style={
+                              isSelected
+                                ? {
                                   backgroundColor: `${opt.color}22`,
                                   borderColor: opt.color,
                                 }
-                              : undefined
-                          }
-                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${
-                            isSelected
-                              ? 'text-primary'
-                              : 'bg-elevated/80 border-border text-secondary hover:text-primary'
-                          }`}
-                        >
-                          <span
-                            style={{ backgroundColor: opt.color }}
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                          />
-                          <OptIcon
-                            className="w-3 h-3 shrink-0"
-                            style={{ color: opt.color }}
-                          />
-                          <span className="truncate">{opt.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                                : undefined
+                            }
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${isSelected
+                                ? 'text-primary'
+                                : 'bg-elevated/80 border-border text-secondary hover:text-primary'
+                              }`}
+                          >
+                            <span
+                              style={{ backgroundColor: opt.color }}
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                            />
+                            <OptIcon
+                              className="w-3 h-3 shrink-0"
+                              style={{ color: opt.color }}
+                            />
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                  <div className="pt-2 border-t border-border space-y-2">
-                    <input
-                      type="text"
-                      value={statusDetail}
-                      onChange={(e) => setStatusDetail(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSaveStatus(statusId, statusDetail);
-                        }
-                      }}
-                      maxLength={20}
-                      placeholder="Detalhe curto (ex: VS Code)..."
-                      className="w-full bg-elevated border border-border rounded-xl px-2.5 py-1 text-[11px] text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-                    />
-                    <div className="flex items-center justify-between gap-2">
-                      {statusDetail && (
+                    <div className="pt-2 border-t border-border space-y-2">
+                      <input
+                        type="text"
+                        value={statusDetail}
+                        onChange={(e) => setStatusDetail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveStatus(statusId, statusDetail);
+                          }
+                        }}
+                        maxLength={20}
+                        placeholder="Detalhe curto (ex: VS Code)..."
+                        className="w-full bg-elevated border border-border rounded-xl px-2.5 py-1 text-[11px] text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        {statusDetail && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusDetail('');
+                              handleSaveStatus(statusId, '');
+                            }}
+                            className="text-[10px] text-muted hover:text-danger"
+                          >
+                            Limpar
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => {
-                            setStatusDetail('');
-                            handleSaveStatus(statusId, '');
-                          }}
-                          className="text-[10px] text-muted hover:text-danger"
+                          disabled={savingStatus}
+                          onClick={() => handleSaveStatus(statusId, statusDetail)}
+                          className="ml-auto px-2.5 py-1 rounded-lg bg-accent text-white text-[10px] font-bold hover:bg-accent-hover disabled:opacity-50"
                         >
-                          Limpar
+                          {savingStatus ? 'Salvando...' : 'Salvar'}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={savingStatus}
-                        onClick={() => handleSaveStatus(statusId, statusDetail)}
-                        className="ml-auto px-2.5 py-1 rounded-lg bg-accent text-white text-[10px] font-bold hover:bg-accent-hover disabled:opacity-50"
-                      >
-                        {savingStatus ? 'Salvando...' : 'Salvar'}
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -1493,11 +1508,10 @@ export function ProfileHeader({
                 type="button"
                 disabled={followLoading}
                 onClick={handleFollowOrSubscribeClick}
-                className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${
-                  isFollowingOrSubscribed
+                className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${isFollowingOrSubscribed
                     ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
                     : 'bg-accent text-white hover:bg-accent-hover'
-                }`}
+                  }`}
               >
                 {isFollowingOrSubscribed ? (
                   <>
@@ -1617,11 +1631,10 @@ export function ProfileHeader({
                     type="button"
                     onClick={() => setNicknameColor(color)}
                     style={{ backgroundColor: color }}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                      nicknameColor.toLowerCase() === color.toLowerCase()
+                    className={`w-6 h-6 rounded-full border-2 transition-transform ${nicknameColor.toLowerCase() === color.toLowerCase()
                         ? 'border-white scale-110'
                         : 'border-transparent opacity-75'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -1721,11 +1734,10 @@ export function ProfileHeader({
                     type="button"
                     disabled={loadingPush}
                     onClick={handleToggleWebPush}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                      pushSubscribed
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${pushSubscribed
                         ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-danger/15 hover:border-danger/40 hover:text-danger'
                         : 'bg-accent text-white hover:bg-accent-hover shadow-sm'
-                    }`}
+                      }`}
                   >
                     {loadingPush ? (
                       <span>Configurando...</span>
@@ -1857,11 +1869,10 @@ export function ProfileHeader({
                   type="button"
                   onClick={() => setExpandTags(!expandTags)}
                   title="Configurar Tags do Perfil"
-                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${
-                    expandTags
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${expandTags
                       ? 'bg-accent text-white border-accent'
                       : 'bg-elevated border-border text-secondary hover:text-accent hover:border-accent'
-                  }`}
+                    }`}
                 >
                   {expandTags ? (
                     <X className="w-3.5 h-3.5" />
@@ -1916,11 +1927,10 @@ export function ProfileHeader({
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('all')}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                  activeCategoryTab === 'all'
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${activeCategoryTab === 'all'
                     ? 'bg-primary text-background border-primary'
                     : 'bg-elevated text-secondary border-border hover:text-primary'
-                }`}
+                  }`}
               >
                 Todas ({TAG_CATEGORIES.reduce((acc, c) => acc + c.tags.length, 0)})
               </button>
@@ -1936,17 +1946,16 @@ export function ProfileHeader({
                     style={
                       isTabActive
                         ? {
-                            backgroundColor: `${cat.color}22`,
-                            borderColor: cat.color,
-                            color: cat.color,
-                          }
+                          backgroundColor: `${cat.color}22`,
+                          borderColor: cat.color,
+                          color: cat.color,
+                        }
                         : undefined
                     }
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                      isTabActive
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${isTabActive
                         ? ''
                         : 'bg-elevated text-secondary border-border hover:text-primary'
-                    }`}
+                      }`}
                   >
                     <CatIcon
                       className="w-3 h-3 shrink-0"
@@ -1990,16 +1999,15 @@ export function ProfileHeader({
                           style={
                             active
                               ? {
-                                  backgroundColor: `${cat.color}24`,
-                                  borderColor: cat.color,
-                                }
+                                backgroundColor: `${cat.color}24`,
+                                borderColor: cat.color,
+                              }
                               : undefined
                           }
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${
-                            active
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${active
                               ? 'text-primary shadow-sm scale-[1.02]'
                               : 'bg-elevated/80 text-secondary border-border hover:text-primary hover:border-muted'
-                          }`}
+                            }`}
                         >
                           <ItemIcon
                             className="w-3.5 h-3.5 shrink-0"

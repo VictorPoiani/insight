@@ -4,6 +4,7 @@ export interface CustomSocialLink {
   label?: string;
 }
 
+
 export interface SocialLinks {
   instagram?: string;
   spotify?: string;
@@ -38,6 +39,9 @@ export interface Profile {
   status?: 'active' | 'suspended' | 'banned';
   onboarding_completed?: boolean;
   created_at: string;
+  total_donated?: number | null;
+  contributor_points?: number | null;
+  contributor_level?: number | null;
 }
 
 export type PostBlockType =

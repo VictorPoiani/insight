@@ -60,11 +60,47 @@ function formatInviteCode(value: string) {
   return parts.join('-');
 }
 
+/**
+ * Asterisco 2D leve exclusivo para Mobile/WebView (imune a bug de composição 3D)
+ */
+function MobileAsterisk2D({ theme }: { theme: 'dark' | 'light' }) {
+  const armAngles = [0, 45, 90, 135];
+  const fill = theme === 'dark' ? '#3898ec' : '#2b8ce6';
+
+  return (
+    <svg
+      viewBox="0 0 200 200"
+      className="w-[340px] h-[340px] select-none pointer-events-none"
+      style={{ animation: 'insightAsteriskSpin2D 36s linear infinite' }}
+    >
+      <g transform="translate(100, 100)">
+        {armAngles.map((angle) => (
+          <rect
+            key={angle}
+            x="-17"
+            y="-86"
+            width="34"
+            height="172"
+            rx="6"
+            ry="6"
+            transform={`rotate(${angle})`}
+            fill={fill}
+          />
+        ))}
+        <circle r="26" fill={fill} />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Escultura 3D do Asterisco (*) exclusiva para Desktop
+ */
 function ExtrudedAsterisk3D({
   theme,
-  size = 580,
-  depthLayers = 28,
-  layerSpacing = 1.7,
+  size = 560,
+  depthLayers = 14,
+  layerSpacing = 2.4,
 }: {
   theme: 'dark' | 'light';
   size?: number;
@@ -244,6 +280,7 @@ export default function LoginPage() {
   }, [username, mode]);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return;
     const { innerWidth, innerHeight } = window;
     const x = (e.clientX / innerWidth - 0.5) * 16;
     const y = (e.clientY / innerHeight - 0.5) * -16;
@@ -297,18 +334,15 @@ export default function LoginPage() {
     try {
       let targetEmail = email.trim().toLowerCase();
 
-      // 1. Mapeia automaticamente qualquer variação do seu e-mail ou username de fundador
       if (
         FOUNDER_ALIASES.has(targetEmail) ||
         FOUNDER_ALIASES.has(targetEmail.replace(/^@+/, ''))
       ) {
         targetEmail = FOUNDER_AUTH_EMAIL;
       } else if (targetEmail.startsWith('@') && targetEmail.includes('@', 1)) {
-        // Remove '@' extra caso o usuário tenha digitado @email@dominio.com
         targetEmail = targetEmail.replace(/^@+/, '');
       }
 
-      // 2. Limpa eventual sessão travada anterior antes de autenticar
       await supabase.auth.signOut().catch(() => {});
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -316,7 +350,6 @@ export default function LoginPage() {
         password: password.trim(),
       });
 
-      // Fallback caso a senha original tenha espaços nas pontas
       let finalData = data;
       let finalError = signInError;
       if (signInError && password !== password.trim()) {
@@ -458,13 +491,21 @@ export default function LoginPage() {
   return (
     <div
       onMouseMove={handleMouseMove}
-      className={`relative min-h-screen w-full flex items-center justify-center p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${
+      className={`relative min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 overflow-x-hidden isolate transition-colors duration-300 ${
         isDark
           ? 'bg-[#07090e] text-zinc-100'
           : 'bg-gradient-to-br from-[#eef4fb] via-[#f8fafc] to-[#e2ecf8] text-slate-900'
       }`}
     >
       <style jsx global>{`
+        @keyframes insightAsteriskSpin2D {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
         @keyframes insightAsteriskOrbit3D {
           0% {
             transform: rotateX(22deg) rotateY(-28deg) rotateZ(0deg);
@@ -487,11 +528,13 @@ export default function LoginPage() {
         }
       `}</style>
 
-      {/* PLANO DE FUNDO ARQUITETÔNICO + ESCULTURA 3D DO ASTERISCO (*) */}
+      {/* PLANO DE FUNDO ISOLADO (z-0 + contain: strict impede vazamento 3D no card) */}
       <div
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-        style={{ perspective: '1200px' }}
+        aria-hidden="true"
+        style={{ contain: 'strict' }}
+        className="fixed inset-0 z-0 pointer-events-none overflow-hidden isolate"
       >
+        {/* Grade de pontos */}
         <div
           style={{
             backgroundImage: isDark
@@ -502,87 +545,100 @@ export default function LoginPage() {
           className="absolute inset-0"
         />
 
-        <div
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[540px] h-[540px] rounded-full blur-[130px] ${
-            isDark ? 'bg-[#2563eb]/20 opacity-90' : 'bg-[#3898ec]/20 opacity-70'
-          }`}
-        />
-
+        {/* Brilho central em gradiente CSS puro (substitui blur-[130px] que buga GPU mobile) */}
         <div
           style={{
-            transform: `translate3d(calc(-50% + ${mouseTilt.x}px), calc(-50% + ${mouseTilt.y}px), 0) rotateX(${mouseTilt.y * 0.6}deg) rotateY(${mouseTilt.x * 0.6}deg)`,
-            transformStyle: 'preserve-3d',
-            transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            filter: isDark
-              ? 'none'
-              : 'drop-shadow(0 28px 45px rgba(18, 74, 133, 0.22))',
+            background: isDark
+              ? 'radial-gradient(circle at center, rgba(37, 99, 235, 0.24) 0%, rgba(37, 99, 235, 0.08) 38%, transparent 70%)'
+              : 'radial-gradient(circle at center, rgba(56, 152, 236, 0.22) 0%, rgba(56, 152, 236, 0.06) 40%, transparent 70%)',
           }}
-          className={`absolute left-1/2 top-1/2 ${
-            isDark ? 'opacity-[0.22]' : 'opacity-[0.62]'
+          className="absolute inset-0"
+        />
+
+        {/* MOBILE: Asterisco 2D super leve (zero preserve-3d / zero clipping) */}
+        <div
+          className={`md:hidden absolute inset-0 flex items-center justify-center ${
+            isDark ? 'opacity-[0.14]' : 'opacity-[0.22]'
           }`}
+        >
+          <MobileAsterisk2D theme={theme} />
+        </div>
+
+        {/* DESKTOP: Escultura 3D isolada em container próprio */}
+        <div
+          className="hidden md:block absolute inset-0"
+          style={{ perspective: '1200px' }}
         >
           <div
             style={{
+              transform: `translate3d(calc(-50% + ${mouseTilt.x}px), calc(-50% + ${mouseTilt.y}px), 0) rotateX(${mouseTilt.y * 0.6}deg) rotateY(${mouseTilt.x * 0.6}deg)`,
               transformStyle: 'preserve-3d',
-              animation: 'insightAsteriskOrbit3D 28s linear infinite',
+              transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              filter: isDark
+                ? 'none'
+                : 'drop-shadow(0 28px 45px rgba(18, 74, 133, 0.22))',
             }}
+            className={`absolute left-1/2 top-1/2 ${
+              isDark ? 'opacity-[0.20]' : 'opacity-[0.55]'
+            }`}
+          >
+            <div
+              style={{
+                transformStyle: 'preserve-3d',
+                animation: 'insightAsteriskOrbit3D 28s linear infinite',
+              }}
+            >
+              <ExtrudedAsterisk3D
+                theme={theme}
+                size={560}
+                depthLayers={14}
+                layerSpacing={2.4}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              transformStyle: 'preserve-3d',
+              animation: 'insightAsteriskFloatSlow 34s ease-in-out infinite',
+            }}
+            className={`hidden lg:block absolute -top-10 -left-10 ${
+              isDark ? 'opacity-[0.11]' : 'opacity-[0.34]'
+            }`}
           >
             <ExtrudedAsterisk3D
               theme={theme}
-              size={600}
-              depthLayers={28}
-              layerSpacing={1.7}
+              size={240}
+              depthLayers={10}
+              layerSpacing={2}
+            />
+          </div>
+
+          <div
+            style={{
+              transformStyle: 'preserve-3d',
+              animation: 'insightAsteriskFloatSlow 40s ease-in-out infinite reverse',
+            }}
+            className={`hidden lg:block absolute -bottom-14 -right-10 ${
+              isDark ? 'opacity-[0.11]' : 'opacity-[0.34]'
+            }`}
+          >
+            <ExtrudedAsterisk3D
+              theme={theme}
+              size={270}
+              depthLayers={10}
+              layerSpacing={2}
             />
           </div>
         </div>
-
-        <div
-          style={{
-            transformStyle: 'preserve-3d',
-            animation: 'insightAsteriskFloatSlow 34s ease-in-out infinite',
-            filter: isDark
-              ? 'none'
-              : 'drop-shadow(0 18px 28px rgba(18, 74, 133, 0.16))',
-          }}
-          className={`hidden lg:block absolute -top-10 -left-10 ${
-            isDark ? 'opacity-[0.12] blur-[1px]' : 'opacity-[0.38]'
-          }`}
-        >
-          <ExtrudedAsterisk3D
-            theme={theme}
-            size={250}
-            depthLayers={18}
-            layerSpacing={1.4}
-          />
-        </div>
-
-        <div
-          style={{
-            transformStyle: 'preserve-3d',
-            animation: 'insightAsteriskFloatSlow 40s ease-in-out infinite reverse',
-            filter: isDark
-              ? 'none'
-              : 'drop-shadow(0 18px 28px rgba(18, 74, 133, 0.16))',
-          }}
-          className={`hidden lg:block absolute -bottom-14 -right-10 ${
-            isDark ? 'opacity-[0.12] blur-[1.5px]' : 'opacity-[0.38]'
-          }`}
-        >
-          <ExtrudedAsterisk3D
-            theme={theme}
-            size={290}
-            depthLayers={18}
-            layerSpacing={1.5}
-          />
-        </div>
       </div>
 
-      {/* CARD CENTRAL */}
+      {/* CARD CENTRAL (Fundo sólido limpo no mobile + glassmorphism apenas no desktop) */}
       <div
-        className={`relative z-20 w-full max-w-md rounded-3xl p-6 sm:p-8 border backdrop-blur-xl transition-all duration-300 ${
+        className={`relative z-20 w-full max-w-md rounded-3xl p-6 sm:p-8 border transition-all duration-300 ${
           isDark
-            ? 'bg-[#111318]/80 border-zinc-800/90 shadow-[0_24px_80px_rgba(0,0,0,0.65)]'
-            : 'bg-white/95 border-slate-200/95 shadow-[0_28px_70px_-12px_rgba(15,23,42,0.18),0_0_0_1px_rgba(15,23,42,0.04)]'
+            ? 'bg-[#111318] md:bg-[#111318]/85 md:backdrop-blur-xl border-zinc-800/90 shadow-[0_24px_80px_rgba(0,0,0,0.65)]'
+            : 'bg-white md:bg-white/95 md:backdrop-blur-xl border-slate-200/95 shadow-[0_28px_70px_-12px_rgba(15,23,42,0.18),0_0_0_1px_rgba(15,23,42,0.04)]'
         }`}
       >
         {mode === 'signup' && signupStep === 2 ? (
@@ -639,7 +695,7 @@ export default function LoginPage() {
 
             <div>
               <label className={labelClass}>
-                Chave de Convite
+                Chave de Convite (Padrão XXXX-XXXX-XXXX)
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-accent absolute left-3.5 top-3" />
@@ -648,7 +704,7 @@ export default function LoginPage() {
                   required
                   value={inviteCode}
                   onChange={(e) => setInviteCode(formatInviteCode(e.target.value))}
-                  placeholder="XXXX-XXXX-XXXX"
+                  placeholder="INSG-2026-BETA"
                   maxLength={14}
                   className={`${inputClass} font-mono font-bold tracking-widest uppercase`}
                 />

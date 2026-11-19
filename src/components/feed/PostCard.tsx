@@ -11,6 +11,7 @@ import {
   PostVisibility,
 } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
+import { gridCellStyle } from '@/lib/grid';
 import { PostComposer } from './PostComposer';
 import { SharePostModal } from './SharePostModal';
 import {
@@ -622,14 +623,7 @@ export function PostCard({
           {blocksState.map((b, idx) => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
-            const span = Number(b.gridSpan) || 12;
-            const start = Number(b.gridStart) || 0;
-            const cellStyle = {
-              gridColumn:
-                start > 0
-                  ? `${start} / span ${Math.min(span, 13 - start)}`
-                  : `span ${span} / span ${span}`,
-            };
+            const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
 
             if (b.type === 'divider') {
               return (

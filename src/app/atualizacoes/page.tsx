@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
 import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
 import { CustomSpotifyPlayer } from '@/components/feed/CustomSpotifyPlayer';
 import {
@@ -241,7 +242,7 @@ function normalizeRowToOfficialUpdate(
       fontStyle: b.fontStyle || (b.type === 'code' ? 'mono' : 'sans'),
       align: b.align || 'left',
       gridSpan: Number(b.gridSpan) || 12,
-      gridStart: Number(b.gridStart) || 0,
+      gridStart: normalizeGridStart(b.gridStart, b.gridSpan),
     }));
   } else if (rawText) {
     extractedBlocks = [
@@ -615,7 +616,7 @@ export default function NotificacoesPage() {
     setBlocks((prev) => {
       const updated = prev.map((b) =>
         b.id === draggedBlockId
-          ? { ...b, gridStart: span >= 12 ? 0 : newCol }
+          ? { ...b, gridStart: targetId ? 0 : normalizeGridStart(newCol, span) }
           : b
       );
 
@@ -1119,8 +1120,8 @@ export default function NotificacoesPage() {
             className="grid grid-cols-12 gap-2.5 min-h-[140px] p-2 rounded-xl border border-transparent relative"
           >
             {blocks.map((block, index) => {
-              const span = block.gridSpan || 12;
-              const start = block.gridStart || 0;
+              const span = normalizeGridSpan(block.gridSpan);
+              const start = normalizeGridStart(block.gridStart, span);
               const isConfigOpen = cellConfigOpenForId === block.id;
               const isDragOver = dragOverBlockId === block.id;
 
@@ -1137,12 +1138,7 @@ export default function NotificacoesPage() {
                   }}
                   onDragLeave={() => setDragOverBlockId(null)}
                   onDrop={(e) => handleGridDrop(e, block.id)}
-                  style={{
-                    gridColumn:
-                      start > 0
-                        ? `${start} / span ${Math.min(span, 13 - start)}`
-                        : `span ${span} / span ${span}`,
-                  }}
+                  style={gridCellStyle(span, start)}
                   className={`group relative flex flex-col gap-1.5 rounded-xl p-2 transition-all border min-w-0 ${
                     isDragOver
                       ? 'border-accent bg-accent/5'
@@ -1254,10 +1250,7 @@ export default function NotificacoesPage() {
                             onClick={() =>
                               updateBlock(block.id, {
                                 gridSpan: c.cols,
-                                gridStart:
-                                  c.cols === 12
-                                    ? 0
-                                    : Math.min(start || 1, 13 - c.cols),
+                                gridStart: normalizeGridStart(start, c.cols),
                               })
                             }
                             className={`py-1 rounded text-[10px] font-bold border ${
@@ -1943,14 +1936,7 @@ export default function NotificacoesPage() {
                   {update.blocks.map((b, idx) => {
                     const fontCls = getFontClass(b.fontStyle);
                     const alignStyle = { textAlign: b.align || 'left' } as const;
-                    const span = Number(b.gridSpan) || 12;
-                    const start = Number(b.gridStart) || 0;
-                    const cellStyle = {
-                      gridColumn:
-                        start > 0
-                          ? `${start} / span ${Math.min(span, 13 - start)}`
-                          : `span ${span} / span ${span}`,
-                    };
+                    const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
 
                     if (b.type === 'divider') {
                       return (

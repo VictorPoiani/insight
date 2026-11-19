@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
 import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
@@ -1018,7 +1019,9 @@ export function PostComposer({
         b.id === draggedBlockId
           ? {
               ...b,
-              gridStart: span >= 12 ? 0 : newCol,
+              // Soltou sobre outra célula: entra no fluxo ao lado dela.
+              // Soltou numa área vazia: fixa na coluna sob o cursor.
+              gridStart: targetId ? 0 : normalizeGridStart(newCol, span),
             }
           : b
       );
@@ -1270,11 +1273,8 @@ export function PostComposer({
       })
       .map((b, idx) => {
         const blockId = b.id || `blk-${Date.now()}-${idx}`;
-        const span = Math.max(3, Math.min(12, Number(b.gridSpan) || 12));
-        const start =
-          span >= 12
-            ? 0
-            : Math.max(0, Math.min(13 - span, Number(b.gridStart) || 0));
+        const span = normalizeGridSpan(b.gridSpan);
+        const start = normalizeGridStart(b.gridStart, span);
 
         const normalized: PostBlock = {
           ...b,
@@ -1757,8 +1757,8 @@ export function PostComposer({
       >
         {blocks.map((block, index) => {
           const isDragOver = dragOverBlockId === block.id;
-          const span = block.gridSpan || 12;
-          const start = block.gridStart || 0;
+          const span = normalizeGridSpan(block.gridSpan);
+          const start = normalizeGridStart(block.gridStart, span);
           const isConfigOpen = cellConfigOpenForId === block.id;
           const blockIssues = writingIssues.filter((iss) => iss.blockId === block.id);
 
@@ -1770,12 +1770,7 @@ export function PostComposer({
               onDragOver={(e) => handleBlockDragOver(e, block.id)}
               onDragLeave={() => setDragOverBlockId(null)}
               onDrop={(e) => handleGridDrop(e, block.id)}
-              style={{
-                gridColumn:
-                  start > 0
-                    ? `${start} / span ${Math.min(span, 13 - start)}`
-                    : `span ${span} / span ${span}`,
-              }}
+              style={gridCellStyle(span, start)}
               className={`group relative flex flex-col gap-1.5 rounded-xl p-2 transition-all border min-w-0 ${
                 isDragOver
                   ? 'border-accent bg-accent/5'
@@ -1903,10 +1898,8 @@ export function PostComposer({
                           onClick={() =>
                             updateBlock(block.id, {
                               gridSpan: c.cols,
-                              gridStart:
-                                c.cols === 12
-                                  ? 0
-                                  : Math.min(start || 1, 13 - c.cols),
+                              // Mantém o fluxo automático para permitir lado a lado
+                              gridStart: normalizeGridStart(start, c.cols),
                             })
                           }
                           className={`py-1 rounded text-[10px] font-bold border transition-colors ${
@@ -1933,7 +1926,7 @@ export function PostComposer({
                       className="w-full bg-elevated border border-border rounded-lg px-2 py-1 text-xs text-primary focus:outline-none focus:border-accent"
                     >
                       <option value={0}>Automático (Fluxo lado a lado)</option>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((col) => (
+                      {Array.from({ length: 12 - span }, (_, i) => i + 2).map((col) => (
                         <option key={col} value={col}>
                           Coluna {col}
                         </option>

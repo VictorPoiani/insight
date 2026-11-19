@@ -272,17 +272,20 @@ export default function ApoiePage() {
       )
       .subscribe();
 
-    const interval = setInterval(async () => {
-      const { data } = await supabase
-        .from('donations')
-        .select('status')
-        .eq('id', targetId)
-        .maybeSingle();
-
-      if (data?.status === 'approved') {
-        handleApproved();
+ const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/donations/status?donationId=${encodeURIComponent(targetId)}`,
+          { cache: 'no-store' }
+        );
+        const data = await res.json();
+        if (data?.status === 'approved') {
+          handleApproved();
+        }
+      } catch {
+        // Ignora falha momentânea de rede
       }
-    }, 4500);
+    }, 3500);
 
     return () => {
       supabase.removeChannel(channel);

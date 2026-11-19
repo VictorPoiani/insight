@@ -18,7 +18,9 @@ const VAPID_PRIVATE_KEY =
 const VAPID_SUBJECT =
   process.env.VAPID_SUBJECT || 'mailto:contato.insightproject@gmail.com';
 
-setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 interface NewsletterPayload {
   action: 'welcome' | 'new_post' | 'official_update';
@@ -239,11 +241,11 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
       if (b.type === 'roadmap' && Array.isArray(b.roadmapSteps)) {
         const stepsHtml = b.roadmapSteps
           .map(
-            (s) => `
+            (s: any) => `
             <div style="margin-bottom: 10px; padding: 12px; background-color: #18181b; border: 1px solid #27272a; border-radius: 10px;">
-              <div style="font-family: monospace; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">${s.phase}</div>
-              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 2px;">${s.title}</div>
-              <div style="font-size: 13px; color: #a1a1aa; margin-top: 4px;">${s.description}</div>
+              <div style="font-family: monospace; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">${s.phase || ''}</div>
+              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 2px;">${s.title || ''}</div>
+              <div style="font-size: 13px; color: #a1a1aa; margin-top: 4px;">${s.description || ''}</div>
             </div>`
           )
           .join('');
@@ -376,7 +378,7 @@ function buildMasterEmailTemplate({
                 <p style="margin: 0 0 14px 0; font-size: 12px;">
                   <a href="${siteUrl}" style="color: #60a5fa; text-decoration: none; margin: 0 8px;">Feed Principal</a> ·
                   <a href="${siteUrl}/config" style="color: #60a5fa; text-decoration: none; margin: 0 8px;">Personalizar Filtros</a> ·
-                  <a href="${siteUrl}/notificacoes" style="color: #60a5fa; text-decoration: none; margin: 0 8px;">Mural Oficial</a> ·
+                  <a href="${siteUrl}/atualizacoes" style="color: #60a5fa; text-decoration: none; margin: 0 8px;">Mural Oficial</a> ·
                   <a href="${siteUrl}/apoie" style="color: #60a5fa; text-decoration: none; margin: 0 8px;">Apoiar Projeto</a>
                 </p>
                 <p style="margin: 0; font-size: 11px; color: #52525b;">
@@ -405,7 +407,7 @@ async function sendEmailDispatcher(
 
   const errors: string[] = [];
 
-  // CAMADA 1: BREVO SMTP RELAY (Gratuito, 300/dia, sem domínio próprio e sem bloqueio WebLoginRequired)
+  // CAMADA 1: BREVO SMTP RELAY
   const brevoTransporter = createBrevoTransporter();
   const brevoSender =
     process.env.BREVO_SENDER_EMAIL?.trim() ||
@@ -433,18 +435,16 @@ async function sendEmailDispatcher(
           });
         }
       }
-      console.log('✅ [Brevo SMTP] E-mail entregue com sucesso para:', recipients);
       brevoTransporter.close();
       return { ok: true, sent: recipients.length, errors: [] };
     } catch (brevoErr: any) {
       const msg = brevoErr?.message || String(brevoErr);
-      console.error('❌ [Erro Brevo SMTP]:', msg);
       errors.push(`Brevo: ${msg}`);
       brevoTransporter.close();
     }
   }
 
-  // CAMADA 2: GMAIL SMTP (Caso configurado e destravado)
+  // CAMADA 2: GMAIL SMTP
   const gmailTransporter = createGmailTransporter();
   const gmailUser = process.env.GMAIL_USER?.trim();
 
@@ -469,12 +469,10 @@ async function sendEmailDispatcher(
           });
         }
       }
-      console.log('✅ [Gmail SMTP] E-mail entregue com sucesso para:', recipients);
       gmailTransporter.close();
       return { ok: true, sent: recipients.length, errors: [] };
     } catch (smtpErr: any) {
       const msg = smtpErr?.message || String(smtpErr);
-      console.error('❌ [Erro Gmail SMTP]:', msg);
       errors.push(`Gmail SMTP: ${msg}`);
       gmailTransporter.close();
     }
@@ -548,7 +546,7 @@ async function triggerWebPushForOfficialUpdate(
             JSON.stringify({
               title,
               body: message.slice(0, 160),
-              url: '/notificacoes',
+              url: '/atualizacoes',
               tag: 'insight-official-update',
             })
           );
@@ -694,7 +692,7 @@ export async function POST(request: Request) {
           </div>
         `,
         ctaLabel: 'Ver Linha do Tempo Completa',
-        ctaUrl: `${siteUrl}/notificacoes`,
+        ctaUrl: `${siteUrl}/atualizacoes`,
         siteUrl,
       });
 

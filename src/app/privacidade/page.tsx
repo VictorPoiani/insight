@@ -173,7 +173,7 @@ export default function PrivacidadePage() {
             de Assinantes (tabela <code>subscribers</code>) são utilizados exclusivamente para o
             disparo de conteúdos editoriais do <strong className="text-primary">Insight*</strong> e
             comunicados institucionais do{' '}
-            <Link href="/notificacoes" className="text-accent font-semibold hover:underline">
+            <Link href="/atualizacoes" className="text-accent font-semibold hover:underline">
               Mural Oficial
             </Link>
             . Sob nenhuma circunstância comercializamos, alugamos ou cedemos listas de e-mail a

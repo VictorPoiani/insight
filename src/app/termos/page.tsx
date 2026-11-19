@@ -373,7 +373,7 @@ export default function TermosPage() {
             atualizado periodicamente para refletir melhorias operacionais, novos recursos comerciais
             ou alterações legislativas. As revisões entrarão em vigor imediatamente após sua
             publicação nesta página e divulgação no{' '}
-            <Link href="/notificacoes" className="text-accent font-semibold hover:underline">
+            <Link href="/atualizacoes" className="text-accent font-semibold hover:underline">
               Mural Oficial
             </Link>{' '}
             da Plataforma. A continuidade do uso dos Serviços após a atualização constituirá

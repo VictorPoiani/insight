@@ -639,7 +639,7 @@ export default function AboutPage() {
           </a>
 
           <Link
-            href="/notificacoes"
+            href="/atualizacoes"
             className="px-3.5 py-2.5 rounded-xl bg-surface border border-border hover:border-accent text-xs font-bold text-primary transition-colors"
           >
             Mural de Atualizações

@@ -111,7 +111,7 @@ O **Insight\*** transforma publicações do feed em boletins editoriais enviados
 ---
 
 ### 🔔 5. Mural Oficial, Apoio & Transparência
-- **Mural Oficial (`/notificacoes`):** Linha do tempo dedicada a *changelogs*, novidades de recursos e comunicados oficiais do projeto.
+- **Mural Oficial (`/atualizacoes`):** Linha do tempo dedicada a *changelogs*, novidades de recursos e comunicados oficiais do projeto.
 - **Apoie o Projeto (`/apoie`):** Página responsiva para contribuições voluntárias e incentivo à manutenção da infraestrutura.
 - **Governança & Conformidade Legal (`/termos` e `/privacidade`):** Termos de Uso e Política de Privacidade em padrão corporativo v2.0, adequados ao **Marco Civil da Internet** e à **LGPD**.
 

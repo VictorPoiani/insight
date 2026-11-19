@@ -17,6 +17,7 @@ export interface SocialLinks {
 
 export interface Profile {
   id: string;
+  user_id?: string | null;
   username: string;
   full_name: string;
   display_name?: string | null;
@@ -31,7 +32,11 @@ export interface Profile {
   spotify_track_id?: string | null;
   tags?: string[] | null;
   followers_count?: number | null;
+  posts_count?: number | null;
   social_links: SocialLinks;
+  role?: 'admin' | 'moderator' | 'user';
+  status?: 'active' | 'suspended' | 'banned';
+  onboarding_completed?: boolean;
   created_at: string;
 }
 
@@ -298,6 +303,7 @@ export interface NotificationItem {
 
 export interface CustomTopic {
   id: string;
+  profile_id?: string | null;
   name: string;
   tag: string;
   color: string;

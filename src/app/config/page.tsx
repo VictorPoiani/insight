@@ -2,31 +2,120 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { Profile } from '@/types/database';
 import {
-  Sun,
-  Moon,
-  Contrast,
-  Type,
+  BookOpen,
+  Eye,
+  EyeOff,
   Lock,
   LogOut,
   ShieldCheck,
   FileText,
   Shield,
   Check,
-  BellPlus,
-  Sparkles,
+  Bell,
   Pin,
   Hash,
+  KeyRound,
+  Trash2,
+  Plus,
+  Copy,
+  Flag,
+  ExternalLink,
+  LogIn,
+  AtSign,
+  Download,
+  UserCheck,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 
+type ThemeOption = 'dark' | 'light' | 'night' | 'oled';
+type ReadingFontOption = 'sans' | 'serif' | 'mono';
+
 interface UserPreferences {
-  theme: 'dark' | 'light';
+  theme: ThemeOption;
   highContrast: boolean;
   fontSize: number;
+  readingMode: boolean;
+  readingFont: ReadingFontOption;
+  warmFilter: number;
+  accentColor: string;
+  reduceMotion: boolean;
 }
 
 type NotifyMode = 'all' | 'tags' | 'pinned' | 'official_only';
+type ConfigTabId = 'appearance' | 'account' | 'notifications' | 'staff';
+
+interface InviteCodeRow {
+  id: string;
+  code: string;
+  max_uses: number;
+  uses_count: number;
+  created_at: string;
+}
+
+interface ReportRow {
+  id: string;
+  reporter_id: string | null;
+  target_post_id: string | null;
+  target_profile_id: string | null;
+  reason: string;
+  status: 'pending' | 'resolved' | 'dismissed';
+  created_at: string;
+}
+
+const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
+
+const DEFAULT_VAPID_PUBLIC_KEY =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+  'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+const RESERVED_USERNAMES = new Set([
+  'admin',
+  'insight',
+  'suporte',
+  'explore',
+  'login',
+  'config',
+  'notificacoes',
+  'apoie',
+  'about',
+  'termos',
+  'privacidade',
+  'api',
+  'root',
+  'moderator',
+]);
+
+// 5 níveis na trilha estilo X/Twitter (Aa ---o---o---o--- Aa)
+const FONT_SIZE_STEPS = [16, 17.5, 19, 20.5, 22];
+
+const ACCENT_PRESETS = [
+  { label: 'Azul Insight', color: '#2563eb' },
+  { label: 'Celeste', color: '#38bdf8' },
+  { label: 'Amarelo Sol', color: '#eab308' },
+  { label: 'Carmesim', color: '#f43f5e' },
+  { label: 'Violeta', color: '#8b5cf6' },
+  { label: 'Âmbar Quente', color: '#e08b3e' },
+  { label: 'Esmeralda', color: '#10b981' },
+];
 
 const NEWSLETTER_TAGS = [
   'dev',
@@ -43,25 +132,102 @@ const DEFAULT_PREFS: UserPreferences = {
   theme: 'dark',
   highContrast: false,
   fontSize: 19,
+  readingMode: false,
+  readingFont: 'sans',
+  warmFilter: 0,
+  accentColor: '#2563eb',
+  reduceMotion: false,
 };
 
+function generateRandomBetaCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const pick = (len: number) =>
+    Array.from({ length: len }, () =>
+      chars.charAt(Math.floor(Math.random() * chars.length))
+    ).join('');
+  return `INSG-${pick(4)}-${pick(4)}`;
+}
+
+/**
+ * Chave deslizante minimalista (Toggle Switch)
+ */
+function FluidSwitch({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+        checked ? 'bg-accent' : 'bg-elevated border-border'
+      }`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
+}
+
 export default function ConfigPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [activeTab, setActiveTab] = useState<ConfigTabId>('appearance');
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [mounted, setMounted] = useState(false);
+  const [focusSidebarsCollapsed, setFocusSidebarsCollapsed] = useState(false);
 
+  // Notificações (Web Push + Newsletter)
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [loadingPush, setLoadingPush] = useState(false);
   const [subEmail, setSubEmail] = useState('');
   const [notifyMode, setNotifyMode] = useState<NotifyMode>('all');
   const [subTags, setSubTags] = useState<string[]>(['dev', 'projetos']);
   const [savingSub, setSavingSub] = useState(false);
   const [subSaved, setSubSaved] = useState(false);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Conta Autenticada
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [myProfile, setMyProfile] = useState<Profile | null>(null);
 
-  const supabase = createClient();
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  >('idle');
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameMsg, setUsernameMsg] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const [exportingData, setExportingData] = useState(false);
+
+  // Painel da Equipe Dev
+  const [isStaff, setIsStaff] = useState(false);
+  const [inviteCodes, setInviteCodes] = useState<InviteCodeRow[]>([]);
+  const [newCodeMaxUses, setNewCodeMaxUses] = useState(5);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [reports, setReports] = useState<ReportRow[]>([]);
 
   const loadSubscriberPreferences = useCallback(
     async (targetEmail: string) => {
@@ -84,34 +250,22 @@ export default function ConfigPage() {
     [supabase]
   );
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('insight-preferences');
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<UserPreferences>;
-        const merged: UserPreferences = {
-          theme: parsed.theme === 'light' ? 'light' : 'dark',
-          highContrast: Boolean(parsed.highContrast),
-          fontSize: parsed.fontSize || 19,
-        };
-        setPrefs(merged);
-        applyPreferencesToDOM(merged);
-      }
+  const loadStaffPanelData = useCallback(async () => {
+    const [{ data: codesData }, { data: reportsData }] = await Promise.all([
+      supabase
+        .from('invite_codes')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30),
+    ]);
 
-      const savedSubEmail = localStorage.getItem('insight-subscriber-email');
-      if (savedSubEmail) {
-        setSubEmail(savedSubEmail);
-        loadSubscriberPreferences(savedSubEmail);
-      }
-    } catch {
-      // Ignora erro de leitura local
-    }
-    setMounted(true);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserEmail(session?.user?.email ?? null);
-    });
-  }, [supabase, loadSubscriberPreferences]);
+    if (codesData) setInviteCodes(codesData as InviteCodeRow[]);
+    if (reportsData) setReports(reportsData as ReportRow[]);
+  }, [supabase]);
 
   function applyPreferencesToDOM(nextPrefs: UserPreferences) {
     const root = document.documentElement;
@@ -123,14 +277,398 @@ export default function ConfigPage() {
       root.removeAttribute('data-contrast');
     }
 
-    root.style.fontSize = `${nextPrefs.fontSize}px`;
+    if (nextPrefs.readingMode) {
+      root.setAttribute('data-reading', 'comfortable');
+    } else {
+      root.removeAttribute('data-reading');
+    }
+
+    root.setAttribute('data-reading-font', nextPrefs.readingFont);
+
+    if (nextPrefs.reduceMotion) {
+      root.setAttribute('data-reduce-motion', 'true');
+    } else {
+      root.removeAttribute('data-reduce-motion');
+    }
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const effectiveSize = isMobile
+      ? Math.max(14, Math.min(18, nextPrefs.fontSize - 3))
+      : nextPrefs.fontSize;
+    root.style.fontSize = `${effectiveSize}px`;
+
+    root.style.setProperty('--accent', nextPrefs.accentColor);
+    root.style.setProperty('--accent-hover', nextPrefs.accentColor);
+    root.style.setProperty(
+      '--warm-overlay-opacity',
+      (nextPrefs.warmFilter / 100).toFixed(2)
+    );
   }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('insight-preferences');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<UserPreferences>;
+        const merged: UserPreferences = {
+          theme:
+            parsed.theme === 'light' ||
+            parsed.theme === 'night' ||
+            parsed.theme === 'oled'
+              ? parsed.theme
+              : 'dark',
+          highContrast: Boolean(parsed.highContrast),
+          fontSize: parsed.fontSize || 19,
+          readingMode: Boolean(parsed.readingMode),
+          readingFont: parsed.readingFont || 'sans',
+          warmFilter: typeof parsed.warmFilter === 'number' ? parsed.warmFilter : 0,
+          accentColor: parsed.accentColor || '#2563eb',
+          reduceMotion: Boolean(parsed.reduceMotion),
+        };
+        setPrefs(merged);
+        applyPreferencesToDOM(merged);
+      }
+
+      const savedSubEmail = localStorage.getItem('insight-subscriber-email');
+      if (savedSubEmail) {
+        setSubEmail(savedSubEmail);
+        loadSubscriberPreferences(savedSubEmail);
+      }
+    } catch {
+      // Ignora erro local
+    }
+    setMounted(true);
+
+    if (
+      typeof window !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window
+    ) {
+      setPushSupported(true);
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => setPushSubscribed(Boolean(sub)))
+        .catch(() => {});
+    }
+
+    async function loadUserSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setUserEmail(null);
+        setMyProfile(null);
+        setIsStaff(false);
+        return;
+      }
+
+      setUserEmail(session.user.email ?? null);
+      if (!subEmail && session.user.email) {
+        setSubEmail(session.user.email);
+        loadSubscriberPreferences(session.user.email);
+      }
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle();
+
+      if (prof) {
+        const typed = prof as Profile;
+        setMyProfile(typed);
+        setNewUsername(typed.username || '');
+        const staffMember =
+          typed.role === 'admin' ||
+          typed.role === 'moderator' ||
+          typed.id === FOUNDER_PROFILE_ID;
+        setIsStaff(staffMember);
+        if (staffMember) {
+          loadStaffPanelData();
+        }
+      }
+    }
+
+    loadUserSession();
+  }, [supabase, loadSubscriberPreferences, loadStaffPanelData]);
+
+  // Verifica unicidade do novo @username em tempo real
+  useEffect(() => {
+    if (!myProfile) return;
+    const clean = newUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+    if (!clean || clean === myProfile.username.toLowerCase()) {
+      setUsernameStatus('idle');
+      return;
+    }
+
+    if (clean.length < 3 || RESERVED_USERNAMES.has(clean)) {
+      setUsernameStatus('invalid');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      const { data: rpcAvailable, error: rpcErr } = await supabase.rpc(
+        'check_username_available',
+        {
+          target_username: clean,
+          exclude_profile_id: myProfile.id,
+        }
+      );
+
+      let isFree = false;
+      if (!rpcErr && typeof rpcAvailable === 'boolean') {
+        isFree = rpcAvailable;
+      } else {
+        const { data: rows } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', clean)
+          .neq('id', myProfile.id)
+          .limit(1);
+        isFree = !rows || rows.length === 0;
+      }
+
+      if (!cancelled) {
+        setUsernameStatus(isFree ? 'available' : 'taken');
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [newUsername, myProfile, supabase]);
 
   function updatePreferences(patch: Partial<UserPreferences>) {
     const nextPrefs = { ...prefs, ...patch };
     setPrefs(nextPrefs);
     localStorage.setItem('insight-preferences', JSON.stringify(nextPrefs));
     applyPreferencesToDOM(nextPrefs);
+  }
+
+  function handleResetVisualPreferences() {
+    setPrefs(DEFAULT_PREFS);
+    localStorage.setItem('insight-preferences', JSON.stringify(DEFAULT_PREFS));
+    applyPreferencesToDOM(DEFAULT_PREFS);
+  }
+
+  function handleToggleFocusSidebars() {
+    const next = !focusSidebarsCollapsed;
+    setFocusSidebarsCollapsed(next);
+    window.dispatchEvent(
+      new CustomEvent('insight-toggle-focus-mode', {
+        detail: { collapse: next },
+      })
+    );
+  }
+
+  async function handleUpdateUsername(e: React.FormEvent) {
+    e.preventDefault();
+    if (!myProfile || savingUsername) return;
+    setUsernameMsg(null);
+
+    const clean = newUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (clean.length < 3 || RESERVED_USERNAMES.has(clean)) {
+      setUsernameMsg({
+        type: 'error',
+        text: 'Escolha um @username válido com pelo menos 3 caracteres.',
+      });
+      return;
+    }
+
+    if (usernameStatus === 'taken') {
+      setUsernameMsg({
+        type: 'error',
+        text: `O identificador @${clean} já pertence a outra conta.`,
+      });
+      return;
+    }
+
+    setSavingUsername(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ username: clean })
+      .eq('id', myProfile.id);
+    setSavingUsername(false);
+
+    if (error) {
+      setUsernameMsg({
+        type: 'error',
+        text: 'Não foi possível alterar o @username: ' + error.message,
+      });
+      return;
+    }
+
+    setMyProfile({ ...myProfile, username: clean });
+    setUsernameStatus('idle');
+    setUsernameMsg({
+      type: 'success',
+      text: `Seu identificador agora é @${clean}`,
+    });
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordMsg(null);
+
+    if (newPassword.length < 6) {
+      setPasswordMsg({
+        type: 'error',
+        text: 'A nova senha deve ter no mínimo 6 caracteres.',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({
+        type: 'error',
+        text: 'A confirmação de senha não coincide.',
+      });
+      return;
+    }
+
+    setUpdatingPassword(true);
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    setUpdatingPassword(false);
+
+    if (error) {
+      setPasswordMsg({
+        type: 'error',
+        text: 'Erro ao atualizar senha: ' + error.message,
+      });
+      return;
+    }
+
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordMsg({
+      type: 'success',
+      text: 'Senha atualizada com sucesso!',
+    });
+  }
+
+  async function handleExportUserData() {
+    if (!myProfile || exportingData) return;
+    setExportingData(true);
+
+    try {
+      const { data: userPosts } = await supabase
+        .from('posts')
+        .select('*')
+        .or(`profile_id.eq.${myProfile.id},author_id.eq.${myProfile.id}`)
+        .order('created_at', { ascending: false });
+
+      const backupPayload = {
+        exported_at: new Date().toISOString(),
+        platform: 'Insight*',
+        profile: myProfile,
+        posts_count: userPosts?.length || 0,
+        posts: userPosts || [],
+      };
+
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `insight-dados-${myProfile.username}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingData(false);
+    }
+  }
+
+  async function handleSelfDeleteAccount() {
+    if (!myProfile) return;
+    if (myProfile.id === FOUNDER_PROFILE_ID) {
+      alert('A conta principal do fundador não pode ser autoexcluída.');
+      return;
+    }
+
+    const confirmation = prompt(
+      `ATENÇÃO: Para excluir permanentemente seu perfil (@${myProfile.username}) e todas as suas publicações, digite EXCLUIR MINHA CONTA:`
+    );
+    if (confirmation !== 'EXCLUIR MINHA CONTA') return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', myProfile.id);
+
+    if (error) {
+      alert('Erro ao excluir perfil: ' + error.message);
+      return;
+    }
+
+    await supabase.auth.signOut();
+    alert('Sua conta e seus dados foram removidos da plataforma.');
+    router.push('/');
+    router.refresh();
+  }
+
+  async function handleToggleWebPush() {
+    if (!pushSupported || loadingPush) return;
+    setLoadingPush(true);
+
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const existingSub = await reg.pushManager.getSubscription();
+
+      if (existingSub) {
+        await fetch('/api/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'unsubscribe',
+            endpoint: existingSub.endpoint,
+          }),
+        });
+        await existingSub.unsubscribe();
+        setPushSubscribed(false);
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('Permita as notificações no cadeado da barra de endereços do navegador.');
+          setLoadingPush(false);
+          return;
+        }
+
+        const newSub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(
+            DEFAULT_VAPID_PUBLIC_KEY
+          ) as unknown as BufferSource,
+        });
+
+        await fetch('/api/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'subscribe',
+            subscription: newSub.toJSON(),
+            notifyMode: 'all',
+            interestedTags: [],
+          }),
+        });
+
+        setPushSubscribed(true);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao configurar notificações no navegador.');
+    } finally {
+      setLoadingPush(false);
+    }
   }
 
   function toggleSubTag(tag: string) {
@@ -163,457 +701,1077 @@ export default function ConfigPage() {
 
     if (error) {
       setSavingSub(false);
-      alert('Erro ao salvar preferências de e-mail: ' + error.message);
+      alert('Erro ao salvar preferências: ' + error.message);
       return;
     }
 
     localStorage.setItem('insight-subscriber-email', cleanEmail);
-
-    await fetch('/api/newsletter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'welcome',
-        email: cleanEmail,
-        notifyMode,
-        interestedTags: subTags,
-      }),
-    }).catch(() => {});
-
     setSavingSub(false);
     setSubSaved(true);
-    setTimeout(() => setSubSaved(false), 3000);
+    setTimeout(() => setSubSaved(false), 2500);
   }
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError(null);
+  async function handleGenerateInviteCode() {
+    if (!isStaff || creatingInvite) return;
+    setCreatingInvite(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const code = generateRandomBetaCode();
+    const { error } = await supabase.from('invite_codes').insert({
+      code,
+      max_uses: Math.max(1, Number(newCodeMaxUses) || 5),
+      created_by: myProfile?.id || FOUNDER_PROFILE_ID,
     });
 
-    setAuthLoading(false);
+    setCreatingInvite(false);
+    if (!error) loadStaffPanelData();
+  }
 
-    if (error) {
-      setAuthError('Credenciais inválidas. Verifique seu e-mail e senha no Supabase.');
-      return;
-    }
+  async function handleDeleteInviteCode(id: string) {
+    await supabase.from('invite_codes').delete().eq('id', id);
+    setInviteCodes((prev) => prev.filter((c) => c.id !== id));
+  }
 
-    setUserEmail(data.user?.email ?? null);
-    setEmail('');
-    setPassword('');
+  async function handleResolveReport(reportId: string, status: 'resolved' | 'dismissed') {
+    await supabase.from('reports').update({ status }).eq('id', reportId);
+    setReports((prev) =>
+      prev.map((r) => (r.id === reportId ? { ...r, status } : r))
+    );
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
     setUserEmail(null);
+    setMyProfile(null);
+    setIsStaff(false);
+    router.push('/');
+    router.refresh();
   }
 
+  // Índice atual do tamanho da fonte na trilha de 5 pontos
+  const currentFontStepIndex = Math.max(
+    0,
+    FONT_SIZE_STEPS.findIndex((s) => Math.abs(s - prefs.fontSize) < 0.8)
+  );
+  const fontProgressPct =
+    (currentFontStepIndex / (FONT_SIZE_STEPS.length - 1)) * 100;
+
   return (
-    <div className="p-6 space-y-6">
-      <header className="border-b border-border pb-4">
-        <h1 className="text-2xl font-extrabold text-primary">Configurações</h1>
-        <p className="text-xs sm:text-sm text-secondary mt-1">
-          Personalize a aparência, notificações por e-mail, acessibilidade e acesso de autor.
-        </p>
+    <div className="w-full min-h-screen bg-background">
+      {/* CABEÇALHO FIXO MINIMALISTA COM ABAS */}
+      <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border">
+        <div className="px-6 pt-4 pb-3 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-extrabold text-primary">
+              Configurações
+            </h1>
+            <p className="text-xs text-muted">
+              Personalize sua experiência de leitura, cores, plano de fundo e conta
+            </p>
+          </div>
+
+          {myProfile && (
+            <Link
+              href={`/u/${encodeURIComponent(myProfile.username)}`}
+              className="px-3 py-1.5 rounded-full bg-surface border border-border hover:border-accent text-xs font-bold text-primary flex items-center gap-2 transition-colors"
+            >
+              <img
+                src={myProfile.avatar_url || '/assets/net/default-perfil'}
+                alt={myProfile.full_name}
+                className="w-5 h-5 rounded-full object-cover"
+              />
+              <span>@{myProfile.username}</span>
+            </Link>
+          )}
+        </div>
+
+        {/* Abas Horizontais Limpas */}
+        <div className="px-6 flex items-center gap-6 overflow-x-auto no-scrollbar text-xs sm:text-sm font-bold">
+          <button
+            type="button"
+            onClick={() => setActiveTab('appearance')}
+            className={`py-2.5 relative flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              activeTab === 'appearance'
+                ? 'text-primary'
+                : 'text-secondary hover:text-primary'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-accent" />
+            <span>Leitura & Visual</span>
+            {activeTab === 'appearance' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('account')}
+            className={`py-2.5 relative flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              activeTab === 'account'
+                ? 'text-primary'
+                : 'text-secondary hover:text-primary'
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5 text-accent" />
+            <span>Conta & Segurança</span>
+            {activeTab === 'account' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('notifications')}
+            className={`py-2.5 relative flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              activeTab === 'notifications'
+                ? 'text-primary'
+                : 'text-secondary hover:text-primary'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5 text-accent" />
+            <span>Notificações</span>
+            {activeTab === 'notifications' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+            )}
+          </button>
+
+          {isStaff && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('staff')}
+              className={`py-2.5 relative flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                activeTab === 'staff'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-accent" />
+              <span>Equipe Dev</span>
+              {activeTab === 'staff' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+              )}
+            </button>
+          )}
+        </div>
       </header>
 
-      {/* 1. Aparência (Modo Escuro / Modo Claro) */}
-      <section className="p-5 rounded-2xl bg-surface border border-border space-y-4">
-        <div>
-          <h2 className="text-sm font-bold text-primary">Tema da Interface</h2>
-          <p className="text-xs text-secondary">
-            Sua escolha fica salva neste navegador para os próximos acessos.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => updatePreferences({ theme: 'dark' })}
-            className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
-              mounted && prefs.theme === 'dark'
-                ? 'bg-accent/15 border-accent text-primary'
-                : 'bg-elevated border-border text-secondary hover:text-primary'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Moon className="w-5 h-5 text-accent" />
-              <div className="text-left">
-                <p className="text-xs sm:text-sm font-bold">Modo Escuro</p>
-                <p className="text-[11px] text-muted">Visual original Dark UI</p>
-              </div>
+      {/* ====================================================================
+          ABA 1: LEITURA & VISUAL (SEPARAÇÃO FLUIDA SEM CARDS)
+          ==================================================================== */}
+      {activeTab === 'appearance' && (
+        <div className="divide-y divide-border">
+          {/* Prévia de Leitura Fluida no Topo */}
+          <div className="px-6 py-5 bg-surface/20">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-muted">
+                Prévia de leitura ao vivo
+              </span>
+              <button
+                type="button"
+                onClick={handleResetVisualPreferences}
+                className="text-xs font-semibold text-secondary hover:text-primary inline-flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Restaurar padrão</span>
+              </button>
             </div>
-            {mounted && prefs.theme === 'dark' && (
-              <Check className="w-4 h-4 text-accent shrink-0" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => updatePreferences({ theme: 'light' })}
-            className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
-              mounted && prefs.theme === 'light'
-                ? 'bg-accent/15 border-accent text-primary'
-                : 'bg-elevated border-border text-secondary hover:text-primary'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Sun className="w-5 h-5 text-accent" />
-              <div className="text-left">
-                <p className="text-xs sm:text-sm font-bold">Modo Claro</p>
-                <p className="text-[11px] text-muted">Leitura diurna clara</p>
-              </div>
-            </div>
-            {mounted && prefs.theme === 'light' && (
-              <Check className="w-4 h-4 text-accent shrink-0" />
-            )}
-          </button>
-        </div>
-      </section>
-
-      {/* 2. Notificações por E-mail (Newsletter e Filtros de Postagens) */}
-      <form
-        onSubmit={handleSaveNewsletterPrefs}
-        className="p-5 rounded-2xl bg-surface border border-border space-y-4"
-      >
-        <div>
-          <h2 className="text-sm font-extrabold text-primary flex items-center gap-2">
-            <BellPlus className="w-4 h-4 text-accent" />
-            <span>Acompanhar por E-mail (Newsletter)</span>
-          </h2>
-          <p className="text-xs text-secondary mt-0.5">
-            Inscreva seu e-mail ou personalize exatamente quais tipos de publicações deseja receber.
-          </p>
-        </div>
-
-        <div>
-          <input
-            type="email"
-            required
-            value={subEmail}
-            onChange={(e) => setSubEmail(e.target.value)}
-            onBlur={(e) => loadSubscriberPreferences(e.target.value)}
-            placeholder="Digite seu melhor e-mail..."
-            className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-          />
-        </div>
-
-        {/* Regra Obrigatória: Atualizações Oficiais */}
-        <div className="p-3.5 rounded-xl bg-elevated/70 border border-border flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded bg-accent text-white flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-primary">
-                Atualizações Oficiais da Plataforma (Aba Notificações)
-              </p>
-              <p className="text-[11px] text-muted">
-                Novidades oficiais e notas de versão do Insight*
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface border border-border text-[10px] font-bold text-secondary shrink-0">
-            <Lock className="w-3 h-3 text-accent" />
-            Padrão obrigatório
-          </span>
-        </div>
-
-        {/* Opções de Filtro de Postagens do Feed */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-secondary block">
-            Notificações de novas postagens do feed:
-          </label>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => setNotifyMode('all')}
-              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                notifyMode === 'all'
-                  ? 'bg-accent/15 border-accent text-primary'
-                  : 'bg-elevated border-border text-secondary hover:text-primary'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold">Todas as postagens</p>
-                <p className="text-[11px] text-muted">
-                  Aviso sempre que um novo insight for publicado
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setNotifyMode('pinned')}
-              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                notifyMode === 'pinned'
-                  ? 'bg-accent/15 border-accent text-primary'
-                  : 'bg-elevated border-border text-secondary hover:text-primary'
-              }`}
-            >
-              <Pin className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold">Apenas Fixadas (Destaques)</p>
-                <p className="text-[11px] text-muted">
-                  Somente publicações marcadas como fixadas
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setNotifyMode('tags')}
-              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                notifyMode === 'tags'
-                  ? 'bg-accent/15 border-accent text-primary'
-                  : 'bg-elevated border-border text-secondary hover:text-primary'
-              }`}
-            >
-              <Hash className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold">Apenas temas que eu gosto</p>
-                <p className="text-[11px] text-muted">
-                  Filtrar pelas hashtags do meu interesse
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setNotifyMode('official_only')}
-              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                notifyMode === 'official_only'
-                  ? 'bg-accent/15 border-accent text-primary'
-                  : 'bg-elevated border-border text-secondary hover:text-primary'
-              }`}
-            >
-              <Lock className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold">Somente Atualizações Oficiais</p>
-                <p className="text-[11px] text-muted">
-                  Não receber avisos de posts comuns do feed
-                </p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {notifyMode === 'tags' && (
-          <div className="p-3.5 rounded-xl bg-elevated border border-border space-y-2">
-            <p className="text-xs font-semibold text-primary">
-              Escolha as hashtags que deseja acompanhar:
+            <p className="reading-preview-zone text-sm text-primary leading-relaxed">
+              &ldquo;A simplicidade é o último grau de sofisticação. Ajuste abaixo o tamanho da fonte, a cor de destaque, o plano de fundo e o modo de leitura confortável.&rdquo;
             </p>
-            <div className="flex flex-wrap gap-2">
-              {NEWSLETTER_TAGS.map((tag) => {
-                const active = subTags.includes(tag);
+          </div>
+
+          {/* 1. Tamanho da Fonte (Trilha de 5 pontos: Aa ---●--- Aa) */}
+          <div className="px-6 py-6 space-y-5">
+            <h2 className="text-base font-extrabold text-primary">
+              Tamanho da fonte
+            </h2>
+
+            <div className="flex items-center gap-4 pt-1">
+              <span className="text-xs font-medium text-secondary select-none">
+                Aa
+              </span>
+
+              <div className="relative flex-1 flex items-center justify-between">
+                {/* Linha de fundo */}
+                <div className="absolute left-0 right-0 h-1 rounded-full bg-elevated" />
+
+                {/* Linha preenchida até o ponto ativo */}
+                <div
+                  style={{ width: `${mounted ? fontProgressPct : 50}%` }}
+                  className="absolute left-0 h-1 rounded-full bg-accent transition-all duration-200"
+                />
+
+                {/* 5 Nós clicáveis */}
+                {FONT_SIZE_STEPS.map((stepSize, idx) => {
+                  const isSelected = mounted && idx === currentFontStepIndex;
+                  const isPassed = mounted && idx <= currentFontStepIndex;
+
+                  return (
+                    <button
+                      key={stepSize}
+                      type="button"
+                      onClick={() => updatePreferences({ fontSize: stepSize })}
+                      title={`Tamanho ${idx + 1}`}
+                      className="relative z-10 flex items-center justify-center focus:outline-none group py-2"
+                    >
+                      <span
+                        className={`rounded-full transition-all duration-150 ${
+                          isSelected
+                            ? 'w-5 h-5 bg-accent shadow-md scale-110 ring-4 ring-accent/20'
+                            : isPassed
+                            ? 'w-3.5 h-3.5 bg-accent'
+                            : 'w-3.5 h-3.5 bg-border group-hover:bg-secondary'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="text-xl font-semibold text-primary select-none">
+                Aa
+              </span>
+            </div>
+          </div>
+
+          {/* 2. Cor de Destaque (Círculos grandes com Checkmark interno) */}
+          <div className="px-6 py-6 space-y-4">
+            <h2 className="text-base font-extrabold text-primary">Cor</h2>
+
+            <div className="flex flex-wrap items-center justify-between sm:justify-start sm:gap-7 gap-3 pt-1">
+              {ACCENT_PRESETS.map((preset) => {
+                const active =
+                  mounted &&
+                  prefs.accentColor.toLowerCase() === preset.color.toLowerCase();
+
                 return (
                   <button
-                    key={tag}
+                    key={preset.color}
                     type="button"
-                    onClick={() => toggleSubTag(tag)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1 transition-colors ${
-                      active
-                        ? 'bg-accent text-white border-accent'
-                        : 'bg-surface text-secondary border-border hover:text-primary'
-                    }`}
+                    title={preset.label}
+                    onClick={() => updatePreferences({ accentColor: preset.color })}
+                    style={{ backgroundColor: preset.color }}
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-white shadow-sm transition-transform hover:scale-105 active:scale-95 focus:outline-none"
                   >
-                    <span>#{tag}</span>
-                    {active && <Check className="w-3 h-3" />}
+                    {active && <Check className="w-5 h-5 stroke-[2.8]" />}
                   </button>
                 );
               })}
             </div>
           </div>
-        )}
 
-        <div className="flex justify-end pt-2 border-t border-border">
-          <button
-            type="submit"
-            disabled={savingSub}
-            className="px-5 py-2 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-hover flex items-center gap-1.5 disabled:opacity-50 transition-colors"
-          >
-            {subSaved ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Preferências Salvas! Confira seu e-mail</span>
-              </>
-            ) : (
-              <span>
-                {savingSub ? 'Salvando...' : 'Salvar e Receber Confirmação'}
-              </span>
-            )}
-          </button>
-        </div>
-      </form>
+          {/* 3. Plano de Fundo (Blocos Retangulares Limpos + Switches Fluídos) */}
+          <div className="px-6 py-6 space-y-5">
+            <h2 className="text-base font-extrabold text-primary">
+              Plano de fundo
+            </h2>
 
-      {/* 3. Acessibilidade e Escala de Fonte */}
-      <section className="p-5 rounded-2xl bg-surface border border-border space-y-4">
-        <h2 className="text-sm font-bold text-primary">Acessibilidade e Leitura</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                {
+                  id: 'light' as ThemeOption,
+                  label: 'Claro',
+                  bg: '#ffffff',
+                  textColor: '#0f172a',
+                  borderIdle: '#cbd5e1',
+                },
+                {
+                  id: 'dark' as ThemeOption,
+                  label: 'Obsidian',
+                  bg: '#121317',
+                  textColor: '#f4f4f5',
+                  borderIdle: '#27272a',
+                },
+                {
+                  id: 'night' as ThemeOption,
+                  label: 'Âmbar',
+                  bg: '#191510',
+                  textColor: '#ebe3d5',
+                  borderIdle: '#3d3429',
+                },
+                {
+                  id: 'oled' as ThemeOption,
+                  label: 'Lights out',
+                  bg: '#000000',
+                  textColor: '#ffffff',
+                  borderIdle: '#27272a',
+                },
+              ].map((t) => {
+                const active = mounted && prefs.theme === t.id;
 
-        <div className="flex items-center justify-between gap-4 pt-1">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-elevated border border-border text-accent">
-              <Contrast className="w-4 h-4" />
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      const patch: Partial<UserPreferences> = { theme: t.id };
+                      if (t.id === 'night') {
+                        patch.readingMode = true;
+                        patch.accentColor = '#e08b3e';
+                      } else if (
+                        prefs.theme === 'night' &&
+                        prefs.accentColor === '#e08b3e'
+                      ) {
+                        patch.accentColor = '#2563eb';
+                      }
+                      updatePreferences(patch);
+                    }}
+                    style={{
+                      backgroundColor: t.bg,
+                      color: t.textColor,
+                      borderColor: active ? prefs.accentColor : t.borderIdle,
+                    }}
+                    className={`h-16 px-4 rounded-xl border-2 flex items-center gap-3 transition-all focus:outline-none ${
+                      active ? 'shadow-md' : 'opacity-90 hover:opacity-100'
+                    }`}
+                  >
+                    <span
+                      style={{
+                        backgroundColor: active ? prefs.accentColor : 'transparent',
+                        borderColor: active
+                          ? prefs.accentColor
+                          : 'rgba(148, 163, 184, 0.5)',
+                      }}
+                      className="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 text-white"
+                    >
+                      {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </span>
+
+                    <span className="text-xs sm:text-sm font-bold truncate">
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            <div>
-              <p className="text-xs sm:text-sm font-semibold text-primary">Alto Contraste</p>
-              <p className="text-xs text-muted">
-                Aumenta a definição de bordas e textos
-              </p>
+
+            {/* Opções de Leitura Confortável e Filtro Quente integradas sem cards */}
+            <div className="pt-4 space-y-5">
+              {/* Switch: Modo de Leitura Confortável */}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-primary">
+                    Modo de leitura confortável
+                  </p>
+                  <p className="text-xs text-muted mt-0.5">
+                    Aumenta o entrelinhamento dos posts (1.85x) e suaviza o espaçamento para textos longos
+                  </p>
+                </div>
+                <FluidSwitch
+                  checked={Boolean(mounted && prefs.readingMode)}
+                  onChange={() =>
+                    updatePreferences({ readingMode: !prefs.readingMode })
+                  }
+                />
+              </div>
+
+              {/* Barra Deslizante: Filtro Noturno de Luz Azul */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">
+                      Filtro noturno de luz azul (Tom Âmbar)
+                    </p>
+                    <p className="text-xs text-muted">
+                      Aplica uma camada quente suave para proteger a visão à noite
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-accent">
+                    {mounted ? prefs.warmFilter : 0}%
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={35}
+                  step={5}
+                  value={mounted ? prefs.warmFilter : 0}
+                  onChange={(e) =>
+                    updatePreferences({ warmFilter: Number(e.target.value) })
+                  }
+                  className="w-full accent-accent cursor-pointer h-1.5 bg-elevated rounded-lg"
+                />
+              </div>
+
+              {/* Tipografia das Publicações */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-primary">
+                    Tipografia das publicações
+                  </p>
+                  <p className="text-xs text-muted">
+                    Escolha o estilo de fonte principal dos artigos e posts
+                  </p>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5">
+                  {[
+                    { id: 'sans' as ReadingFontOption, label: 'Sans' },
+                    { id: 'serif' as ReadingFontOption, label: 'Editorial' },
+                    { id: 'mono' as ReadingFontOption, label: 'Mono' },
+                  ].map((f) => {
+                    const active = mounted && prefs.readingFont === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => updatePreferences({ readingFont: f.id })}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                          active
+                            ? 'bg-accent text-white border-accent'
+                            : 'bg-transparent border-border text-secondary hover:text-primary'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => updatePreferences({ highContrast: !prefs.highContrast })}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-              mounted && prefs.highContrast
-                ? 'bg-accent text-white border-accent'
-                : 'bg-elevated text-secondary border-border hover:text-primary'
-            }`}
-          >
-            {mounted && prefs.highContrast ? 'Ativado' : 'Desativado'}
-          </button>
-        </div>
+          {/* 4. Acessibilidade e Foco (Linhas Fluídas com Switch) */}
+          <div className="px-6 py-6 space-y-5">
+            <h2 className="text-base font-extrabold text-primary">
+              Acessibilidade e foco
+            </h2>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-elevated border border-border text-accent">
-              <Type className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-xs sm:text-sm font-semibold text-primary">Escala da Interface</p>
-              <p className="text-xs text-muted">
-                Ajuste o tamanho geral dos textos e cartões
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {[
-              { size: 17, label: 'Compacto' },
-              { size: 19, label: 'Padrão' },
-              { size: 21, label: 'Grande' },
-            ].map((item) => (
-              <button
-                key={item.size}
-                type="button"
-                onClick={() => updatePreferences({ fontSize: item.size })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                  mounted && prefs.fontSize === item.size
-                    ? 'bg-accent text-white border-accent'
-                    : 'bg-elevated text-secondary border-border hover:text-primary'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Documentos Legais e LGPD */}
-      <section className="p-5 rounded-2xl bg-surface border border-border space-y-3">
-        <h2 className="text-sm font-bold text-primary">Privacidade e Termos</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Link
-            href="/privacidade"
-            className="p-3.5 rounded-xl bg-elevated border border-border hover:border-accent flex items-center gap-3 transition-colors"
-          >
-            <Shield className="w-4 h-4 text-accent shrink-0" />
-            <div>
-              <p className="text-xs font-bold text-primary">Política de Privacidade</p>
-              <p className="text-[11px] text-muted">Seus direitos e conformidade LGPD</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/termos"
-            className="p-3.5 rounded-xl bg-elevated border border-border hover:border-accent flex items-center gap-3 transition-colors"
-          >
-            <FileText className="w-4 h-4 text-accent shrink-0" />
-            <div>
-              <p className="text-xs font-bold text-primary">Termos de Uso</p>
-              <p className="text-[11px] text-muted">Regras e diretrizes da plataforma</p>
-            </div>
-          </Link>
-        </div>
-      </section>
-
-      {/* 5. Acesso do Autor (Supabase Auth) */}
-      <section className="p-5 rounded-2xl bg-surface border border-border space-y-4">
-        <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4 text-accent" />
-          <h2 className="text-sm font-bold text-primary">Modo Autor (Desenvolvimento)</h2>
-        </div>
-
-        {userEmail ? (
-          <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-elevated border border-accent/40">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-accent shrink-0" />
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-bold text-primary">Modo Autor Ativo</p>
-                <p className="text-[11px] text-secondary">Autenticado como {userEmail}</p>
+                <p className="text-sm font-semibold text-primary">
+                  Modo foco (Recolher barras laterais)
+                </p>
+                <p className="text-xs text-muted">
+                  Expande a área central de leitura ocultando os menus laterais
+                </p>
+              </div>
+              <FluidSwitch
+                checked={focusSidebarsCollapsed}
+                onChange={handleToggleFocusSidebars}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">
+                  Alto contraste
+                </p>
+                <p className="text-xs text-muted">
+                  Aumenta a nitidez das bordas e o contraste entre textos e fundo
+                </p>
+              </div>
+              <FluidSwitch
+                checked={Boolean(mounted && prefs.highContrast)}
+                onChange={() =>
+                  updatePreferences({ highContrast: !prefs.highContrast })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">
+                  Reduzir animações
+                </p>
+                <p className="text-xs text-muted">
+                  Minimiza efeitos de movimento e transições na interface
+                </p>
+              </div>
+              <FluidSwitch
+                checked={Boolean(mounted && prefs.reduceMotion)}
+                onChange={() =>
+                  updatePreferences({ reduceMotion: !prefs.reduceMotion })
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          ABA 2: CONTA & SEGURANÇA (SEPARAÇÃO FLUIDA SEM CARDS)
+          ==================================================================== */}
+      {activeTab === 'account' && (
+        <div className="divide-y divide-border">
+          {userEmail && myProfile ? (
+            <>
+              {/* Sessão Atual */}
+              <div className="px-6 py-6 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <img
+                    src={myProfile.avatar_url || '/assets/net/default-perfil'}
+                    alt={myProfile.full_name}
+                    className="w-12 h-12 rounded-full object-cover border border-border"
+                  />
+                  <div>
+                    <p className="text-sm font-extrabold text-primary">
+                      {myProfile.display_name || myProfile.full_name}
+                    </p>
+                    <p className="text-xs text-muted">
+                      @{myProfile.username} · {userEmail}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 rounded-full border border-border hover:border-danger text-xs font-bold text-danger flex items-center gap-1.5 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sair da conta</span>
+                </button>
+              </div>
+
+              {/* Identificador Único (@username) */}
+              <form
+                onSubmit={handleUpdateUsername}
+                className="px-6 py-6 space-y-3.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-extrabold text-primary">
+                      Identificador único (@username)
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Endereço público do seu perfil: /u/{newUsername || myProfile.username}
+                    </p>
+                  </div>
+
+                  {usernameStatus === 'checking' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-sky-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Verificando...</span>
+                    </span>
+                  )}
+                  {usernameStatus === 'available' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Disponível</span>
+                    </span>
+                  )}
+                  {usernameStatus === 'taken' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-danger">
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Já está em uso</span>
+                    </span>
+                  )}
+                </div>
+
+                {usernameMsg && (
+                  <p
+                    className={`text-xs font-semibold ${
+                      usernameMsg.type === 'success'
+                        ? 'text-emerald-400'
+                        : 'text-danger'
+                    }`}
+                  >
+                    {usernameMsg.text}
+                  </p>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 max-w-xl">
+                  <div className="relative flex-1 w-full">
+                    <AtSign className="w-4 h-4 text-muted absolute left-3.5 top-2.5" />
+                    <input
+                      type="text"
+                      required
+                      maxLength={24}
+                      value={newUsername}
+                      onChange={(e) =>
+                        setNewUsername(
+                          e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+                        )
+                      }
+                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-surface border border-border text-xs sm:text-sm font-mono text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={
+                      savingUsername ||
+                      newUsername === myProfile.username ||
+                      usernameStatus === 'taken' ||
+                      usernameStatus === 'invalid' ||
+                      usernameStatus === 'checking'
+                    }
+                    className="w-full sm:w-auto px-5 py-2 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-40 transition-colors shrink-0"
+                  >
+                    {savingUsername ? 'Salvando...' : 'Atualizar'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Alterar Senha */}
+              <form
+                onSubmit={handleChangePassword}
+                className="px-6 py-6 space-y-3.5"
+              >
+                <div className="flex items-center justify-between max-w-xl">
+                  <div>
+                    <h2 className="text-base font-extrabold text-primary">
+                      Alterar senha
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Defina uma nova senha de acesso (mínimo de 6 caracteres)
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs text-secondary hover:text-primary flex items-center gap-1"
+                  >
+                    {showPassword ? (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5" />
+                        <span>Ocultar</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Mostrar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {passwordMsg && (
+                  <p
+                    className={`text-xs font-semibold ${
+                      passwordMsg.type === 'success'
+                        ? 'text-emerald-400'
+                        : 'text-danger'
+                    }`}
+                  >
+                    {passwordMsg.text}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Nova senha"
+                    className="bg-surface border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirme a nova senha"
+                    className="bg-surface border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={updatingPassword}
+                    className="px-5 py-2 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                  >
+                    {updatingPassword ? 'Atualizando...' : 'Salvar nova senha'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Dados, Backup e Documentos Legais */}
+              <div className="px-6 py-6 space-y-5">
+                <h2 className="text-base font-extrabold text-primary">
+                  Seus dados e privacidade (LGPD)
+                </h2>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">
+                      Exportar backup da conta (JSON)
+                    </p>
+                    <p className="text-xs text-muted">
+                      Baixe uma cópia com seus dados de perfil e todas as suas publicações
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportUserData}
+                    disabled={exportingData}
+                    className="px-4 py-2 rounded-full border border-border hover:border-accent text-xs font-bold text-primary flex items-center gap-1.5 shrink-0 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5 text-accent" />
+                    <span>{exportingData ? 'Gerando...' : 'Baixar arquivo'}</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 pt-1 text-xs font-semibold text-accent">
+                  <Link
+                    href="/privacidade"
+                    className="hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Política de Privacidade</span>
+                  </Link>
+                  <Link
+                    href="/termos"
+                    className="hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Termos de Uso</span>
+                  </Link>
+                </div>
+
+                {myProfile.id !== FOUNDER_PROFILE_ID && (
+                  <div className="pt-3 flex items-center justify-between">
+                    <span className="text-xs text-muted">
+                      Encerrar conta e apagar publicações
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSelfDeleteAccount}
+                      className="text-xs font-bold text-danger hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir minha conta</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="px-6 py-14 text-center space-y-3">
+              <Lock className="w-6 h-6 text-accent mx-auto" />
+              <h2 className="text-sm font-bold text-primary">
+                Você não está autenticado
+              </h2>
+              <p className="text-xs text-secondary max-w-sm mx-auto">
+                Entre ou crie sua conta para gerenciar seu @username, senha e dados pessoais.
+              </p>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Entrar / Criar Conta</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====================================================================
+          ABA 3: NOTIFICAÇÕES (SEPARAÇÃO FLUIDA SEM CARDS)
+          ==================================================================== */}
+      {activeTab === 'notifications' && (
+        <div className="divide-y divide-border">
+          {/* Web Push no Navegador */}
+          <div className="px-6 py-6 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-extrabold text-primary">
+                Alertas instantâneos no navegador (Web Push)
+              </h2>
+              <p className="text-xs text-muted mt-0.5">
+                Receba notificações nativas no seu dispositivo assim que novas atualizações saírem
+              </p>
+            </div>
+
+            {pushSupported ? (
+              <FluidSwitch
+                checked={pushSubscribed}
+                onChange={handleToggleWebPush}
+              />
+            ) : (
+              <span className="text-xs font-mono text-muted">Indisponível</span>
+            )}
+          </div>
+
+          {/* Newsletter por E-mail */}
+          <form
+            onSubmit={handleSaveNewsletterPrefs}
+            className="px-6 py-6 space-y-5"
+          >
+            <div>
+              <h2 className="text-base font-extrabold text-primary">
+                Notificações por e-mail
+              </h2>
+              <p className="text-xs text-muted mt-0.5">
+                Escolha quais publicações e notas oficiais deseja receber no seu e-mail
+              </p>
+            </div>
+
+            <input
+              type="email"
+              required
+              value={subEmail}
+              onChange={(e) => setSubEmail(e.target.value)}
+              onBlur={(e) => loadSubscriberPreferences(e.target.value)}
+              placeholder="Seu melhor e-mail..."
+              className="max-w-md w-full bg-surface border border-border rounded-xl px-3.5 py-2 text-xs sm:text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+            />
+
+            <div className="space-y-3 max-w-xl">
+              {[
+                {
+                  id: 'all' as NotifyMode,
+                  title: 'Todas as publicações',
+                  sub: 'Aviso a cada novo insight publicado',
+                  icon: Sparkles,
+                },
+                {
+                  id: 'pinned' as NotifyMode,
+                  title: 'Apenas destaques fixados',
+                  sub: 'Somente publicações marcadas como fixadas',
+                  icon: Pin,
+                },
+                {
+                  id: 'tags' as NotifyMode,
+                  title: 'Filtrar por #hashtags',
+                  sub: 'Apenas os temas selecionados abaixo',
+                  icon: Hash,
+                },
+                {
+                  id: 'official_only' as NotifyMode,
+                  title: 'Somente notas oficiais',
+                  sub: 'Apenas changelogs da plataforma',
+                  icon: Lock,
+                },
+              ].map((opt) => {
+                const active = notifyMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setNotifyMode(opt.id)}
+                    className="w-full py-2 flex items-center justify-between text-left group focus:outline-none"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-primary group-hover:text-accent transition-colors">
+                        {opt.title}
+                      </p>
+                      <p className="text-xs text-muted">{opt.sub}</p>
+                    </div>
+
+                    <span
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                        active
+                          ? 'bg-accent border-accent text-white'
+                          : 'border-border'
+                      }`}
+                    >
+                      {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {notifyMode === 'tags' && (
+              <div className="pt-2 space-y-2">
+                <p className="text-xs font-semibold text-secondary">
+                  Selecione as hashtags de interesse:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {NEWSLETTER_TAGS.map((tag) => {
+                    const active = subTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleSubTag(tag)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1 transition-colors ${
+                          active
+                            ? 'bg-accent text-white border-accent'
+                            : 'bg-transparent text-secondary border-border hover:text-primary'
+                        }`}
+                      >
+                        <span>#{tag}</span>
+                        {active && <Check className="w-3 h-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <button
+                type="submit"
+                disabled={savingSub}
+                className="px-5 py-2 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {subSaved ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Preferências salvas!</span>
+                  </>
+                ) : (
+                  <span>{savingSub ? 'Salvando...' : 'Salvar preferências'}</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ====================================================================
+          ABA 4: PAINEL DA EQUIPE DEV (SEPARAÇÃO FLUIDA SEM CARDS)
+          ==================================================================== */}
+      {activeTab === 'staff' && isStaff && (
+        <div className="divide-y divide-border">
+          <div className="px-6 py-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-extrabold text-primary">
+                  Chaves de convite do Beta Fechado ({inviteCodes.length})
+                </h2>
+                <p className="text-xs text-muted">
+                  Gere e gerencie códigos no padrão XXXX-XXXX-XXXX para novos membros
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 border border-border rounded-full px-3 py-1.5 text-xs">
+                  <span className="text-muted text-[11px]">Usos:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={newCodeMaxUses}
+                    onChange={(e) => setNewCodeMaxUses(Number(e.target.value))}
+                    className="w-10 bg-transparent font-mono font-bold text-primary focus:outline-none text-center"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={creatingInvite}
+                  onClick={handleGenerateInviteCode}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Gerar chave</span>
+                </button>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface border border-border text-xs font-semibold text-danger hover:border-danger transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Bloquear Modo Autor</span>
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleLogin} className="space-y-3">
-            <p className="text-xs text-secondary">
-              Exclusivo para Victor Poiani publicar novos insights, editar o perfil e atualizar o
-              mural.
-            </p>
+            <div className="divide-y divide-border border-t border-border">
+              {inviteCodes.map((item) => {
+                const exhausted = item.uses_count >= item.max_uses;
+                return (
+                  <div
+                    key={item.id}
+                    className="py-3 flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <p className="text-xs sm:text-sm font-mono font-extrabold text-primary tracking-wider">
+                        {item.code}
+                      </p>
+                      <p
+                        className={`text-[11px] font-mono ${
+                          exhausted ? 'text-danger' : 'text-emerald-400'
+                        }`}
+                      >
+                        {item.uses_count} / {item.max_uses} acessos utilizados
+                      </p>
+                    </div>
 
-            {authError && (
-              <p className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
-                {authError}
-              </p>
-            )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.code);
+                          setCopiedCode(item.code);
+                          setTimeout(() => setCopiedCode(null), 1800);
+                        }}
+                        className="p-2 rounded-full hover:bg-surface text-secondary hover:text-primary transition-colors"
+                      >
+                        {copiedCode === item.code ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="E-mail de administrador"
-                className="bg-elevated border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-              />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Senha"
-                className="bg-elevated border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-              />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInviteCode(item.id)}
+                        className="p-2 rounded-full hover:bg-surface text-muted hover:text-danger transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="px-4 py-2 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-50 transition-colors"
-            >
-              {authLoading ? 'Verificando...' : 'Destravar Modo Autor'}
-            </button>
-          </form>
-        )}
-      </section>
+          <div className="px-6 py-6 space-y-3">
+            <h2 className="text-base font-extrabold text-primary flex items-center gap-2">
+              <Flag className="w-4 h-4 text-danger" />
+              <span>
+                Denúncias da comunidade ({reports.filter((r) => r.status === 'pending').length} pendentes)
+              </span>
+            </h2>
+
+            {reports.length === 0 ? (
+              <p className="text-xs text-muted py-2">
+                Nenhuma denúncia registrada até o momento.
+              </p>
+            ) : (
+              <div className="divide-y divide-border">
+                {reports.map((rep) => (
+                  <div
+                    key={rep.id}
+                    className="py-3 flex flex-wrap items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <p className="font-bold text-primary">{rep.reason}</p>
+                      <p className="text-[11px] text-muted font-mono">
+                        Status: {rep.status.toUpperCase()} ·{' '}
+                        {new Date(rep.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {rep.target_post_id && (
+                        <Link
+                          href={`/?post=${rep.target_post_id}`}
+                          className="px-3 py-1 rounded-full border border-border text-[11px] font-semibold text-accent flex items-center gap-1"
+                        >
+                          <span>Ver post</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      )}
+                      {rep.status === 'pending' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveReport(rep.id, 'resolved')}
+                            className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-bold"
+                          >
+                            Resolvido
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveReport(rep.id, 'dismissed')}
+                            className="px-3 py-1 rounded-full border border-border text-muted hover:text-primary text-[11px]"
+                          >
+                            Arquivar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

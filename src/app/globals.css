@@ -55,6 +55,65 @@
   --accent-soft: rgba(56, 189, 248, 0.2) !important;
 }
 
+/* ============================================================================
+   TEMAS DE LEITURA: MODO NOTURNO (LUZ QUENTE / ÂMBAR) & PRETO OLED
+   ============================================================================ */
+[data-theme="night"] {
+  --background: #12100d;
+  --surface: #1a1713;
+  --elevated: #231f1a;
+  --border: #332d25;
+
+  --primary: #ebe3d5;
+  --secondary: #b8ae9e;
+  --muted: #877e6f;
+
+  --accent: #e08b3e;
+  --accent-hover: #c9772c;
+  --accent-soft: rgba(224, 139, 62, 0.16);
+}
+
+[data-theme="oled"] {
+  --background: #000000;
+  --surface: #08080a;
+  --elevated: #111114;
+  --border: #1f1f24;
+
+  --primary: #f4f4f5;
+  --secondary: #a1a1aa;
+  --muted: #63636b;
+}
+
+/* ============================================================================
+   MODO DE LEITURA CONFORTÁVEL & TIPOGRAFIA DOS POSTS
+   ============================================================================ */
+[data-reading="comfortable"] article .notion-content,
+[data-reading="comfortable"] article p,
+[data-reading="comfortable"] .reading-preview-zone {
+  line-height: 1.85 !important;
+  letter-spacing: 0.012em !important;
+}
+
+[data-reading-font="serif"] article .notion-content,
+[data-reading-font="serif"] .reading-preview-zone {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+}
+
+[data-reading-font="mono"] article .notion-content,
+[data-reading-font="mono"] .reading-preview-zone {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.93em !important;
+}
+
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 html {
   font-size: 19px;
   background-color: var(--background);
@@ -144,4 +203,37 @@ body {
   padding: 1px 4px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+
+/* ============================================================================
+   OTIMIZAÇÕES MOBILE (EMPILHAMENTO, ANTI-ZOOM IOS E TRAVA HORIZONTAL)
+   ============================================================================ */
+html,
+body {
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Empilha automaticamente blocos de 2 ou 3 colunas no celular */
+@media (max-width: 639px) {
+  .notion-content > * {
+    grid-column: 1 / -1 !important;
+  }
+
+  .notion-content figure {
+    width: 100% !important;
+  }
+}
+
+/* Impede o zoom automático do iOS Safari ao focar em inputs < 16px */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }

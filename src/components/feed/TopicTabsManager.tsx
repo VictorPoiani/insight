@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
 import {
@@ -36,9 +37,95 @@ import {
   Code2,
   Layers,
   Database,
-  Terminal,
   BookOpen,
 } from 'lucide-react';
+
+const DEFAULT_FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
+
+function sanitizeBlockHtml(dirtyHtml?: string | null): string {
+  if (!dirtyHtml) return '';
+  return dirtyHtml
+    .replace(
+      /<(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea)[^>]*>[\s\S]*?<\/\1>/gi,
+      ''
+    )
+    .replace(
+      /<\/?(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea|svg|math|base)[^>]*>/gi,
+      ''
+    )
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(
+      /(href|src|xlink:href|action)\s*=\s*(?:"\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*')/gi,
+      '$1="#"'
+    );
+}
+
+/**
+ * Animação do Asterisco (*) de 8 pontas para as abas e workspaces
+ */
+function TopicAsteriskSpinner({
+  size = 'xs',
+  color,
+}: {
+  size?: 'xs' | 'md';
+  color?: string;
+}) {
+  const armAngles = [0, 45, 90, 135];
+
+  if (size === 'xs') {
+    return (
+      <span className="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0">
+        <svg
+          viewBox="0 0 200 200"
+          className="w-full h-full animate-spin"
+          style={{ color: color || '#3898ec', animationDuration: '1.1s' }}
+        >
+          <g transform="translate(100, 100)">
+            {armAngles.map((angle) => (
+              <rect
+                key={angle}
+                x="-18"
+                y="-86"
+                width="36"
+                height="172"
+                rx="7"
+                ry="7"
+                transform={`rotate(${angle})`}
+                fill="currentColor"
+              />
+            ))}
+            <circle r="28" fill="currentColor" />
+          </g>
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <div className="w-full py-10 flex flex-col items-center justify-center gap-2.5 select-none">
+      <div className="w-8 h-8 animate-spin" style={{ animationDuration: '1.35s' }}>
+        <svg viewBox="0 0 200 200" className="w-full h-full">
+          <g transform="translate(100, 100)">
+            {armAngles.map((angle) => (
+              <rect
+                key={angle}
+                x="-17"
+                y="-86"
+                width="34"
+                height="172"
+                rx="6"
+                ry="6"
+                transform={`rotate(${angle})`}
+                fill={color || '#3898ec'}
+              />
+            ))}
+            <circle r="26" fill={color || '#3898ec'} />
+          </g>
+        </svg>
+      </div>
+    </div>
+  );
+}
 
 export interface FeedTabItem {
   id: string;
@@ -63,11 +150,16 @@ export const DEFAULT_TABS: FeedTabItem[] = [
   { id: 'reposts', label: 'Reposts', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
 ];
 
+export const GENERIC_USER_DEFAULT_TABS: FeedTabItem[] = [
+  { id: 'principal', label: 'Principal', tag: null, color: '#2563eb', isDefault: true },
+  { id: 'reposts', label: 'Reposts', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
+];
+
 const TOPIC_COLORS = [
-  '#2563eb', 
+  '#2563eb',
   '#38bdf8',
   '#10b981',
-  '#a855f7', 
+  '#a855f7',
   '#f59e0b',
   '#E63946',
   '#71717a',
@@ -133,10 +225,10 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
         goals: [
           {
             id: `goal-${uid()}`,
-            title: 'Lançamento da versão 2.0 da plataforma',
+            title: 'Definir primeira meta do projeto',
             targetValue: '100% concluído',
             priority: 'high',
-            progress: 65,
+            progress: 25,
           },
         ],
       };
@@ -145,7 +237,7 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
       return {
         habitColumns: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
         habits: [
-          { id: `hab-${uid()}`, name: 'Estudo técnico', checks: [true, true, true, false, false, false, false] },
+          { id: `hab-${uid()}`, name: 'Hábito diário', checks: [true, false, false, false, false, false, false] },
         ],
       };
 
@@ -154,25 +246,25 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
         tasks: [
           {
             id: `tsk-${uid()}`,
-            title: 'Estruturar arquitetura modular de blocos',
-            status: 'done',
-            assignee: 'Victor Poiani',
-            priority: 'high',
+            title: 'Primeira tarefa da lista',
+            status: 'in_progress',
+            assignee: 'Autor',
+            priority: 'medium',
           },
         ],
       };
 
     case 'diet':
       return {
-        waterGlasses: 4,
+        waterGlasses: 0,
         dietMeals: [
           {
             id: `meal-${uid()}`,
-            time: '07:30 · Café da Manhã',
-            foods: 'Ovos mexidos e aveia',
-            calories: 420,
-            proteinGrams: 28,
-            completed: true,
+            time: '08:00 · Refeição 01',
+            foods: 'Descreva os alimentos...',
+            calories: 350,
+            proteinGrams: 20,
+            completed: false,
           },
         ],
       };
@@ -184,9 +276,9 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
             id: `evt-${uid()}`,
             date: new Date().toISOString().slice(0, 10),
             time: '19:00',
-            title: 'Sistemas de Informação — UFV-CRP',
-            location: 'Campus Rio Paranaíba',
-            category: 'Académico',
+            title: 'Compromisso ou estudo semanal',
+            location: 'Local ou link',
+            category: 'Geral',
             color: '#38bdf8',
           },
         ],
@@ -197,10 +289,10 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
         roadmapSteps: [
           {
             id: `step-${uid()}`,
-            phase: 'Fase 01 · Fundação',
-            title: 'Arquitetura & Design System',
-            description: 'Definição da base visual.',
-            status: 'completed',
+            phase: 'Fase 01 · Planeamento',
+            title: 'Marco Inicial',
+            description: 'Definição dos objetivos principais.',
+            status: 'planned',
           },
         ],
       };
@@ -211,8 +303,8 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
         mindMapNodes: [
           {
             id: centerId,
-            label: 'Conceito Central',
-            note: 'Núcleo principal',
+            label: 'Ideia Central',
+            note: 'Ponto de partida',
             x: 50,
             y: 45,
             color: '#2563eb',
@@ -226,8 +318,8 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
     case 'blank_db':
       return {
         customTable: [
-          ['Registo', 'Categoria', 'Status', 'Observações'],
-          ['Item 01', 'Arquitetura', 'Ativo', 'Especificação inicial'],
+          ['Item', 'Categoria', 'Status', 'Notas'],
+          ['Registo 01', 'Geral', 'Ativo', 'Observação inicial'],
         ],
       };
 
@@ -241,6 +333,7 @@ function extractTopicMetadata(ct: CustomTopic): {
   visibility: PostVisibility;
   templateType: TopicTemplateType;
   workspaceData: TopicWorkspaceData;
+  ownerProfileId: string;
 } {
   const firstBlockMeta = (ct.description_blocks?.[0] as any)?._topicMeta;
   const icon = ct.icon || firstBlockMeta?.icon || 'file';
@@ -257,21 +350,35 @@ function extractTopicMetadata(ct: CustomTopic): {
       ? ct.workspace_data
       : firstBlockMeta?.workspace_data || {};
 
-  return { icon, visibility, templateType, workspaceData };
+  const ownerProfileId: string =
+    ct.profile_id || firstBlockMeta?.profile_id || DEFAULT_FOUNDER_PROFILE_ID;
+
+  return { icon, visibility, templateType, workspaceData, ownerProfileId };
 }
 
 interface TopicTabsManagerProps {
   activeTabId: string;
   onSelectTab: (tab: FeedTabItem) => void;
   isAdmin: boolean;
+  profileId?: string;
 }
 
 export function TopicTabsManager({
   activeTabId,
   onSelectTab,
   isAdmin,
+  profileId,
 }: TopicTabsManagerProps) {
+  const params = useParams();
+  const pathname = usePathname();
+  const supabase = createClient();
+
+  const [resolvedProfileId, setResolvedProfileId] = useState<string | null>(
+    profileId || (pathname === '/' ? DEFAULT_FOUNDER_PROFILE_ID : null)
+  );
+
   const [customTopics, setCustomTopics] = useState<CustomTopic[]>([]);
+  const [switchingTabId, setSwitchingTabId] = useState<string | null>(null);
   const [expandCreate, setExpandCreate] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -297,22 +404,65 @@ export function TopicTabsManager({
   const [saving, setSaving] = useState(false);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
-  const supabase = createClient();
 
   useEffect(() => {
-    loadCustomTopics();
-  }, []);
+    async function resolveTargetOwner() {
+      if (profileId) {
+        setResolvedProfileId(profileId);
+        return;
+      }
 
-  async function loadCustomTopics() {
+      const rawUsername = params?.username;
+      if (rawUsername) {
+        const cleanUser = decodeURIComponent(
+          Array.isArray(rawUsername) ? rawUsername[0] : rawUsername
+        );
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', cleanUser)
+          .maybeSingle();
+
+        if (prof?.id) {
+          setResolvedProfileId(prof.id);
+          return;
+        }
+      }
+
+      if (pathname === '/') {
+        setResolvedProfileId(DEFAULT_FOUNDER_PROFILE_ID);
+      }
+    }
+
+    resolveTargetOwner();
+  }, [profileId, params, pathname, supabase]);
+
+  const loadCustomTopics = useCallback(async () => {
+    if (!resolvedProfileId) {
+      setCustomTopics([]);
+      return;
+    }
+
     const { data } = await supabase
       .from('custom_topics')
       .select('*')
       .order('created_at', { ascending: true });
 
     if (data) {
-      setCustomTopics(data as CustomTopic[]);
+      const strictlyOwnedTopics = (data as CustomTopic[]).filter((ct) => {
+        const meta = extractTopicMetadata(ct);
+        return meta.ownerProfileId === resolvedProfileId;
+      });
+      setCustomTopics(strictlyOwnedTopics);
     }
-  }
+  }, [resolvedProfileId, supabase]);
+
+  useEffect(() => {
+    loadCustomTopics();
+  }, [loadCustomTopics]);
+
+  const isFounderProfile = resolvedProfileId === DEFAULT_FOUNDER_PROFILE_ID;
+  const baseDefaultTabs = isFounderProfile ? DEFAULT_TABS : GENERIC_USER_DEFAULT_TABS;
 
   const visibleCustomTopics = customTopics.filter((ct) => {
     const meta = extractTopicMetadata(ct);
@@ -321,7 +471,7 @@ export function TopicTabsManager({
   });
 
   const allTabs: FeedTabItem[] = [
-    ...DEFAULT_TABS,
+    ...baseDefaultTabs,
     ...visibleCustomTopics.map((ct) => {
       const meta = extractTopicMetadata(ct);
       return {
@@ -341,7 +491,7 @@ export function TopicTabsManager({
     }),
   ];
 
-  const currentTab = allTabs.find((t) => t.id === activeTabId) || DEFAULT_TABS[0];
+  const currentTab = allTabs.find((t) => t.id === activeTabId) || baseDefaultTabs[0];
 
   const templatesCatalog = useMemo(
     () => [
@@ -494,7 +644,7 @@ export function TopicTabsManager({
 
   async function handleCreateTopic(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedTemplate || saving) return;
+    if (!selectedTemplate || saving || !resolvedProfileId) return;
 
     const cleanName = name.trim();
     const cleanTag = (tag.trim() || cleanName)
@@ -521,6 +671,7 @@ export function TopicTabsManager({
         postVisibility: visibility,
         ...({
           _topicMeta: {
+            profile_id: resolvedProfileId,
             icon: iconKey,
             visibility,
             template_type: selectedTemplate.type,
@@ -531,6 +682,7 @@ export function TopicTabsManager({
     ];
 
     const fullPayload = {
+      profile_id: resolvedProfileId,
       name: cleanName,
       tag: cleanTag,
       color,
@@ -575,6 +727,7 @@ export function TopicTabsManager({
 
     const created: CustomTopic = {
       ...(data as CustomTopic),
+      profile_id: resolvedProfileId,
       icon: iconKey,
       visibility,
       template_type: selectedTemplate.type,
@@ -629,7 +782,7 @@ export function TopicTabsManager({
     if (!error) {
       setCustomTopics((prev) => prev.filter((t) => t.id !== topicToDelete.id));
       if (activeTabId === topicToDelete.id) {
-        onSelectTab(DEFAULT_TABS[0]);
+        onSelectTab(baseDefaultTabs[0]);
       }
     } else {
       alert('Erro ao excluir tópico: ' + error.message);
@@ -638,7 +791,7 @@ export function TopicTabsManager({
 
   return (
     <div className="border-b border-border bg-background">
-      {/* 1. Barra de Abas Horizontai */}
+      {/* 1. Barra de Abas Horizontais com Animação do Asterisco (*) */}
       <div className="flex items-center justify-between px-4 sm:px-6 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-5 sm:gap-7 min-w-max">
           {allTabs.map((tab) => {
@@ -654,6 +807,10 @@ export function TopicTabsManager({
                       alert(`A aba "${tab.label}" está atualmente em desenvolvimento.`);
                       return;
                     }
+                    if (tab.id !== currentTab.id) {
+                      setSwitchingTabId(tab.id);
+                      setTimeout(() => setSwitchingTabId(null), 320);
+                    }
                     onSelectTab(tab);
                   }}
                   style={{
@@ -667,10 +824,14 @@ export function TopicTabsManager({
                       : 'text-secondary hover:text-primary'
                   }`}
                 >
-                  {!tab.isDefault &&
-                    renderTopicVectorIcon(tab.icon, 'w-3.5 h-3.5 shrink-0', tab.color)}
+                  {switchingTabId === tab.id ? (
+                    <TopicAsteriskSpinner size="xs" color={tab.color} />
+                  ) : (
+                    !tab.isDefault &&
+                    renderTopicVectorIcon(tab.icon, 'w-3.5 h-3.5 shrink-0', tab.color)
+                  )}
                   <span>{tab.label}</span>
-                  
+
                   {isDev && (
                     <span className="px-1.5 py-0.2 rounded bg-elevated border border-border text-[9px] font-mono font-medium text-muted">
                       Em breve
@@ -724,7 +885,7 @@ export function TopicTabsManager({
         </div>
       </div>
 
-      {/* modal adaptadoa */}
+      {/* Modal de Criação de Página / Workspace */}
       {isAdmin && expandCreate && (
         <div
           onClick={() => setExpandCreate(false)}
@@ -852,7 +1013,7 @@ export function TopicTabsManager({
               <div className="w-6 hidden sm:block" />
             </div>
 
-            {/* Corpo da janela */}
+            {/* Corpo da Janela */}
             <div className="p-5 sm:p-8 overflow-y-auto space-y-7 flex-1 bg-background/40">
               {!selectedTemplate ? (
                 <>
@@ -1078,7 +1239,7 @@ export function TopicTabsManager({
                                     Em andamento
                                   </span>
                                   <span className="w-4 h-4 rounded-full bg-elevated border border-border text-primary flex items-center justify-center font-semibold text-[8px]">
-                                    VP
+                                    AU
                                   </span>
                                 </div>
                               </div>
@@ -1230,9 +1391,9 @@ export function TopicTabsManager({
                                 </span>
                               </div>
                               <div className="flex items-center justify-between py-1 border-b border-border text-secondary">
-                                <span>07:30 · Café da Manhã</span>
+                                <span>08:00 · Refeição 01</span>
                                 <span className="text-emerald-500 font-mono font-semibold">
-                                  28g P
+                                  20g P
                                 </span>
                               </div>
                             </div>
@@ -1267,10 +1428,10 @@ export function TopicTabsManager({
                                 <Calendar className="w-4 h-4 text-rose-500 shrink-0" />
                                 <div>
                                   <p className="font-semibold text-primary">
-                                    19:00 · Sistemas de Informação
+                                    19:00 · Planeamento Semanal
                                   </p>
                                   <p className="text-[9px] text-muted">
-                                    UFV-CRP · Académico
+                                    Insight · Geral
                                   </p>
                                 </div>
                               </div>
@@ -1358,7 +1519,7 @@ export function TopicTabsManager({
                               .slice(0, 24)
                           );
                         }}
-                        placeholder="Ex: Arquitetura, Estudos, Roadmap..."
+                        placeholder="Ex: Arquitetura, Estudos, Projetos..."
                         className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
                       />
                     </div>
@@ -1382,7 +1543,7 @@ export function TopicTabsManager({
                                 .replace(/[^a-z0-9]/g, '')
                             )
                           }
-                          placeholder="arquitetura"
+                          placeholder="identificador"
                           className="w-full bg-transparent text-xs text-primary font-mono focus:outline-none"
                         />
                       </div>
@@ -1501,118 +1662,126 @@ export function TopicTabsManager({
         </div>
       )}
 
-      {/* 3. Cabeçalho do topico ligado */}
-      {!currentTab.isDefault && (
-        <div className="mx-4 sm:mx-6 my-4 rounded-2xl overflow-hidden border border-border bg-surface">
-          {currentTab.bannerUrl && (
-            <div className="relative w-full h-36 sm:h-44 bg-elevated overflow-hidden border-b border-border">
-              <img
-                src={currentTab.bannerUrl}
-                alt={currentTab.label}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-              <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="inline-block px-2 py-0.5 rounded bg-black/60 border border-white/15 font-mono text-[10px] font-semibold text-zinc-200">
-                      #{currentTab.tag}
-                    </span>
-                    {currentTab.visibility === 'private' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/60 border border-white/15 text-zinc-300 text-[10px] font-medium">
-                        <Lock className="w-2.5 h-2.5" /> Particular
-                      </span>
+      {/* 3. Cabeçalho e Painel do Tópico Selecionado (Com transição de Asterisco) */}
+      {switchingTabId ? (
+        <TopicAsteriskSpinner size="md" color={currentTab.color} />
+      ) : (
+        <>
+          {!currentTab.isDefault && (
+            <div className="mx-4 sm:mx-6 my-4 rounded-2xl overflow-hidden border border-border bg-surface">
+              {currentTab.bannerUrl && (
+                <div className="relative w-full h-36 sm:h-44 bg-elevated overflow-hidden border-b border-border">
+                  <img
+                    src={currentTab.bannerUrl}
+                    alt={currentTab.label}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                  <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="inline-block px-2 py-0.5 rounded bg-black/60 border border-white/15 font-mono text-[10px] font-semibold text-zinc-200">
+                          #{currentTab.tag}
+                        </span>
+                        {currentTab.visibility === 'private' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/60 border border-white/15 text-zinc-300 text-[10px] font-medium">
+                            <Lock className="w-2.5 h-2.5" /> Particular
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow flex items-center gap-2">
+                        {renderTopicVectorIcon(currentTab.icon, 'w-5 h-5', currentTab.color)}
+                        <span>{currentTab.label}</span>
+                      </h2>
+                    </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTopic(currentTab)}
+                        className="px-2.5 py-1 rounded-lg bg-black/60 hover:bg-danger text-white text-[11px] font-medium flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Excluir</span>
+                      </button>
                     )}
                   </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow flex items-center gap-2">
-                    {renderTopicVectorIcon(currentTab.icon, 'w-5 h-5', currentTab.color)}
-                    <span>{currentTab.label}</span>
-                  </h2>
                 </div>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTopic(currentTab)}
-                    className="px-2.5 py-1 rounded-lg bg-black/60 hover:bg-danger text-white text-[11px] font-medium flex items-center gap-1 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Excluir</span>
-                  </button>
+              )}
+
+              <div className="p-4 space-y-2.5">
+                {!currentTab.bannerUrl && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {renderTopicVectorIcon(currentTab.icon, 'w-4 h-4', currentTab.color)}
+                      <h2 className="text-base sm:text-lg font-bold text-primary">
+                        {currentTab.label}
+                      </h2>
+                      <span className="text-xs font-mono text-muted">
+                        #{currentTab.tag}
+                      </span>
+                      {currentTab.visibility === 'private' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary text-[10px] font-medium">
+                          <Lock className="w-2.5 h-2.5" /> Particular
+                        </span>
+                      )}
+                    </div>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTopic(currentTab)}
+                        className="px-2.5 py-1 rounded-lg bg-elevated border border-border hover:border-danger text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Excluir</span>
+                      </button>
+                    )}
+                  </div>
                 )}
+
+                {Array.isArray(currentTab.descriptionBlocks) &&
+                  currentTab.descriptionBlocks.length > 0 && (
+                    <div className="notion-content space-y-2 text-xs sm:text-sm text-secondary leading-relaxed">
+                      {currentTab.descriptionBlocks.map((b, i) => (
+                        <div
+                          key={b.id || i}
+                          style={{ borderLeftColor: currentTab.color }}
+                          className="pl-3 py-0.5 border-l-2"
+                          dangerouslySetInnerHTML={{
+                            __html: sanitizeBlockHtml(b.html),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
               </div>
             </div>
           )}
 
-          <div className="p-4 space-y-2.5">
-            {!currentTab.bannerUrl && (
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {renderTopicVectorIcon(currentTab.icon, 'w-4 h-4', currentTab.color)}
-                  <h2 className="text-base sm:text-lg font-bold text-primary">
-                    {currentTab.label}
-                  </h2>
-                  <span className="text-xs font-mono text-muted">
-                    #{currentTab.tag}
-                  </span>
-                  {currentTab.visibility === 'private' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary text-[10px] font-medium">
-                      <Lock className="w-2.5 h-2.5" /> Particular
-                    </span>
-                  )}
-                </div>
-
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTopic(currentTab)}
-                    className="px-2.5 py-1 rounded-lg bg-elevated border border-border hover:border-danger text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Excluir</span>
-                  </button>
-                )}
-              </div>
+          {/* 4. Painel de Workspace do Tópico */}
+          {!currentTab.isDefault &&
+            currentTab.templateType &&
+            currentTab.templateType !== 'blank_page' && (
+              <TopicWorkspaceView
+                topicId={currentTab.id}
+                topicColor={currentTab.color}
+                templateType={currentTab.templateType}
+                initialData={currentTab.workspaceData || {}}
+                descriptionBlocks={currentTab.descriptionBlocks}
+                isAdmin={isAdmin}
+                onWorkspaceUpdated={(nextData) => {
+                  setCustomTopics((prev) =>
+                    prev.map((ct) =>
+                      ct.id === currentTab.id
+                        ? { ...ct, workspace_data: nextData }
+                        : ct
+                    )
+                  );
+                }}
+              />
             )}
-
-            {Array.isArray(currentTab.descriptionBlocks) &&
-              currentTab.descriptionBlocks.length > 0 && (
-                <div className="notion-content space-y-2 text-xs sm:text-sm text-secondary leading-relaxed">
-                  {currentTab.descriptionBlocks.map((b, i) => (
-                    <div
-                      key={b.id || i}
-                      style={{ borderLeftColor: currentTab.color }}
-                      className="pl-3 py-0.5 border-l-2"
-                      dangerouslySetInnerHTML={{ __html: b.html || '' }}
-                    />
-                  ))}
-                </div>
-              )}
-          </div>
-        </div>
+        </>
       )}
-
-      {/* 4. Painel  de topico */}
-      {!currentTab.isDefault &&
-        currentTab.templateType &&
-        currentTab.templateType !== 'blank_page' && (
-          <TopicWorkspaceView
-            topicId={currentTab.id}
-            topicColor={currentTab.color}
-            templateType={currentTab.templateType}
-            initialData={currentTab.workspaceData || {}}
-            descriptionBlocks={currentTab.descriptionBlocks}
-            isAdmin={isAdmin}
-            onWorkspaceUpdated={(nextData) => {
-              setCustomTopics((prev) =>
-                prev.map((ct) =>
-                  ct.id === currentTab.id
-                    ? { ...ct, workspace_data: nextData }
-                    : ct
-                )
-              );
-            }}
-          />
-        )}
     </div>
   );
 }

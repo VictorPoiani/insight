@@ -1,25 +1,29 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
-  Home,
+  House,
+  Bell,
   Sparkles,
   Info,
   Heart,
   Settings,
-  Lock,
   LogOut,
-  X,
+  LogIn,
+  UserCircle2,
   PanelLeftClose,
   PanelLeftOpen,
+  MoreHorizontal,
+  User,
 } from 'lucide-react';
 
 const navItems = [
-  { name: 'Início', href: '/', icon: Home },
-  { name: 'Atualizações', href: '/notificacoes', icon: Sparkles },
+  { name: 'Início', href: '/', icon: House },
+  { name: 'Notificações', href: '/notificacoes', icon: Bell, showBadge: true },
+  { name: 'Atualizações', href: '/atualizacoes', icon: Sparkles },
   { name: 'Apoie', href: '/apoie', icon: Heart },
   { name: 'Configurações', href: '/config', icon: Settings },
   { name: 'Sobre', href: '/about', icon: Info },
@@ -32,19 +36,41 @@ const SNAP_COLLAPSE_WIDTH = 120;
 
 export function LeftSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const supabase = createClient();
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showLoginBox, setShowLoginBox] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    username: string;
+    full_name: string;
+    display_name?: string | null;
+    avatar_url: string | null;
+    role?: string;
+  } | null>(null);
 
-  // Estados de Redimensionamento e Recolhimento
+  const [unreadCount, setUnreadCount] = useState(0);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
   const sidebarRef = useRef<HTMLElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o popover da conta ao clicar fora
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(e.target as Node)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     try {
@@ -52,7 +78,7 @@ export function LeftSidebar() {
       if (saved) {
         const prefs = JSON.parse(saved);
         const root = document.documentElement;
-        if (prefs.theme === 'light' || prefs.theme === 'dark') {
+        if (prefs.theme) {
           root.setAttribute('data-theme', prefs.theme);
         }
         if (prefs.highContrast) {
@@ -75,14 +101,35 @@ export function LeftSidebar() {
       // Mantém padrão
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAdmin(Boolean(session?.user));
-    });
+    async function loadLoggedProfile() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setCurrentUser(null);
+        return;
+      }
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, display_name, avatar_url, role')
+        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle();
+
+      if (prof) {
+        setCurrentUser(prof);
+      } else {
+        setCurrentUser(null);
+      }
+    }
+
+    loadLoggedProfile();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAdmin(Boolean(session?.user));
+    } = supabase.auth.onAuthStateChange(() => {
+      loadLoggedProfile();
     });
 
     function handleFocusMode(e: Event) {
@@ -100,6 +147,54 @@ export function LeftSidebar() {
       window.removeEventListener('insight-toggle-focus-mode', handleFocusMode);
     };
   }, [supabase]);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!currentUser?.id) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', currentUser.id)
+      .eq('is_read', false);
+
+    setUnreadCount(count || 0);
+  }, [currentUser?.id, supabase]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+
+    window.addEventListener('insight-notifications-updated', fetchUnreadCount);
+
+    if (!currentUser?.id) {
+      return () => {
+        window.removeEventListener('insight-notifications-updated', fetchUnreadCount);
+      };
+    }
+
+    const channel = supabase
+      .channel(`sidebar-notifs-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_id=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('insight-notifications-updated', fetchUnreadCount);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id, pathname, fetchUnreadCount, supabase]);
 
   function saveSidebarState(nextWidth: number, nextCollapsed: boolean) {
     try {
@@ -147,30 +242,13 @@ export function LeftSidebar() {
     };
   }, [isResizing, width]);
 
-  async function handleAdminLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || !password || authLoading) return;
-
-    setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setAuthLoading(false);
-
-    if (error) {
-      alert('Acesso negado: ' + error.message);
-      return;
-    }
-
-    setEmail('');
-    setPassword('');
-    setShowLoginBox(false);
-  }
-
-  async function handleAdminLogout() {
+  async function handleLogout() {
+    setAccountMenuOpen(false);
     await supabase.auth.signOut();
-    setShowLoginBox(false);
+    setCurrentUser(null);
+    setUnreadCount(0);
+    router.push('/');
+    router.refresh();
   }
 
   function toggleCollapse() {
@@ -178,6 +256,14 @@ export function LeftSidebar() {
     setIsCollapsed(next);
     saveSidebarState(width, next);
   }
+
+  const myProfileHref = currentUser
+    ? `/u/${encodeURIComponent(currentUser.username)}`
+    : '/login';
+
+  const isDevUser =
+    currentUser?.role === 'admin' ||
+    currentUser?.id === '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
   return (
     <aside
@@ -187,7 +273,7 @@ export function LeftSidebar() {
         isResizing ? '' : 'transition-[width] duration-150 ease-out'
       } ${isCollapsed ? 'px-2 items-center' : 'px-4'}`}
     >
-      {/* Alça Vertical Direita para Redimensionar Arrastando */}
+      {/* Alça de Redimensionamento */}
       <div
         title="Arraste para ajustar a largura ou recolher"
         onMouseDown={(e) => {
@@ -200,7 +286,7 @@ export function LeftSidebar() {
       </div>
 
       <div className="space-y-7 w-full">
-        {/* Topo: Logo + Botão Discreto de Recolher/Expandir */}
+        {/* Marca Insight* + Botão Recolher */}
         <div
           className={`flex items-center ${
             isCollapsed ? 'justify-center' : 'justify-between px-2'
@@ -228,11 +314,12 @@ export function LeftSidebar() {
           </button>
         </div>
 
-        {/* Menu de Navegação */}
+        {/* Navegação Principal */}
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            const showBadge = Boolean(item.showBadge && unreadCount > 0);
 
             return (
               <Link
@@ -240,110 +327,157 @@ export function LeftSidebar() {
                 href={item.href}
                 title={isCollapsed ? item.name : undefined}
                 className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-                  isCollapsed
-                    ? 'justify-center p-2.5'
-                    : 'gap-3 px-3 py-2.5'
+                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
                 } ${
                   isActive
                     ? 'bg-surface text-accent border border-border'
                     : 'text-secondary hover:bg-surface hover:text-primary'
                 }`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="truncate">{item.name}</span>}
+                <div className="relative shrink-0">
+                  <Icon className="w-5 h-5" />
+                  {showBadge && isCollapsed && (
+                    <span className="w-2 h-2 rounded-full bg-accent absolute -top-0.5 -right-0.5 ring-2 ring-background" />
+                  )}
+                </div>
+
+                {!isCollapsed && (
+                  <span className="truncate flex-1">{item.name}</span>
+                )}
+
+                {!isCollapsed && showBadge && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-accent text-white text-[10px] font-mono font-bold shrink-0">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
+
         </nav>
       </div>
 
-      {/* Rodapé de Status da Versão de Admin */}
-      <div className="space-y-2 w-full">
-        {showLoginBox && !isAdmin && !isCollapsed && (
-          <form
-            onSubmit={handleAdminLogin}
-            className="p-3 rounded-xl bg-surface border border-border space-y-2"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-accent uppercase">
-                Acesso de Desenvolvimento
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowLoginBox(false)}
-                className="text-muted hover:text-primary"
+      {/* ====================================================================
+          RODAPÉ DE CONTA FLUIDO COM POPOVER (SEM LOGOUT ACIDENTAL)
+          ==================================================================== */}
+      <div ref={accountMenuRef} className="relative w-full">
+        {currentUser ? (
+          <>
+            {/* Menu Popover (abre para cima) */}
+            {accountMenuOpen && (
+              <div
+                className={`absolute bottom-full mb-2 z-50 w-56 rounded-2xl bg-surface/95 backdrop-blur-xl border border-border shadow-2xl py-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 ${
+                  isCollapsed ? 'left-0' : 'left-0 right-0 w-full'
+                }`}
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="E-mail de Acesso"
-              className="w-full bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-[11px] text-primary focus:outline-none focus:border-accent"
-            />
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Senha"
-              className="w-full bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-[11px] text-primary focus:outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full py-1.5 rounded-lg bg-accent text-white text-[11px] font-bold hover:bg-accent-hover disabled:opacity-50"
-            >
-              {authLoading ? 'Entrando...' : 'Entrar como Admin'}
-            </button>
-          </form>
-        )}
+                <div className="px-3.5 py-2 border-b border-border/70">
+                  <p className="text-xs font-bold text-primary truncate">
+                    {currentUser.display_name || currentUser.full_name}
+                  </p>
+                  <p className="text-[11px] text-muted truncate">
+                    @{currentUser.username}
+                  </p>
+                </div>
 
-        <div
-          className={`rounded-lg bg-surface border border-border text-xs text-secondary flex items-center ${
-            isCollapsed ? 'p-2 justify-center' : 'px-3 py-3 justify-between gap-2'
-          }`}
-        >
-          {!isCollapsed && (
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-semibold text-primary truncate">Insight v1.5</p>
-                {isAdmin && (
-                  <span className="text-[10px] font-mono font-bold text-[#10b981]">
-                    ● Admin
-                  </span>
+                <div className="py-1">
+                  <Link
+                    href={myProfileHref}
+                    onClick={() => setAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-secondary hover:text-primary hover:bg-elevated/70 transition-colors"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>Ver meu perfil</span>
+                  </Link>
+
+                  <Link
+                    href="/config"
+                    onClick={() => setAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-secondary hover:text-primary hover:bg-elevated/70 transition-colors"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Configurações</span>
+                  </Link>
+                </div>
+
+                <div className="pt-1 border-t border-border/70">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="truncate">Sair de @{currentUser.username}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Gatilho Minimalista Fluido */}
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((prev) => !prev)}
+              title={
+                isCollapsed
+                  ? `${currentUser.display_name || currentUser.full_name} (@${currentUser.username})`
+                  : 'Opções da conta'
+              }
+              className={`w-full rounded-full flex items-center transition-all duration-150 group/account ${
+                isCollapsed
+                  ? 'p-1.5 justify-center hover:bg-surface'
+                  : 'px-2.5 py-2 justify-between gap-2.5 hover:bg-surface'
+              } ${accountMenuOpen ? 'bg-surface' : ''}`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative shrink-0">
+                  <img
+                    src={currentUser.avatar_url || '/assets/net/default-perfil'}
+                    alt={currentUser.full_name}
+                    className="w-9 h-9 rounded-full object-cover ring-1 ring-border group-hover/account:ring-accent/60 transition-all"
+                  />
+                  {isDevUser && (
+                    <span
+                      title="Desenvolvedor Insight"
+                      className="w-2.5 h-2.5 rounded-full bg-[#10b981] ring-2 ring-background absolute -bottom-0.5 -right-0.5"
+                    />
+                  )}
+                </div>
+
+                {!isCollapsed && (
+                  <div className="min-w-0 text-left">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[13px] font-bold text-primary truncate leading-tight">
+                        {currentUser.display_name || currentUser.full_name}
+                      </p>
+                      {isDevUser && (
+                        <span className="px-1.5 py-[1px] rounded-md bg-[#10b981]/15 text-[#10b981] text-[9px] font-mono font-bold tracking-tight shrink-0">
+                          DEV
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted truncate leading-tight mt-0.5">
+                      @{currentUser.username}
+                    </p>
+                  </div>
                 )}
               </div>
-              <p className="mt-0.5 text-muted truncate">Victor Poiani</p>
-            </div>
-          )}
 
-          {isAdmin ? (
-            <button
-              type="button"
-              onClick={handleAdminLogout}
-              title="Sair do modo Admin"
-              className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
+              {!isCollapsed && (
+                <MoreHorizontal className="w-4 h-4 text-muted group-hover/account:text-primary transition-colors shrink-0 mr-0.5" />
+              )}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                if (isCollapsed) setIsCollapsed(false);
-                setShowLoginBox(!showLoginBox);
-              }}
-              title="Acesso de Desenvolvedor"
-              className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors shrink-0"
-            >
-              <Lock className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+          </>
+        ) : (
+          <Link
+            href="/login"
+            title="Entrar ou Criar Conta"
+            className={`rounded-full bg-accent hover:bg-accent-hover text-white font-bold text-xs flex items-center transition-colors shadow-sm ${
+              isCollapsed ? 'p-2.5 justify-center' : 'px-4 py-2.5 justify-center gap-2'
+            }`}
+          >
+            <LogIn className="w-4 h-4 shrink-0" />
+            {!isCollapsed && <span>Entrar / Criar Conta</span>}
+          </Link>
+        )}
       </div>
     </aside>
   );

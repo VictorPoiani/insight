@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Profile } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +10,8 @@ import {
   Bolt,
   BellPlus,
   BellRing,
+  UserPlus,
+  UserCheck,
   Check,
   X,
   ImagePlus,
@@ -90,6 +92,8 @@ interface DetectedPlatform {
   domain: string;
 }
 
+const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
+
 const DEFAULT_VAPID_PUBLIC_KEY =
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
   'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
@@ -110,37 +114,37 @@ const KNOWN_PLATFORMS: {
   name: string;
   slug: string;
 }[] = [
-    { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
-    { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
-    { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
-    {
-      match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
-      name: 'Steam',
-      slug: 'steam',
-    },
-    { match: ['github.com'], name: 'GitHub', slug: 'github' },
-    { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
-    { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
-    { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
-    { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
-    { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
-    { match: ['threads.net'], name: 'Threads', slug: 'threads' },
-    { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
-    { match: ['behance.net'], name: 'Behance', slug: 'behance' },
-    { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
-    { match: ['figma.com'], name: 'Figma', slug: 'figma' },
-    { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
-    { match: ['medium.com'], name: 'Medium', slug: 'medium' },
-    { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
-    { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
-    { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
-    { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
-    { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
-    { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
-    { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
-    { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
-    { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
-  ];
+  { match: ['instagram.com'], name: 'Instagram', slug: 'instagram' },
+  { match: ['tiktok.com'], name: 'TikTok', slug: 'tiktok' },
+  { match: ['spotify.com'], name: 'Spotify', slug: 'spotify' },
+  {
+    match: ['steamcommunity.com', 'store.steampowered.com', 's.team'],
+    name: 'Steam',
+    slug: 'steam',
+  },
+  { match: ['github.com'], name: 'GitHub', slug: 'github' },
+  { match: ['linkedin.com'], name: 'LinkedIn', slug: 'linkedin' },
+  { match: ['x.com', 'twitter.com'], name: 'X', slug: 'x' },
+  { match: ['youtube.com', 'youtu.be'], name: 'YouTube', slug: 'youtube' },
+  { match: ['discord.gg', 'discord.com'], name: 'Discord', slug: 'discord' },
+  { match: ['twitch.tv'], name: 'Twitch', slug: 'twitch' },
+  { match: ['threads.net'], name: 'Threads', slug: 'threads' },
+  { match: ['bsky.app'], name: 'Bluesky', slug: 'bluesky' },
+  { match: ['behance.net'], name: 'Behance', slug: 'behance' },
+  { match: ['dribbble.com'], name: 'Dribbble', slug: 'dribbble' },
+  { match: ['figma.com'], name: 'Figma', slug: 'figma' },
+  { match: ['notion.so', 'notion.site'], name: 'Notion', slug: 'notion' },
+  { match: ['medium.com'], name: 'Medium', slug: 'medium' },
+  { match: ['dev.to'], name: 'DEV', slug: 'devdotto' },
+  { match: ['reddit.com'], name: 'Reddit', slug: 'reddit' },
+  { match: ['pinterest.com'], name: 'Pinterest', slug: 'pinterest' },
+  { match: ['wa.me', 'whatsapp.com'], name: 'WhatsApp', slug: 'whatsapp' },
+  { match: ['t.me', 'telegram.org'], name: 'Telegram', slug: 'telegram' },
+  { match: ['letterboxd.com'], name: 'Letterboxd', slug: 'letterboxd' },
+  { match: ['last.fm'], name: 'Last.fm', slug: 'lastdotfm' },
+  { match: ['soundcloud.com'], name: 'SoundCloud', slug: 'soundcloud' },
+  { match: ['vercel.app', 'vercel.com'], name: 'Vercel', slug: 'vercel' },
+];
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -178,7 +182,10 @@ function detectPlatformFromUrl(rawUrl: string): DetectedPlatform {
   }
 }
 
-function buildInitialProfileLinks(socialLinks?: any): CustomSocialLinkItem[] {
+function buildInitialProfileLinks(
+  socialLinks?: any,
+  isFounder = false
+): CustomSocialLinkItem[] {
   if (
     socialLinks &&
     Array.isArray(socialLinks.custom_links) &&
@@ -189,39 +196,49 @@ function buildInitialProfileLinks(socialLinks?: any): CustomSocialLinkItem[] {
     );
   }
 
-  const defaults: CustomSocialLinkItem[] = [
+  const extracted: CustomSocialLinkItem[] = [];
+  if (socialLinks?.instagram) {
+    extracted.push({ id: 'lnk-instagram', url: socialLinks.instagram, label: 'Instagram' });
+  }
+  if (socialLinks?.tiktok) {
+    extracted.push({ id: 'lnk-tiktok', url: socialLinks.tiktok, label: 'TikTok' });
+  }
+  if (socialLinks?.spotify) {
+    extracted.push({ id: 'lnk-spotify', url: socialLinks.spotify, label: 'Spotify' });
+  }
+  if (socialLinks?.steam) {
+    extracted.push({ id: 'lnk-steam', url: socialLinks.steam, label: 'Steam' });
+  }
+  if (socialLinks?.github) {
+    extracted.push({ id: 'lnk-github', url: socialLinks.github, label: 'GitHub' });
+  }
+
+  if (extracted.length > 0) return extracted;
+
+  if (!isFounder) return [];
+
+  return [
     {
       id: 'lnk-instagram',
-      url:
-        socialLinks?.instagram || 'https://www.instagram.com/victorpoiani/',
+      url: 'https://www.instagram.com/victorpoiani/',
       label: 'Instagram',
     },
     {
       id: 'lnk-tiktok',
-      url: socialLinks?.tiktok || 'https://tiktok.com',
+      url: 'https://tiktok.com',
       label: 'TikTok',
     },
     {
       id: 'lnk-spotify',
-      url: socialLinks?.spotify || 'https://open.spotify.com',
+      url: 'https://open.spotify.com',
       label: 'Spotify',
     },
     {
       id: 'lnk-steam',
-      url: socialLinks?.steam || 'https://store.steampowered.com',
+      url: 'https://store.steampowered.com',
       label: 'Steam',
     },
   ];
-
-  if (socialLinks?.github) {
-    defaults.push({
-      id: 'lnk-github',
-      url: socialLinks.github,
-      label: 'GitHub',
-    });
-  }
-
-  return defaults;
 }
 
 function SmartPlatformIcon({
@@ -241,18 +258,19 @@ function SmartPlatformIcon({
   const iconSrc = meta.slug
     ? `https://cdn.simpleicons.org/${meta.slug}/8e8e93`
     : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-      meta.domain
-    )}&sz=128`;
+        meta.domain
+      )}&sz=128`;
 
   return (
     <img
       src={iconSrc}
       alt={meta.name}
       onError={() => setImgError(true)}
-      className={`${className} object-contain transition-all duration-200 ${meta.slug
+      className={`${className} object-contain transition-all duration-200 ${
+        meta.slug
           ? 'opacity-80 group-hover/slink:opacity-100 group-hover/slink:scale-105'
           : 'rounded-sm grayscale opacity-75 group-hover/slink:grayscale-0 group-hover/slink:opacity-100'
-        }`}
+      }`}
     />
   );
 }
@@ -289,6 +307,29 @@ interface TagCategoryConfig {
   color: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   tags: TagItemConfig[];
+}
+
+function ZapIcon({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={style}
+    >
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
 }
 
 const TAG_CATEGORIES: TagCategoryConfig[] = [
@@ -393,29 +434,6 @@ const TAG_CATEGORIES: TagCategoryConfig[] = [
   },
 ];
 
-function ZapIcon({
-  className,
-  style,
-}: {
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      style={style}
-    >
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
-
 function resolveTagMeta(tagLabel: string) {
   const normalized = tagLabel.trim().toLowerCase();
 
@@ -482,6 +500,8 @@ export function ProfileHeader({
   isAdmin,
   onProfileUpdated,
 }: ProfileHeaderProps) {
+  const isFounderProfile = profile.id === FOUNDER_PROFILE_ID;
+
   const [expandEdit, setExpandEdit] = useState(false);
   const [expandSubscribe, setExpandSubscribe] = useState(false);
   const [expandTags, setExpandTags] = useState(false);
@@ -492,18 +512,24 @@ export function ProfileHeader({
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
   const [tagSearch, setTagSearch] = useState('');
 
-  // Estados de Status do Usuário
+  // Estados de Sessão e Follows
+  const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
+  const [isFollowingProfile, setIsFollowingProfile] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  // Estados de Status do Utilizador
   const [statusId, setStatusId] = useState<string>(
-    profile.social_links?.status_id || 'coding'
+    profile.social_links?.status_id || (isFounderProfile ? 'coding' : 'online')
   );
   const [statusDetail, setStatusDetail] = useState<string>(
     profile.social_links?.status_detail || ''
   );
   const [savingStatus, setSavingStatus] = useState(false);
 
-  // Estados do Gerenciador Minimalista de Links
+  // Estados do Gestor Minimalista de Links
   const [profileLinks, setProfileLinks] = useState<CustomSocialLinkItem[]>(() =>
-    buildInitialProfileLinks(profile.social_links)
+    buildInitialProfileLinks(profile.social_links, isFounderProfile)
   );
   const [expandLinksModal, setExpandLinksModal] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -514,7 +540,7 @@ export function ProfileHeader({
     profile.cover_url || profile.banner_url || ''
   );
   const [avatarUrl, setAvatarUrl] = useState(
-    profile.avatar_url || '/assets/net/logo.png'
+    profile.avatar_url || '/assets/net/default-perfil'
   );
   const [followersCount, setFollowersCount] = useState(
     profile.followers_count || 0
@@ -523,14 +549,16 @@ export function ProfileHeader({
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [displayName, setDisplayName] = useState(
-    profile.display_name || profile.full_name || 'Victor Poiani'
+    profile.display_name || profile.full_name || profile.username
   );
-  const [nickname, setNickname] = useState(profile.nickname || 'o criador');
+  const [nickname, setNickname] = useState(
+    profile.nickname ?? (isFounderProfile ? 'o criador' : '')
+  );
   const [nicknameColor, setNicknameColor] = useState(
     profile.nickname_color || '#E63946'
   );
   const [location, setLocation] = useState(
-    profile.location || 'Rio Paranaíba, MG'
+    profile.location ?? (isFounderProfile ? 'Rio Paranaíba, MG' : '')
   );
   const [birthday, setBirthday] = useState(profile.birthday || '');
   const [bio, setBio] = useState(profile.bio || '');
@@ -539,18 +567,20 @@ export function ProfileHeader({
   const [selectedTags, setSelectedTags] = useState<string[]>(
     Array.isArray(profile.tags) && profile.tags.length > 0
       ? profile.tags
-      : [
-        'Full-Stack',
-        'Guitarrista',
-        'Rock',
-        'Marvel',
-        'Lider',
-        'Sistemas de Informação',
-      ]
+      : isFounderProfile
+      ? [
+          'Full-Stack',
+          'Guitarrista',
+          'Rock',
+          'Marvel',
+          'Lider',
+          'Sistemas de Informação',
+        ]
+      : []
   );
   const [savingTags, setSavingTags] = useState(false);
   const [spotifyTrackId, setSpotifyTrackId] = useState(
-    profile.spotify_track_id || 'Hotel California Eagles'
+    profile.spotify_track_id ?? (isFounderProfile ? 'Hotel California Eagles' : '')
   );
 
   // Estados de Notificações (Web Push + E-mail)
@@ -576,32 +606,51 @@ export function ProfileHeader({
 
   useEffect(() => {
     setCoverUrl(profile.cover_url || profile.banner_url || '');
-    setAvatarUrl(profile.avatar_url || '/assets/net/logo.png');
+    setAvatarUrl(profile.avatar_url || '/assets/net/default-perfil');
     setDisplayName(
-      profile.display_name || profile.full_name || 'Victor Poiani'
+      profile.display_name || profile.full_name || profile.username
     );
-    setNickname(profile.nickname || 'o criador');
+    setNickname(profile.nickname ?? (isFounderProfile ? 'o criador' : ''));
     setNicknameColor(profile.nickname_color || '#E63946');
-    setLocation(profile.location || 'Rio Paranaíba, MG');
+    setLocation(
+      profile.location ?? (isFounderProfile ? 'Rio Paranaíba, MG' : '')
+    );
     setBirthday(profile.birthday || '');
     setBio(profile.bio || '');
 
     if (profile.social_links?.status_id) {
       setStatusId(profile.social_links.status_id);
-    }
-    if (typeof profile.social_links?.status_detail === 'string') {
-      setStatusDetail(profile.social_links.status_detail);
+    } else {
+      setStatusId(isFounderProfile ? 'coding' : 'online');
     }
 
-    setProfileLinks(buildInitialProfileLinks(profile.social_links));
+    if (typeof profile.social_links?.status_detail === 'string') {
+      setStatusDetail(profile.social_links.status_detail);
+    } else {
+      setStatusDetail('');
+    }
+
+    setProfileLinks(buildInitialProfileLinks(profile.social_links, isFounderProfile));
 
     if (Array.isArray(profile.tags) && profile.tags.length > 0) {
       setSelectedTags(profile.tags);
+    } else if (isFounderProfile) {
+      setSelectedTags([
+        'Full-Stack',
+        'Guitarrista',
+        'Rock',
+        'Marvel',
+        'Lider',
+        'Sistemas de Informação',
+      ]);
+    } else {
+      setSelectedTags([]);
     }
-    if (profile.spotify_track_id) {
-      setSpotifyTrackId(profile.spotify_track_id);
-    }
-  }, [profile]);
+
+    setSpotifyTrackId(
+      profile.spotify_track_id ?? (isFounderProfile ? 'Hotel California Eagles' : '')
+    );
+  }, [profile, isFounderProfile]);
 
   // Verifica se o navegador suporta Web Push e se já está inscrito
   useEffect(() => {
@@ -617,11 +666,31 @@ export function ProfileHeader({
         .then((sub) => {
           setPushSubscribed(Boolean(sub));
         })
-        .catch(() => { });
+        .catch(() => {});
     }
   }, []);
 
-  async function refreshTotalFollowersCount() {
+  const refreshTotalFollowersCount = useCallback(async () => {
+    const [{ count: directFollows }, { count: directFollowing }] =
+      await Promise.all([
+        supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', profile.id),
+        supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', profile.id),
+      ]);
+
+    setFollowingCount(directFollowing || 0);
+
+    if (!isFounderProfile) {
+      const totalUserFollowers = directFollows || 0;
+      setFollowersCount(totalUserFollowers);
+      return totalUserFollowers;
+    }
+
     const [{ count: emailCount }, { count: pushCount }] = await Promise.all([
       supabase.from('subscribers').select('*', { count: 'exact', head: true }),
       supabase
@@ -629,14 +698,101 @@ export function ProfileHeader({
         .select('*', { count: 'exact', head: true }),
     ]);
 
-    const total = (emailCount || 0) + (pushCount || 0);
+    const total = (emailCount || 0) + (pushCount || 0) + (directFollows || 0);
     setFollowersCount(total);
     return total;
-  }
+  }, [isFounderProfile, profile.id, supabase]);
 
+  // Carrega utilizador autenticado e verifica se já segue este perfil
   useEffect(() => {
-    refreshTotalFollowersCount();
-  }, [supabase]);
+    async function loadSessionAndFollowState() {
+      await refreshTotalFollowersCount();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setLoggedUserProfile(null);
+        setIsFollowingProfile(false);
+        return;
+      }
+
+      const { data: myProf } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle();
+
+      if (!myProf) {
+        setLoggedUserProfile(null);
+        setIsFollowingProfile(false);
+        return;
+      }
+
+      setLoggedUserProfile(myProf as Profile);
+
+      const { data: followRow } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('follower_id', myProf.id)
+        .eq('following_id', profile.id)
+        .maybeSingle();
+
+      setIsFollowingProfile(Boolean(followRow));
+    }
+
+    loadSessionAndFollowState();
+  }, [profile.id, refreshTotalFollowersCount, supabase]);
+
+  async function handleFollowOrSubscribeClick() {
+    // 1. Visitante sem conta é enviado para /login
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // 2. Se for o próprio dono no perfil fundador, abre o painel de notificações/push
+    if (loggedUserProfile.id === profile.id) {
+      setExpandSubscribe(!expandSubscribe);
+      return;
+    }
+
+    if (followLoading) return;
+    setFollowLoading(true);
+
+    try {
+      if (isFollowingProfile) {
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', loggedUserProfile.id)
+          .eq('following_id', profile.id);
+
+        setIsFollowingProfile(false);
+      } else {
+        await supabase.from('follows').insert({
+          follower_id: loggedUserProfile.id,
+          following_id: profile.id,
+        });
+
+        setIsFollowingProfile(true);
+
+        // Se estiver no perfil principal (Victor Poiani), também abre o painel de alertas opcionais
+        if (isFounderProfile) {
+          setExpandSubscribe(true);
+        }
+      }
+
+      const nextTotal = await refreshTotalFollowersCount();
+      await supabase
+        .from('profiles')
+        .update({ followers_count: nextTotal })
+        .eq('id', profile.id);
+    } finally {
+      setFollowLoading(false);
+    }
+  }
 
   const filteredCategories = useMemo(() => {
     const query = tagSearch.trim().toLowerCase();
@@ -653,6 +809,11 @@ export function ProfileHeader({
   }, [activeCategoryTab, tagSearch]);
 
   async function handleToggleWebPush() {
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
     if (!pushSupported || loadingPush) return;
     setLoadingPush(true);
 
@@ -686,7 +847,9 @@ export function ProfileHeader({
 
         const newSub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(DEFAULT_VAPID_PUBLIC_KEY) as unknown as BufferSource,
+          applicationServerKey: urlBase64ToUint8Array(
+            DEFAULT_VAPID_PUBLIC_KEY
+          ) as unknown as BufferSource,
         });
         const res = await fetch('/api/push', {
           method: 'POST',
@@ -739,7 +902,7 @@ export function ProfileHeader({
       const data = await res.json();
       if (data.sent === 0) {
         alert(
-          'Nenhum dispositivo inscrito ainda. Clique em "Ativar Alertas no Navegador" ao lado para inscrever o seu dispositivo e testar!'
+          'Nenhum dispositivo inscrito ainda. Clique em "Ativar com 1 Clique" ao lado para inscrever o seu dispositivo e testar!'
         );
       }
     } catch {
@@ -820,7 +983,7 @@ export function ProfileHeader({
     const cleanUrl = normalizeUrl(newLinkUrl);
     if (!cleanUrl) return;
 
-    const detected = detectPlatformFromUrl(cleanUrl);
+    const detected = detectPlatformFromUrl(newLinkUrl);
     const nextItem: CustomSocialLinkItem = {
       id: `lnk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       url: cleanUrl,
@@ -859,26 +1022,69 @@ export function ProfileHeader({
     if (bucket === 'cover') setCoverUrl(preview);
     else setAvatarUrl(preview);
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
+    let finalPublicUrl = '';
 
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file);
-    if (uploadError) {
-      alert(`Erro no upload para o bucket "${bucket}": ${uploadError.message}`);
-      return;
+    // 1. Tenta enviar via Cloudflare R2 CDN primeiro
+    try {
+      const presignRes = await fetch('/api/upload/r2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: `${bucket}-${profile.id}-${file.name}`,
+          contentType: file.type || 'image/jpeg',
+          originalSize: file.size,
+          compressedSize: file.size,
+          isGif: file.type === 'image/gif',
+        }),
+      });
+
+      const presignData = await presignRes.json();
+      if (presignRes.ok && presignData.uploadUrl) {
+        const putRes = await fetch(presignData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'image/jpeg' },
+          body: file,
+        });
+        if (putRes.ok && presignData.publicUrl) {
+          finalPublicUrl = presignData.publicUrl;
+        }
+      }
+    } catch {
+      // Continua para o fallback do Supabase Storage
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-    const publicUrl = publicUrlData.publicUrl;
+    // 2. Fallback para Supabase Storage caso necessário
+    if (!finalPublicUrl) {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
+
+      let targetBucket: string = bucket;
+      const { error: uploadError } = await supabase.storage
+        .from(targetBucket)
+        .upload(fileName, file);
+
+      if (uploadError) {
+        targetBucket = 'posts';
+        const { error: retryError } = await supabase.storage
+          .from(targetBucket)
+          .upload(fileName, file);
+
+        if (retryError) {
+          alert(`Erro ao enviar imagem: ${retryError.message}`);
+          return;
+        }
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(targetBucket)
+        .getPublicUrl(fileName);
+      finalPublicUrl = publicUrlData.publicUrl;
+    }
 
     const updatePayload =
       column === 'cover_url'
-        ? { cover_url: publicUrl, banner_url: publicUrl }
-        : { avatar_url: publicUrl };
+        ? { cover_url: finalPublicUrl, banner_url: finalPublicUrl }
+        : { avatar_url: finalPublicUrl };
 
     await supabase.from('profiles').update(updatePayload).eq('id', profile.id);
     if (onProfileUpdated) onProfileUpdated();
@@ -950,6 +1156,11 @@ export function ProfileHeader({
 
   async function handleQuickSubscribe(e: React.FormEvent) {
     e.preventDefault();
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
     const cleanEmail = subEmail.trim().toLowerCase();
     if (!cleanEmail || submittingSub) return;
 
@@ -988,7 +1199,7 @@ export function ProfileHeader({
         notifyMode: 'all',
         interestedTags: [],
       }),
-    }).catch(() => { });
+    }).catch(() => {});
 
     setSubmittingSub(false);
     setSubSuccess(true);
@@ -1003,18 +1214,35 @@ export function ProfileHeader({
     ? birthday.split('-').reverse().join('/')
     : null;
 
+  const formattedJoinDate = useMemo(() => {
+    if (isFounderProfile) return 'Desde julho de 2026';
+    if (!profile.created_at) return 'Membro do Insight';
+    try {
+      const d = new Date(profile.created_at);
+      return `Desde ${d.toLocaleDateString('pt-BR', {
+        month: 'long',
+        year: 'numeric',
+      })}`;
+    } catch {
+      return 'Membro do Insight';
+    }
+  }, [isFounderProfile, profile.created_at]);
+
   const visibleProfileTags = showAllProfileTags
     ? selectedTags
     : selectedTags.slice(0, 8);
   const hiddenTagsCount = Math.max(0, selectedTags.length - 8);
+
+  const isFollowingOrSubscribed = isFollowingProfile || (isFounderProfile && pushSubscribed);
 
   return (
     <section className="border-b border-border bg-background pb-6">
       {/* 1. Banner / Capa do Perfil */}
       <div
         onClick={() => isAdmin && coverInputRef.current?.click()}
-        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${isAdmin ? 'cursor-pointer' : ''
-          }`}
+        className={`relative w-full h-52 bg-surface border-b border-border overflow-hidden group ${
+          isAdmin ? 'cursor-pointer' : ''
+        }`}
       >
         {coverUrl ? (
           <img
@@ -1027,8 +1255,8 @@ export function ProfileHeader({
             <ImagePlus className="w-7 h-7" />
             <span className="text-xs font-semibold">
               {isAdmin
-                ? 'Clique para adicionar uma capa'
-                : 'Insight — Victor Poiani'}
+                ? 'Clique para adicionar uma imagem de capa'
+                : `Insight — ${displayName}`}
             </span>
           </div>
         )}
@@ -1057,8 +1285,9 @@ export function ProfileHeader({
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div
               onClick={() => isAdmin && avatarInputRef.current?.click()}
-              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${isAdmin ? 'cursor-pointer' : ''
-                }`}
+              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${
+                isAdmin ? 'cursor-pointer' : ''
+              }`}
             >
               <img
                 src={avatarUrl}
@@ -1095,10 +1324,11 @@ export function ProfileHeader({
                     ? 'Clique para alterar seu status atual'
                     : `Status: ${currentStatus.label}`
                 }
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${isAdmin
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold text-primary transition-all ${
+                  isAdmin
                     ? 'cursor-pointer hover:scale-[1.02] active:scale-95'
                     : 'cursor-default'
-                  }`}
+                }`}
               >
                 <span className="relative flex h-1.5 w-1.5 shrink-0">
                   {currentStatus.pulse && (
@@ -1160,15 +1390,16 @@ export function ProfileHeader({
                           style={
                             isSelected
                               ? {
-                                backgroundColor: `${opt.color}22`,
-                                borderColor: opt.color,
-                              }
+                                  backgroundColor: `${opt.color}22`,
+                                  borderColor: opt.color,
+                                }
                               : undefined
                           }
-                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${isSelected
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left text-[11px] font-semibold transition-all ${
+                            isSelected
                               ? 'text-primary'
                               : 'bg-elevated/80 border-border text-secondary hover:text-primary'
-                            }`}
+                          }`}
                         >
                           <span
                             style={{ backgroundColor: opt.color }}
@@ -1230,7 +1461,7 @@ export function ProfileHeader({
           <div className="flex items-center gap-2.5 sm:gap-3 ml-auto shrink-0">
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-secondary whitespace-nowrap">
               <span>
-                <b className="text-primary font-bold">0</b> Seguindo
+                <b className="text-primary font-bold">{followingCount}</b> Seguindo
               </span>
               <span>
                 <b className="text-primary font-bold">{followersCount}</b>{' '}
@@ -1256,26 +1487,42 @@ export function ProfileHeader({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setExpandSubscribe(!expandSubscribe)}
-              className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${pushSubscribed
-                  ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
-                  : 'bg-accent text-white hover:bg-accent-hover'
+            {/* Botão Seguir / Acompanhar */}
+            {loggedUserProfile?.id !== profile.id ? (
+              <button
+                type="button"
+                disabled={followLoading}
+                onClick={handleFollowOrSubscribeClick}
+                className={`px-4 py-1.5 rounded-full font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md whitespace-nowrap shrink-0 ${
+                  isFollowingOrSubscribed
+                    ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
+                    : 'bg-accent text-white hover:bg-accent-hover'
                 }`}
-            >
-              {pushSubscribed ? (
-                <>
-                  <BellRing className="w-3.5 h-3.5" />
-                  <span>Acompanhando</span>
-                </>
-              ) : (
-                <>
-                  <BellPlus className="w-3.5 h-3.5" />
-                  <span>Acompanhar</span>
-                </>
-              )}
-            </button>
+              >
+                {isFollowingOrSubscribed ? (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Seguindo</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Seguir</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              isFounderProfile && (
+                <button
+                  type="button"
+                  onClick={() => setExpandSubscribe(!expandSubscribe)}
+                  className="px-3.5 py-1.5 rounded-full font-bold text-xs bg-elevated border border-border hover:border-accent text-primary flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                  <BellRing className="w-3.5 h-3.5 text-accent" />
+                  <span>Painel Push</span>
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -1291,7 +1538,7 @@ export function ProfileHeader({
           </h1>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-secondary mt-1.5">
-            <span>@{profile.username || 'Victor Poiani'}</span>
+            <span>@{profile.username}</span>
             {location && (
               <span className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-muted" />
@@ -1300,7 +1547,7 @@ export function ProfileHeader({
             )}
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-muted" />
-              Desde julho de 2026
+              {formattedJoinDate}
             </span>
             {formattedBirthday && (
               <span className="flex items-center gap-1">
@@ -1320,7 +1567,11 @@ export function ProfileHeader({
 
         <div className="mt-2.5 flex items-center gap-1.5 text-xs font-bold text-[#00ccff]">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Conta Verificada</span>
+          <span>
+            {isFounderProfile || profile.role === 'admin'
+              ? 'Conta Verificada · Fundador'
+              : 'Conta Verificada · Equipe'}
+          </span>
         </div>
 
         {/* Card Expansível: Edição de Perfil */}
@@ -1344,7 +1595,7 @@ export function ProfileHeader({
               </div>
               <div>
                 <label className="text-[11px] text-muted block mb-1">
-                  Alcunha (ex: Desenvolvedor Médio)
+                  Alcunha (ex: Desenvolvedor Full-Stack)
                 </label>
                 <input
                   type="text"
@@ -1366,10 +1617,11 @@ export function ProfileHeader({
                     type="button"
                     onClick={() => setNicknameColor(color)}
                     style={{ backgroundColor: color }}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform ${nicknameColor.toLowerCase() === color.toLowerCase()
+                    className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                      nicknameColor.toLowerCase() === color.toLowerCase()
                         ? 'border-white scale-110'
                         : 'border-transparent opacity-75'
-                      }`}
+                    }`}
                   />
                 ))}
               </div>
@@ -1384,6 +1636,7 @@ export function ProfileHeader({
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Cidade, Estado"
                   className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
                 />
               </div>
@@ -1406,6 +1659,7 @@ export function ProfileHeader({
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
+                placeholder="Conte um pouco sobre você, seus projetos e interesses..."
                 className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary resize-none focus:outline-none focus:border-accent"
               />
             </div>
@@ -1430,9 +1684,8 @@ export function ProfileHeader({
         )}
 
         {/* PAINEL HÍBRIDO DE NOTIFICAÇÕES: WEB PUSH NATIVO (1 CLIQUE) + E-MAIL */}
-        {expandSubscribe && (
+        {expandSubscribe && isFounderProfile && (
           <div className="mt-4 p-4 rounded-2xl bg-surface border border-border space-y-4 shadow-lg">
-            {/* Opção 1: Web Push Instantâneo no Navegador / Sistema Operativo */}
             <div className="p-3.5 rounded-xl bg-elevated/70 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
@@ -1445,7 +1698,7 @@ export function ProfileHeader({
                   </span>
                 </div>
                 <p className="text-[11px] text-secondary">
-                  Receba notificações nativas no seu ecrã assim que um novo post ou atualização sair, sem precisar de e-mail.
+                  Receba notificações nativas no seu ecrã assim que um novo post ou atualização sair.
                 </p>
               </div>
 
@@ -1468,10 +1721,11 @@ export function ProfileHeader({
                     type="button"
                     disabled={loadingPush}
                     onClick={handleToggleWebPush}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${pushSubscribed
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      pushSubscribed
                         ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-danger/15 hover:border-danger/40 hover:text-danger'
                         : 'bg-accent text-white hover:bg-accent-hover shadow-sm'
-                      }`}
+                    }`}
                   >
                     {loadingPush ? (
                       <span>Configurando...</span>
@@ -1495,7 +1749,6 @@ export function ProfileHeader({
               </div>
             </div>
 
-            {/* Opção 2: Newsletter & Changelogs por E-mail */}
             <form onSubmit={handleQuickSubscribe} className="space-y-2">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-secondary px-1">
                 <Mail className="w-3.5 h-3.5 text-muted" />
@@ -1543,78 +1796,83 @@ export function ProfileHeader({
           </div>
         )}
 
-        {/* 5. Seção de Tags Dinâmicas */}
-        <div className="flex items-center gap-3 mt-6 text-xs font-semibold text-secondary">
-          <span>Tags</span>
-          <div className="flex-1 h-px bg-border" />
-          {selectedTags.length > 0 && (
-            <span className="text-[10px] text-muted font-normal">
-              {selectedTags.length} {selectedTags.length === 1 ? 'ativa' : 'ativas'}
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 mt-3">
-          {visibleProfileTags.map((tag) => {
-            const meta = resolveTagMeta(tag);
-            const Icon = meta.Icon;
-            return (
-              <span
-                key={tag}
-                title={meta.categoryName}
-                style={{
-                  backgroundColor: `${meta.color}14`,
-                  borderColor: `${meta.color}40`,
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold text-primary transition-transform hover:scale-[1.02]"
-              >
-                <Icon
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: meta.color }}
-                />
-                <span>{tag}</span>
-              </span>
-            );
-          })}
-
-          {hiddenTagsCount > 0 && !showAllProfileTags && (
-            <button
-              type="button"
-              onClick={() => setShowAllProfileTags(true)}
-              className="px-2.5 py-1 rounded-full bg-elevated border border-border text-[11px] font-semibold text-secondary hover:text-primary transition-colors"
-            >
-              +{hiddenTagsCount}
-            </button>
-          )}
-
-          {showAllProfileTags && selectedTags.length > 8 && (
-            <button
-              type="button"
-              onClick={() => setShowAllProfileTags(false)}
-              className="px-2.5 py-1 rounded-full bg-elevated border border-border text-[11px] font-semibold text-muted hover:text-primary transition-colors"
-            >
-              Recolher
-            </button>
-          )}
-
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setExpandTags(!expandTags)}
-              title="Configurar Tags do Perfil"
-              className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${expandTags
-                  ? 'bg-accent text-white border-accent'
-                  : 'bg-elevated border-border text-secondary hover:text-accent hover:border-accent'
-                }`}
-            >
-              {expandTags ? (
-                <X className="w-3.5 h-3.5" />
-              ) : (
-                <Plus className="w-3.5 h-3.5" />
+        {/* 5. Secção de Tags Dinâmicas */}
+        {(selectedTags.length > 0 || isAdmin) && (
+          <>
+            <div className="flex items-center gap-3 mt-6 text-xs font-semibold text-secondary">
+              <span>Tags</span>
+              <div className="flex-1 h-px bg-border" />
+              {selectedTags.length > 0 && (
+                <span className="text-[10px] text-muted font-normal">
+                  {selectedTags.length} {selectedTags.length === 1 ? 'ativa' : 'ativas'}
+                </span>
               )}
-            </button>
-          )}
-        </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              {visibleProfileTags.map((tag) => {
+                const meta = resolveTagMeta(tag);
+                const Icon = meta.Icon;
+                return (
+                  <span
+                    key={tag}
+                    title={meta.categoryName}
+                    style={{
+                      backgroundColor: `${meta.color}14`,
+                      borderColor: `${meta.color}40`,
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold text-primary transition-transform hover:scale-[1.02]"
+                  >
+                    <Icon
+                      className="w-3.5 h-3.5 shrink-0"
+                      style={{ color: meta.color }}
+                    />
+                    <span>{tag}</span>
+                  </span>
+                );
+              })}
+
+              {hiddenTagsCount > 0 && !showAllProfileTags && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllProfileTags(true)}
+                  className="px-2.5 py-1 rounded-full bg-elevated border border-border text-[11px] font-semibold text-secondary hover:text-primary transition-colors"
+                >
+                  +{hiddenTagsCount}
+                </button>
+              )}
+
+              {showAllProfileTags && selectedTags.length > 8 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllProfileTags(false)}
+                  className="px-2.5 py-1 rounded-full bg-elevated border border-border text-[11px] font-semibold text-muted hover:text-primary transition-colors"
+                >
+                  Recolher
+                </button>
+              )}
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setExpandTags(!expandTags)}
+                  title="Configurar Tags do Perfil"
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${
+                    expandTags
+                      ? 'bg-accent text-white border-accent'
+                      : 'bg-elevated border-border text-secondary hover:text-accent hover:border-accent'
+                  }`}
+                >
+                  {expandTags ? (
+                    <X className="w-3.5 h-3.5" />
+                  ) : (
+                    <Plus className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Painel de Seleção de Tags */}
         {isAdmin && expandTags && (
@@ -1658,10 +1916,11 @@ export function ProfileHeader({
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('all')}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${activeCategoryTab === 'all'
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                  activeCategoryTab === 'all'
                     ? 'bg-primary text-background border-primary'
                     : 'bg-elevated text-secondary border-border hover:text-primary'
-                  }`}
+                }`}
               >
                 Todas ({TAG_CATEGORIES.reduce((acc, c) => acc + c.tags.length, 0)})
               </button>
@@ -1677,16 +1936,17 @@ export function ProfileHeader({
                     style={
                       isTabActive
                         ? {
-                          backgroundColor: `${cat.color}22`,
-                          borderColor: cat.color,
-                          color: cat.color,
-                        }
+                            backgroundColor: `${cat.color}22`,
+                            borderColor: cat.color,
+                            color: cat.color,
+                          }
                         : undefined
                     }
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${isTabActive
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                      isTabActive
                         ? ''
                         : 'bg-elevated text-secondary border-border hover:text-primary'
-                      }`}
+                    }`}
                   >
                     <CatIcon
                       className="w-3 h-3 shrink-0"
@@ -1730,15 +1990,16 @@ export function ProfileHeader({
                           style={
                             active
                               ? {
-                                backgroundColor: `${cat.color}24`,
-                                borderColor: cat.color,
-                              }
+                                  backgroundColor: `${cat.color}24`,
+                                  borderColor: cat.color,
+                                }
                               : undefined
                           }
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${active
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${
+                            active
                               ? 'text-primary shadow-sm scale-[1.02]'
                               : 'bg-elevated/80 text-secondary border-border hover:text-primary hover:border-muted'
-                            }`}
+                          }`}
                         >
                           <ItemIcon
                             className="w-3.5 h-3.5 shrink-0"
@@ -1818,7 +2079,7 @@ export function ProfileHeader({
           </div>
         )}
 
-        {/* 6. Seção Minimalista de Links com Captura Automática de Logo */}
+        {/* 6. Secção Minimalista de Links com Captura Automática de Logo */}
         {(profileLinks.length > 0 || isAdmin) && (
           <>
             <div className="flex items-center gap-3 mt-6 text-xs font-semibold text-secondary">
@@ -1911,7 +2172,7 @@ export function ProfileHeader({
                       required
                       value={newLinkUrl}
                       onChange={(e) => setNewLinkUrl(e.target.value)}
-                      placeholder="Cole o link (ex: https://github.com/VictorPoiani)"
+                      placeholder="Cole o link (ex: https://github.com/seu-usuario)"
                       className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
                     />
 
@@ -2037,12 +2298,27 @@ export function ProfileHeader({
         )}
 
         {/* 7. Player Minimalista Customizado do Spotify */}
-        <div className="mt-5">
-          <CustomSpotifyPlayer
-            trackId={spotifyTrackId}
-            onEdit={isAdmin ? handleEditSpotify : undefined}
-          />
-        </div>
+        {spotifyTrackId ? (
+          <div className="mt-5">
+            <CustomSpotifyPlayer
+              trackId={spotifyTrackId}
+              onEdit={isAdmin ? handleEditSpotify : undefined}
+            />
+          </div>
+        ) : (
+          isAdmin && (
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={handleEditSpotify}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface hover:bg-elevated border border-dashed border-border hover:border-[#1DB954] text-xs font-semibold text-secondary hover:text-[#1DB954] transition-colors"
+              >
+                <Music className="w-4 h-4 text-[#1DB954]" />
+                <span>Adicionar faixa favorita do Spotify ao perfil</span>
+              </button>
+            </div>
+          )
+        )}
 
         {/* Modal de Pesquisa Direta de Músicas */}
         <SpotifySearchModal

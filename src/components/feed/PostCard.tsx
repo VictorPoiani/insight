@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Post,
   Profile,
@@ -12,6 +13,7 @@ import {
 } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { PostComposer } from './PostComposer';
+import { SharePostModal } from './SharePostModal';
 import {
   MessageCircle,
   Repeat2,
@@ -25,13 +27,14 @@ import {
   Send,
   X,
   Download,
-  Link2,
   FileText,
   Lock,
   Globe,
   Sparkles,
   Compass,
   Network,
+  LogIn,
+  Flag,
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -39,6 +42,31 @@ interface PostCardProps {
   author: Profile;
   isAdmin: boolean;
   onDelete?: (postId: string) => void;
+}
+
+const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
+
+function sanitizeBlockHtml(dirtyHtml?: string | null): string {
+  if (!dirtyHtml) return '';
+  return dirtyHtml
+    .replace(
+      /<(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea)[^>]*>[\s\S]*?<\/\1>/gi,
+      ''
+    )
+    .replace(
+      /<\/?(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea|svg|math|base)[^>]*>/gi,
+      ''
+    )
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(
+      /(href|src|xlink:href|action)\s*=\s*(?:"\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*')/gi,
+      '$1="#"'
+    );
+}
+
+function getProfileHref(_profileId?: string | null, username?: string | null) {
+  if (username) return `/u/${encodeURIComponent(username)}`;
+  return '/';
 }
 
 function extractSpotifyTrackId(urlOrId: string): string | null {
@@ -84,49 +112,13 @@ export function resolvePostVisibility(
   return 'public';
 }
 
-function wrapCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number
-): number {
-  const paragraphs = text.split('\n');
-  let currentY = y;
-
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(' ');
-    let line = '';
-
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && n > 0) {
-        ctx.fillText(line.trim(), x, currentY);
-        line = words[n] + ' ';
-        currentY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line.trim(), x, currentY);
-    currentY += lineHeight;
-  }
-  return currentY;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
 export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
+  const supabase = createClient();
+  const articleRef = useRef<HTMLElement>(null);
+
+  const [isHighlightedFromUrl, setIsHighlightedFromUrl] = useState(false);
+
+  // Conteúdo do Post
   const [postContent, setPostContent] = useState(post.content);
   const [blocksState, setBlocksState] = useState<PostBlock[]>(post.blocks || []);
   const [postTags, setPostTags] = useState<string[]>(post.tags || []);
@@ -139,34 +131,47 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
     post.spotify_track_id || null
   );
 
+  // Enquetes
   const [votedOptions, setVotedOptions] = useState<Record<string, string[]>>({});
   const [votingBlockId, setVotingBlockId] = useState<string | null>(null);
 
+  // Interações Sociais
   const [likes, setLikes] = useState(post.likes_count || 0);
   const [hasLiked, setHasLiked] = useState(false);
   const [reposts, setReposts] = useState(post.reposts_count || 0);
   const [hasReposted, setHasReposted] = useState(false);
   const [repliesCount, setRepliesCount] = useState(post.replies_count || 0);
 
+  // UI & Modais
   const [isEditing, setIsEditing] = useState(false);
+  const [openShareModal, setOpenShareModal] = useState(false);
 
+  // Thread / Respostas
   const [expandReplies, setExpandReplies] = useState(false);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [loadingReplies, setLoadingReplies] = useState(false);
-  const [visitorName, setVisitorName] = useState('');
-  const [visitorHandle, setVisitorHandle] = useState('');
   const [replyText, setReplyText] = useState('');
   const [replySpotifyInput, setReplySpotifyInput] = useState('');
   const [showReplySpotify, setShowReplySpotify] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
+  const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
 
-  const [expandShare, setExpandShare] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [downloadingStory, setDownloadingStory] = useState(false);
-
-  const supabase = createClient();
   const hasRichBlocks = Array.isArray(blocksState) && blocksState.length > 0;
 
+  // Destaca e rola até o post se aberto via link compartilhado (?post=ID)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('post') === post.id) {
+      setIsHighlightedFromUrl(true);
+      const timer = setTimeout(() => {
+        articleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [post.id]);
+
+  // Sincroniza quando as props mudam
   useEffect(() => {
     const nextBlocks = Array.isArray(post.blocks) ? post.blocks : [];
     setPostContent(post.content);
@@ -176,53 +181,83 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
     setPostVisibility(resolvePostVisibility(post, nextBlocks));
     setPostImageUrl(post.image_url);
     setPostSpotifyId(post.spotify_track_id || null);
+    setLikes(post.likes_count || 0);
+    setReposts(post.reposts_count || 0);
+    setRepliesCount(post.replies_count || 0);
   }, [post]);
 
+  // Sincroniza usuário logado e estado de curtida
   useEffect(() => {
-    const savedName = localStorage.getItem('insight-visitor-name') || '';
-    const savedHandle = localStorage.getItem('insight-visitor-handle') || '';
-    const savedVotesRaw = localStorage.getItem(`insight-votes-${post.id}`);
-    setVisitorName(savedName);
-    setVisitorHandle(savedHandle);
+    let active = true;
 
-    if (savedVotesRaw) {
-      try {
-        const parsedVotes: Record<string, string[]> = JSON.parse(savedVotesRaw);
-        setVotedOptions(parsedVotes);
+    async function syncLoggedUser() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        if (Array.isArray(post.blocks) && post.blocks.length > 0) {
-          let needsServerSync = false;
-          const repairedBlocks = post.blocks.map((blk) => {
-            if (blk.type !== 'poll' || !Array.isArray(blk.pollOptions)) return blk;
-            const checkedIds = parsedVotes[blk.id] || [];
-            if (checkedIds.length === 0) return blk;
+      if (!active) return;
 
-            const updatedOpts = blk.pollOptions.map((opt) => {
-              const currentVotes = Number(opt.votes) || 0;
-              if (checkedIds.includes(opt.id) && currentVotes === 0) {
-                needsServerSync = true;
-                return { ...opt, votes: 1 };
-              }
-              return { ...opt, votes: currentVotes };
-            });
+      if (!session?.user) {
+        setLoggedUserProfile(null);
+        setHasLiked(false);
+        return;
+      }
 
-            return { ...blk, pollOptions: updatedOpts };
-          });
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle();
 
-          if (needsServerSync) {
-            setBlocksState(repairedBlocks);
-            supabase
-              .from('posts')
-              .update({ blocks: repairedBlocks })
-              .eq('id', post.id)
-              .then(() => {});
-          }
-        }
-      } catch {
-        // ignorar rerros de parse
+      if (!active) return;
+
+      if (prof) {
+        const typedProf = prof as Profile;
+        setLoggedUserProfile(typedProf);
+
+        const { data: existingLike } = await supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('post_id', post.id)
+          .eq('profile_id', typedProf.id)
+          .maybeSingle();
+
+        if (active) setHasLiked(Boolean(existingLike));
+      } else {
+        setLoggedUserProfile(null);
+        setHasLiked(false);
       }
     }
-  }, [post.id, post.blocks, supabase]);
+
+    syncLoggedUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      syncLoggedUser();
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [post.id, supabase]);
+
+  // Carrega votos locais em enquetes
+  useEffect(() => {
+    try {
+      const savedVotesRaw = localStorage.getItem(`insight-votes-${post.id}`);
+      if (savedVotesRaw) {
+        setVotedOptions(JSON.parse(savedVotesRaw));
+      }
+    } catch {
+      // Ignora erro local
+    }
+  }, [post.id]);
+
+  // ==========================================================================
+  // AÇÕES DO POST (VISIBILIDADE, ENQUETE, CURTIDA, REPOST, DENÚNCIA, EXCLUSÃO)
+  // ==========================================================================
 
   async function handleToggleVisibility() {
     if (!isAdmin) return;
@@ -237,7 +272,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
             {
               id: `blk-${Date.now()}`,
               type: 'paragraph',
-              html: postContent.replace(/\n/g, '<br>'),
+              html: (postContent || '').replace(/\n/g, '<br>'),
               postVisibility: nextVis,
             },
           ];
@@ -262,19 +297,22 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
     optionId: string,
     allowMultiple?: boolean
   ) {
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
     if (votingBlockId === blockId) return;
 
     const currentVoted = votedOptions[blockId] || [];
     const alreadyVoted = currentVoted.includes(optionId);
 
-    let nextVotedForBlock: string[];
-    if (allowMultiple) {
-      nextVotedForBlock = alreadyVoted
+    const nextVotedForBlock = allowMultiple
+      ? alreadyVoted
         ? currentVoted.filter((id) => id !== optionId)
-        : [...currentVoted, optionId];
-    } else {
-      nextVotedForBlock = alreadyVoted ? [] : [optionId];
-    }
+        : [...currentVoted, optionId]
+      : alreadyVoted
+      ? []
+      : [optionId];
 
     const applyVoteDelta = (sourceBlocks: PostBlock[]): PostBlock[] =>
       sourceBlocks.map((b) => {
@@ -300,7 +338,11 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
 
     setBlocksState(optimisticBlocks);
     setVotedOptions(nextVotedMap);
-    localStorage.setItem(`insight-votes-${post.id}`, JSON.stringify(nextVotedMap));
+    try {
+      localStorage.setItem(`insight-votes-${post.id}`, JSON.stringify(nextVotedMap));
+    } catch {
+      // Ignora erro de quota
+    }
 
     setVotingBlockId(blockId);
     try {
@@ -318,127 +360,93 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
       const serverUpdatedBlocks = applyVoteDelta(baseBlocks);
       setBlocksState(serverUpdatedBlocks);
 
-      const { error } = await supabase
+      await supabase
         .from('posts')
         .update({ blocks: serverUpdatedBlocks })
         .eq('id', post.id);
-
-      if (error) {
-        console.error('Erro ao salvar voto no Supabase:', error.message);
-      }
     } finally {
       setVotingBlockId(null);
     }
   }
 
-  async function toggleExpandReplies() {
-    const nextState = !expandReplies;
-    setExpandReplies(nextState);
-
-    if (nextState && replies.length === 0) {
-      setLoadingReplies(true);
-      const { data } = await supabase
-        .from('replies')
-        .select('*')
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: true });
-
-      if (data) {
-        setReplies(data as Reply[]);
-        setRepliesCount(data.length);
-      }
-      setLoadingReplies(false);
-    }
-  }
-
-  async function handleSendReply(e: React.FormEvent) {
-    e.preventDefault();
-    const trackId = showReplySpotify ? extractSpotifyTrackId(replySpotifyInput) : null;
-    if ((!replyText.trim() && !trackId) || sendingReply) return;
-
-    setSendingReply(true);
-
-    const cleanName = isAdmin
-      ? author.display_name || author.full_name || 'Victor Poiani'
-      : visitorName.trim() || 'Visitante';
-
-    const cleanHandle = isAdmin
-      ? author.username || 'poiani'
-      : visitorHandle.trim().replace(/^@/, '') || 'leitor';
-
-    if (!isAdmin) {
-      localStorage.setItem('insight-visitor-name', cleanName);
-      localStorage.setItem('insight-visitor-handle', cleanHandle);
-    }
-
-    const payload = {
-      post_id: post.id,
-      profile_id: isAdmin ? author.id : null,
-      author_name: cleanName,
-      author_handle: cleanHandle,
-      avatar_url: isAdmin ? author.avatar_url || '/assets/net/logo.png' : null,
-      content: replyText.trim(),
-      spotify_track_id: trackId,
-    };
-
-    const { data, error } = await supabase
-      .from('replies')
-      .insert(payload)
-      .select()
-      .single();
-
-    setSendingReply(false);
-
-    if (!error && data) {
-      const nextCount = repliesCount + 1;
-      setReplies((prev) => [...prev, data as Reply]);
-      setRepliesCount(nextCount);
-      setReplyText('');
-      setReplySpotifyInput('');
-      setShowReplySpotify(false);
-
-      await supabase
-        .from('posts')
-        .update({ replies_count: nextCount })
-        .eq('id', post.id);
-    } else if (error) {
-      alert('Erro ao publicar resposta: ' + error.message);
-    }
-  }
-
-  async function handleDeleteReply(replyId: string) {
-    if (!isAdmin) return;
-    if (!confirm('Excluir esta resposta?')) return;
-    const { error } = await supabase.from('replies').delete().eq('id', replyId);
-    if (!error) {
-      const nextCount = Math.max(0, repliesCount - 1);
-      setReplies((prev) => prev.filter((r) => r.id !== replyId));
-      setRepliesCount(nextCount);
-      await supabase.from('posts').update({ replies_count: nextCount }).eq('id', post.id);
-    }
-  }
-
   async function handleLike() {
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
     const nextLiked = !hasLiked;
     const nextLikes = nextLiked ? likes + 1 : Math.max(0, likes - 1);
     setHasLiked(nextLiked);
     setLikes(nextLikes);
-    await supabase.from('posts').update({ likes_count: nextLikes }).eq('id', post.id);
+
+    const { data, error } = await supabase.rpc('toggle_post_like', {
+      target_post_id: post.id,
+    });
+
+    if (!error && data) {
+      setHasLiked(Boolean((data as any).liked));
+      setLikes(Number((data as any).likes_count) || 0);
+    } else if (error) {
+      await supabase
+        .from('posts')
+        .update({ likes_count: nextLikes })
+        .eq('id', post.id);
+    }
   }
 
   async function handleRepost() {
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
     const nextReposted = !hasReposted;
     const nextReposts = nextReposted ? reposts + 1 : Math.max(0, reposts - 1);
     setHasReposted(nextReposted);
     setReposts(nextReposts);
-    await supabase.from('posts').update({ reposts_count: nextReposts }).eq('id', post.id);
+
+    await supabase
+      .from('posts')
+      .update({ reposts_count: nextReposts })
+      .eq('id', post.id);
+
+    if (nextReposted && author.id !== loggedUserProfile.id) {
+      const snippet = (postContent || '').slice(0, 110);
+      await supabase.from('notifications').insert({
+        recipient_id: author.id,
+        actor_id: loggedUserProfile.id,
+        type: 'repost',
+        post_id: post.id,
+        content_preview: snippet,
+        message: snippet || 'repostou sua publicação',
+      });
+    }
   }
 
-  function handleCopyLink() {
-    const url = `${window.location.origin}/?post=${post.id}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function handleReportPost() {
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const reason = prompt(
+      'Descreva o motivo da denúncia desta publicação (ex: spam, ofensa, conteúdo impróprio):'
+    );
+    if (!reason || !reason.trim()) return;
+
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: loggedUserProfile.id,
+      target_post_id: post.id,
+      target_profile_id: author.id,
+      reason: reason.trim(),
+    });
+
+    if (!error) {
+      alert('Denúncia enviada para a Equipe de Moderação do Insight.');
+    } else {
+      alert('Erro ao enviar denúncia: ' + error.message);
+    }
   }
 
   async function handleDelete() {
@@ -472,183 +480,120 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
     }
   }
 
+  // ==========================================================================
+  // RESPOSTAS / THREAD
+  // ==========================================================================
+
+  async function toggleExpandReplies() {
+    const nextState = !expandReplies;
+    setExpandReplies(nextState);
+
+    if (nextState && replies.length === 0) {
+      setLoadingReplies(true);
+      const { data } = await supabase
+        .from('replies')
+        .select('*')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        setReplies(data as Reply[]);
+        setRepliesCount(data.length);
+      }
+      setLoadingReplies(false);
+    }
+  }
+
+  async function handleSendReply(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!loggedUserProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const trackId = showReplySpotify ? extractSpotifyTrackId(replySpotifyInput) : null;
+    if ((!replyText.trim() && !trackId) || sendingReply) return;
+
+    setSendingReply(true);
+
+    const cleanName =
+      loggedUserProfile.display_name ||
+      loggedUserProfile.full_name ||
+      loggedUserProfile.username;
+
+    const payload = {
+      post_id: post.id,
+      profile_id: loggedUserProfile.id,
+      author_name: cleanName,
+      author_handle: loggedUserProfile.username,
+      avatar_url: loggedUserProfile.avatar_url || '/assets/net/default-perfil',
+      content: replyText.trim(),
+      spotify_track_id: trackId,
+    };
+
+    const { data, error } = await supabase
+      .from('replies')
+      .insert(payload)
+      .select()
+      .single();
+
+    setSendingReply(false);
+
+    if (!error && data) {
+      setReplies((prev) => [...prev, data as Reply]);
+      setRepliesCount((prev) => prev + 1);
+      setReplyText('');
+      setReplySpotifyInput('');
+      setShowReplySpotify(false);
+    } else if (error) {
+      alert('Erro ao publicar resposta: ' + error.message);
+    }
+  }
+
+  async function handleDeleteReply(replyId: string, replyProfileId?: string | null) {
+    const canDeleteThisReply =
+      isAdmin ||
+      loggedUserProfile?.role === 'admin' ||
+      loggedUserProfile?.role === 'moderator' ||
+      loggedUserProfile?.id === FOUNDER_PROFILE_ID ||
+      (loggedUserProfile && replyProfileId === loggedUserProfile.id);
+
+    if (!canDeleteThisReply) return;
+    if (!confirm('Excluir esta resposta?')) return;
+
+    const { error } = await supabase.from('replies').delete().eq('id', replyId);
+    if (!error) {
+      setReplies((prev) => prev.filter((r) => r.id !== replyId));
+      setRepliesCount((prev) => Math.max(0, prev - 1));
+    }
+  }
+
   if (!isAdmin && postVisibility === 'private') {
     return null;
   }
 
-  const postDateObj = new Date(post.created_at);
-  const formattedDate = postDateObj.toLocaleDateString('pt-BR', {
+  const formattedDate = new Date(post.created_at).toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
-  const storyTimeDate = `${postDateObj.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })} · ${postDateObj.toLocaleDateString('pt-BR')}`;
 
-  async function handleDownloadStoryImage() {
-    setDownloadingStory(true);
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1080;
-      canvas.height = 1920;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const grad = ctx.createLinearGradient(0, 0, 0, 1920);
-      grad.addColorStop(0, '#18181b');
-      grad.addColorStop(1, '#09090b');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 1080, 1920);
-
-      const hasImage = Boolean(postImageUrl);
-      const cardWidth = 920;
-      const cardHeight = hasImage ? 1050 : 640;
-      const cardX = (1080 - cardWidth) / 2;
-      const cardY = (1920 - cardHeight) / 2 - 60;
-
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-      ctx.shadowBlur = 40;
-      ctx.shadowOffsetY = 20;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 44);
-      ctx.fill();
-      ctx.restore();
-
-      const avatarX = cardX + 56;
-      const avatarY = cardY + 56;
-      try {
-        const avatarImg = await loadImage(author.avatar_url || '/assets/net/logo.png');
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(avatarX + 45, avatarY + 45, 45, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(avatarImg, avatarX, avatarY, 90, 90);
-        ctx.restore();
-      } catch {
-        ctx.fillStyle = '#2563eb';
-        ctx.beginPath();
-        ctx.arc(avatarX + 45, avatarY + 45, 45, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.fillStyle = '#09090b';
-      ctx.font = 'bold 34px Inter, system-ui, sans-serif';
-      ctx.fillText(
-        author.display_name || author.full_name || 'Victor Poiani',
-        avatarX + 112,
-        avatarY + 42
-      );
-
-      ctx.fillStyle = '#71717a';
-      ctx.font = '28px Inter, system-ui, sans-serif';
-      ctx.fillText(`@${author.username || 'poiani'}`, avatarX + 112, avatarY + 80);
-
-      const followX = cardX + cardWidth - 260;
-      const followY = avatarY + 18;
-      ctx.fillStyle = '#09090b';
-      ctx.beginPath();
-      ctx.roundRect(followX, followY, 130, 52, 26);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 24px Inter, system-ui, sans-serif';
-      ctx.fillText('Seguir', followX + 27, followY + 34);
-
-      ctx.fillStyle = '#09090b';
-      ctx.font = '900 44px Inter, system-ui, sans-serif';
-      ctx.fillText('I*', cardX + cardWidth - 95, avatarY + 60);
-
-      ctx.fillStyle = '#09090b';
-      ctx.font = '34px Inter, system-ui, sans-serif';
-      const fullText =
-        postContent.slice(0, 280) + (postContent.length > 280 ? '...' : '');
-      let nextY = wrapCanvasText(
-        ctx,
-        fullText,
-        cardX + 56,
-        avatarY + 150,
-        cardWidth - 112,
-        46
-      );
-
-      if (postTags && postTags.length > 0) {
-        ctx.fillStyle = '#2563eb';
-        ctx.font = 'bold 30px Inter, system-ui, sans-serif';
-        ctx.fillText(
-          postTags.map((t) => `#${t}`).join('  '),
-          cardX + 56,
-          nextY + 10
-        );
-        nextY += 50;
-      }
-
-      if (postImageUrl) {
-        try {
-          const postImg = await loadImage(postImageUrl);
-          const imgX = cardX + 56;
-          const imgY = nextY + 15;
-          const imgW = cardWidth - 112;
-          const imgH = 380;
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(imgX, imgY, imgW, imgH, 28);
-          ctx.clip();
-          ctx.drawImage(postImg, imgX, imgY, imgW, imgH);
-          ctx.restore();
-        } catch {
-        }
-      }
-
-      const footerY = cardY + cardHeight - 95;
-      ctx.fillStyle = '#71717a';
-      ctx.font = '26px Inter, system-ui, sans-serif';
-      ctx.fillText(
-        `${storyTimeDate} · ${(post.views_count || 1) + likes * 3} visualizações`,
-        cardX + 56,
-        footerY
-      );
-
-      ctx.fillStyle = '#09090b';
-      ctx.font = 'bold 26px Inter, system-ui, sans-serif';
-      ctx.fillText(`${likes} curtidas · ${repliesCount} respostas`, cardX + 56, footerY + 48);
-
-      const stickerW = 460;
-      const stickerH = 82;
-      const stickerX = (1080 - stickerW) / 2;
-      const stickerY = cardY + cardHeight + 55;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.roundRect(stickerX, stickerY, stickerW, stickerH, 24);
-      ctx.fill();
-
-      ctx.fillStyle = '#09090b';
-      ctx.font = 'bold 28px Inter, system-ui, sans-serif';
-      ctx.fillText('INSIGHT* · Ler publicação', stickerX + 65, stickerY + 51);
-
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `insight-story-${post.id.slice(0, 6)}.png`;
-      link.href = dataUrl;
-      link.click();
-    } finally {
-      setDownloadingStory(false);
-    }
-  }
+  const authorProfileHref = getProfileHref(author.id, author.username);
 
   return (
     <article
-      className={`p-6 border-b border-border transition-colors ${
-        postVisibility === 'private'
+      ref={articleRef}
+      id={`post-${post.id}`}
+      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
+        isHighlightedFromUrl
+          ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
+          : postVisibility === 'private'
           ? 'bg-elevated/25 hover:bg-elevated/40'
           : 'hover:bg-surface/30'
       }`}
     >
-      {/* Indicadores Superiores: Fixado e/ou Privado */}
+      {/* Indicadores Superiores: Fixado / Privado */}
       {(isPostPinned || postVisibility === 'private') && (
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {isPostPinned && (
@@ -668,26 +613,33 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
       )}
 
       {/* Cabeçalho do Post */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <Link
+          href={authorProfileHref}
+          className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
+        >
           <img
-            src={author.avatar_url || '/assets/net/logo.png'}
+            src={author.avatar_url || '/assets/net/default-perfil'}
             alt={author.full_name}
-            className="w-10 h-10 rounded-full object-cover border border-border bg-elevated"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
           />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-primary">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
                 {author.display_name || author.full_name}
               </span>
-              <span className="text-xs text-muted">@{author.username || 'poiani'}</span>
+              <span className="text-xs text-muted truncate">
+                @{author.username || 'insight'}
+              </span>
             </div>
-            <time className="text-xs text-muted">{formattedDate}</time>
+            <time className="text-[11px] sm:text-xs text-muted block">
+              {formattedDate}
+            </time>
           </div>
-        </div>
+        </Link>
 
         {isAdmin && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <button
               type="button"
               onClick={handleToggleVisibility}
@@ -734,7 +686,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
         )}
       </div>
 
-      {/*ediça~ode grade renderizada*/}
+      {/* Editor Inline ou Conteúdo Renderizado */}
       {isEditing && isAdmin ? (
         <div className="mt-4">
           <PostComposer
@@ -765,7 +717,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
           />
         </div>
       ) : hasRichBlocks ? (
-        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base text-primary leading-relaxed items-start">
+        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base text-primary leading-relaxed items-start break-words">
           {blocksState.map((b, idx) => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
@@ -791,8 +743,8 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 <h2
                   key={b.id || idx}
                   style={{ ...cellStyle, ...alignStyle }}
-                  className={`${fontCls} text-2xl font-extrabold text-primary leading-tight pt-1`}
-                  dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                  className={`${fontCls} text-xl sm:text-2xl font-extrabold text-primary leading-tight pt-1`}
+                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                 />
               );
             }
@@ -802,8 +754,8 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 <h3
                   key={b.id || idx}
                   style={{ ...cellStyle, ...alignStyle }}
-                  className={`${fontCls} text-lg font-bold text-primary leading-snug pt-1`}
-                  dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                  className={`${fontCls} text-base sm:text-lg font-bold text-primary leading-snug pt-1`}
+                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                 />
               );
             }
@@ -814,7 +766,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                   key={b.id || idx}
                   style={{ ...cellStyle, ...alignStyle }}
                   className={`${fontCls} border-l-4 border-accent pl-4 italic text-secondary`}
-                  dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                 />
               );
             }
@@ -829,8 +781,8 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                   <Sparkles className="w-4 h-4 text-accent shrink-0 mt-1" />
                   <div
                     style={alignStyle}
-                    className={`${fontCls} text-sm text-primary flex-1`}
-                    dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                    className={`${fontCls} text-sm text-primary flex-1 min-w-0`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                   />
                 </div>
               );
@@ -842,7 +794,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                   key={b.id || idx}
                   style={cellStyle}
                   className="p-3.5 rounded-xl bg-elevated border border-border font-mono text-xs text-primary overflow-x-auto whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                 />
               );
             }
@@ -857,8 +809,8 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                   <span className="text-accent font-bold">•</span>
                   <div
                     style={alignStyle}
-                    className={`${fontCls} flex-1`}
-                    dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                    className={`${fontCls} flex-1 min-w-0`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                   />
                 </div>
               );
@@ -944,7 +896,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-3.5 rounded-xl bg-elevated border border-border space-y-2.5"
+                  className="p-3 sm:p-3.5 rounded-xl bg-elevated border border-border space-y-2.5"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
@@ -956,87 +908,72 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                     </span>
                   </div>
 
-                  <div
-                    style={{
-                      backgroundImage:
-                        'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                      backgroundSize: '18px 18px',
-                    }}
-                    className="relative w-full h-[340px] sm:h-[380px] rounded-xl bg-[#09090b] border border-border overflow-hidden"
-                  >
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      {edges.map((edge) => {
-                        const fromNode = b.mindMapNodes?.find(
-                          (n) => n.id === edge.fromId
-                        );
-                        const toNode = b.mindMapNodes?.find(
-                          (n) => n.id === edge.toId
-                        );
-                        if (!fromNode || !toNode) return null;
+                  {/* Wrapper com rolagem lateral suave no celular */}
+                  <div className="w-full overflow-x-auto rounded-xl border border-border">
+                    <div
+                      style={{
+                        backgroundImage:
+                          'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
+                        backgroundSize: '18px 18px',
+                      }}
+                      className="relative w-full min-w-[560px] h-[340px] sm:h-[380px] bg-[#09090b] overflow-hidden"
+                    >
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                        {edges.map((edge) => {
+                          const fromNode = b.mindMapNodes?.find(
+                            (n) => n.id === edge.fromId
+                          );
+                          const toNode = b.mindMapNodes?.find(
+                            (n) => n.id === edge.toId
+                          );
+                          if (!fromNode || !toNode) return null;
 
-                        return (
-                          <line
-                            key={edge.id}
-                            x1={`${fromNode.x}%`}
-                            y1={`${fromNode.y}%`}
-                            x2={`${toNode.x}%`}
-                            y2={`${toNode.y}%`}
-                            stroke={fromNode.color || '#52525b'}
-                            strokeWidth="1.5"
-                            strokeDasharray="4 3"
-                            opacity="0.75"
-                          />
-                        );
-                      })}
-                    </svg>
+                          return (
+                            <line
+                              key={edge.id}
+                              x1={`${fromNode.x}%`}
+                              y1={`${fromNode.y}%`}
+                              x2={`${toNode.x}%`}
+                              y2={`${toNode.y}%`}
+                              stroke={fromNode.color || '#52525b'}
+                              strokeWidth="1.5"
+                              strokeDasharray="4 3"
+                              opacity="0.75"
+                            />
+                          );
+                        })}
+                      </svg>
 
-                    {b.mindMapNodes.map((node, nIdx) => (
-                      <div
-                        key={node.id}
-                        style={{
-                          left: `${node.x}%`,
-                          top: `${node.y}%`,
-                          transform: 'translate(-50%, -50%)',
-                        }}
-                        className="absolute z-10 w-40 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border border-zinc-800 shadow-xl space-y-1"
-                      >
-                        <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-800/80">
-                          <span
-                            style={{ backgroundColor: node.color || '#2563eb' }}
-                            className="w-2 h-2 rounded-full shrink-0"
-                          />
-                          <span className="text-[9px] font-mono font-semibold text-zinc-400">
-                            NÓ · {String(nIdx).padStart(2, '0')}
-                          </span>
-                        </div>
-                        <p className="text-xs font-bold text-zinc-100 leading-snug">
-                          {node.label}
-                        </p>
-                        {node.note && (
-                          <p className="text-[10px] text-zinc-400 leading-tight">
-                            {node.note}
-                          </p>
-                        )}
-                        {node.mediaUrl && (
-                          <div className="mt-1 rounded-lg overflow-hidden border border-zinc-800 bg-black">
-                            {/\.(mp4|webm|mov)(\?|$)/i.test(node.mediaUrl) ? (
-                              <video
-                                src={node.mediaUrl}
-                                controls
-                                playsInline
-                                className="w-full max-h-20 object-contain"
-                              />
-                            ) : (
-                              <img
-                                src={node.mediaUrl}
-                                alt={node.label}
-                                className="w-full max-h-20 object-cover"
-                              />
-                            )}
+                      {b.mindMapNodes.map((node, nIdx) => (
+                        <div
+                          key={node.id}
+                          style={{
+                            left: `${node.x}%`,
+                            top: `${node.y}%`,
+                            transform: 'translate(-50%, -50%)',
+                          }}
+                          className="absolute z-10 w-44 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border border-zinc-800 shadow-xl space-y-1"
+                        >
+                          <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-800/80">
+                            <span
+                              style={{ backgroundColor: node.color || '#2563eb' }}
+                              className="w-2 h-2 rounded-full shrink-0"
+                            />
+                            <span className="text-[9px] font-mono font-semibold text-zinc-400">
+                              NÓ · {String(nIdx).padStart(2, '0')}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          <p className="text-xs font-bold text-zinc-100 leading-snug">
+                            {node.label}
+                          </p>
+                          {node.note && (
+                            <p className="text-[10px] text-zinc-400 leading-tight">
+                              {node.note}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
@@ -1065,7 +1002,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-4 rounded-xl bg-elevated border border-border space-y-3"
+                  className="p-3.5 sm:p-4 rounded-xl bg-elevated border border-border space-y-3"
                 >
                   <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                     <Compass className="w-3.5 h-3.5 text-[#38bdf8]" />
@@ -1102,24 +1039,6 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                               {step.description}
                             </p>
                           )}
-                          {step.mediaUrl && (
-                            <div className="pt-1 rounded-lg overflow-hidden border border-border bg-black">
-                              {/\.(mp4|webm|mov)(\?|$)/i.test(step.mediaUrl) ? (
-                                <video
-                                  src={step.mediaUrl}
-                                  controls
-                                  playsInline
-                                  className="w-full max-h-32 object-contain"
-                                />
-                              ) : (
-                                <img
-                                  src={step.mediaUrl}
-                                  alt={step.title}
-                                  className="w-full max-h-32 object-cover"
-                                />
-                              )}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -1131,94 +1050,41 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
             if (b.type === 'chart' && Array.isArray(b.chartData)) {
               const data = b.chartData;
               const maxVal = Math.max(...data.map((d) => Number(d.value) || 0), 1);
-              const total = Math.max(
-                data.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
-                1
-              );
 
               return (
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-4 rounded-xl bg-elevated border border-border space-y-3"
+                  className="p-3.5 sm:p-4 rounded-xl bg-elevated border border-border space-y-3 overflow-x-auto"
                 >
                   {b.chartTitle && (
                     <h4 className="text-xs font-bold text-primary">{b.chartTitle}</h4>
                   )}
-                  {(b.chartType || 'vertical') === 'vertical' ? (
-                    <div className="h-44 pt-4 px-2 flex items-end justify-around gap-3 border-b border-border">
-                      {data.map((item, i) => {
-                        const val = Number(item.value) || 0;
-                        return (
+                  <div className="h-44 pt-4 px-2 flex items-end justify-around gap-3 border-b border-border min-w-[260px]">
+                    {data.map((item, i) => {
+                      const val = Number(item.value) || 0;
+                      return (
+                        <div
+                          key={i}
+                          className="flex-1 flex flex-col items-center gap-1 h-full justify-end"
+                        >
+                          <span className="text-[10px] font-mono font-bold text-primary">
+                            {val}
+                          </span>
                           <div
-                            key={i}
-                            className="flex-1 flex flex-col items-center gap-1 h-full justify-end"
-                          >
-                            <span className="text-[10px] font-mono font-bold text-primary">
-                              {val}
-                            </span>
-                            <div
-                              style={{
-                                height: `${Math.max((val / maxVal) * 100, 6)}%`,
-                                backgroundColor: item.color || '#2563eb',
-                              }}
-                              className="w-full max-w-[44px] rounded-t-lg"
-                            />
-                            <span className="text-[10px] text-muted truncate max-w-[72px]">
-                              {item.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center justify-center gap-6 py-2">
-                      <svg viewBox="0 0 36 36" className="w-28 h-28 -rotate-90">
-                        {(() => {
-                          let accum = 0;
-                          return data.map((item, i) => {
-                            const val = Number(item.value) || 0;
-                            const pct = (val / total) * 100;
-                            const dash = `${pct} ${100 - pct}`;
-                            const offset = 100 - accum;
-                            accum += pct;
-                            return (
-                              <circle
-                                key={i}
-                                cx="18"
-                                cy="18"
-                                r="15.915"
-                                fill="transparent"
-                                stroke={item.color || '#2563eb'}
-                                strokeWidth="4.2"
-                                strokeDasharray={dash}
-                                strokeDashoffset={offset}
-                              />
-                            );
-                          });
-                        })()}
-                      </svg>
-                      <div className="space-y-1">
-                        {data.map((item, i) => {
-                          const val = Number(item.value) || 0;
-                          return (
-                            <div key={i} className="flex items-center gap-2 text-xs">
-                              <span
-                                style={{ backgroundColor: item.color || '#2563eb' }}
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                              />
-                              <span className="text-primary font-medium">
-                                {item.label}:
-                              </span>
-                              <span className="text-muted font-mono">
-                                {val} ({Math.round((val / total) * 100)}%)
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                            style={{
+                              height: `${Math.max((val / maxVal) * 100, 6)}%`,
+                              backgroundColor: item.color || '#2563eb',
+                            }}
+                            className="w-full max-w-[44px] rounded-t-lg"
+                          />
+                          <span className="text-[10px] text-muted truncate max-w-[72px]">
+                            {item.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             }
@@ -1244,7 +1110,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-4 rounded-xl bg-elevated border border-border space-y-3"
+                  className="p-3.5 sm:p-4 rounded-xl bg-elevated border border-border space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div>
@@ -1257,7 +1123,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                           : 'Selecione uma opção'}
                       </p>
                     </div>
-                    <span className="text-[11px] font-mono text-muted">
+                    <span className="text-[11px] font-mono text-muted shrink-0">
                       {totalVotes} {totalVotes === 1 ? 'voto' : 'votos'}
                     </span>
                   </div>
@@ -1280,10 +1146,10 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                               : 'border-border bg-surface hover:border-accent/50'
                           }`}
                         >
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
-                                className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                                   opt.isChecked
                                     ? 'border-accent bg-accent text-white'
                                     : 'border-muted'
@@ -1291,11 +1157,11 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                               >
                                 {opt.isChecked && <Check className="w-2.5 h-2.5" />}
                               </span>
-                              <span className="font-semibold text-primary">
+                              <span className="font-semibold text-primary truncate">
                                 {opt.text}
                               </span>
                             </div>
-                            <span className="text-[11px] font-mono text-muted">
+                            <span className="text-[11px] font-mono text-muted shrink-0">
                               {votes} ({pct}%)
                             </span>
                           </div>
@@ -1355,7 +1221,9 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                         <tr
                           key={rIdx}
                           className={
-                            rIdx === 0 ? 'bg-elevated font-bold text-primary' : 'bg-surface text-secondary'
+                            rIdx === 0
+                              ? 'bg-elevated font-bold text-primary'
+                              : 'bg-surface text-secondary'
                           }
                         >
                           {(Array.isArray(row) ? row : []).map((cell, cIdx) => (
@@ -1395,7 +1263,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
                 key={b.id || idx}
                 style={{ ...cellStyle, ...alignStyle }}
                 className={`${fontCls} leading-relaxed`}
-                dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
               />
             );
           })}
@@ -1403,7 +1271,7 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
       ) : (
         <>
           {postContent && (
-            <div className="mt-4 text-sm text-primary whitespace-pre-line leading-relaxed">
+            <div className="mt-4 text-sm sm:text-base text-primary whitespace-pre-line leading-relaxed break-words">
               {postContent}
             </div>
           )}
@@ -1435,9 +1303,9 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
         </>
       )}
 
-      {/* Tags */}
+      {/* Hashtags */}
       {postTags && postTags.length > 0 && !isEditing && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
           {postTags.map((tag) => (
             <span
               key={tag}
@@ -1449,209 +1317,123 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
         </div>
       )}
 
-      {/* Barra de Ações */}
-      <div className="mt-4 pt-3 flex items-center gap-6 text-xs text-secondary">
-        <button
-          type="button"
-          onClick={toggleExpandReplies}
-          className={`flex items-center gap-1.5 transition-colors ${
-            expandReplies ? 'text-accent font-semibold' : 'hover:text-primary'
-          }`}
-        >
-          <MessageCircle className="w-4 h-4" />
-          <span>{repliesCount}</span>
-        </button>
+      {/* Barra de Ações (Responsiva para Mobile e Desktop) */}
+      <div className="mt-4 pt-3 flex items-center justify-between gap-2 text-xs text-secondary">
+        <div className="flex items-center gap-5 sm:gap-6">
+          <button
+            type="button"
+            onClick={toggleExpandReplies}
+            aria-label="Respostas"
+            className={`flex items-center gap-1.5 py-1 transition-colors ${
+              expandReplies ? 'text-accent font-semibold' : 'hover:text-primary'
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>{repliesCount}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleRepost}
-          className={`flex items-center gap-1.5 transition-colors ${
-            hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
-          }`}
-        >
-          <Repeat2 className="w-4 h-4" />
-          <span>{reposts}</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleRepost}
+            aria-label="Repostar"
+            className={`flex items-center gap-1.5 py-1 transition-colors ${
+              hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
+            }`}
+          >
+            <Repeat2 className="w-4 h-4" />
+            <span>{reposts}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleLike}
-          className={`flex items-center gap-1.5 transition-colors ${
-            hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
-          }`}
-        >
-          <Heart className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''}`} />
-          <span>{likes}</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleLike}
+            aria-label="Curtir"
+            className={`flex items-center gap-1.5 py-1 transition-colors ${
+              hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''}`} />
+            <span>{likes}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setExpandShare(!expandShare)}
-          className={`flex items-center gap-1.5 transition-colors ${
-            expandShare ? 'text-accent font-semibold' : 'hover:text-primary'
-          }`}
-        >
-          <Share2 className="w-4 h-4" />
-          <span>Compartilhar</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setOpenShareModal(true)}
+            aria-label="Compartilhar publicação"
+            className={`flex items-center gap-1.5 py-1 transition-colors ${
+              openShareModal ? 'text-accent font-semibold' : 'hover:text-primary'
+            }`}
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Compartilhar</span>
+          </button>
+        </div>
+
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={handleReportPost}
+            title="Denunciar publicação à moderação"
+            aria-label="Denunciar publicação"
+            className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
+          >
+            <Flag className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      {expandShare && (
-        <div className="mt-4 pt-4 border-t border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-accent">
-              Prévia para Stories
-            </span>
-            <button
-              type="button"
-              onClick={() => setExpandShare(false)}
-              className="text-muted hover:text-primary"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+      {/* Modal Insight* Share Studio */}
+      <SharePostModal
+        isOpen={openShareModal}
+        onClose={() => setOpenShareModal(false)}
+        post={{
+          ...post,
+          content: postContent,
+          blocks: blocksState,
+          tags: postTags,
+          image_url: postImageUrl,
+        }}
+        author={author}
+      />
 
-          <div className="bg-[#141417] border border-border rounded-2xl p-6 flex flex-col items-center justify-center space-y-4">
-            <div className="w-full max-w-sm bg-white text-zinc-900 rounded-2xl p-4 shadow-2xl space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <img
-                    src={author.avatar_url || '/assets/net/logo.png'}
-                    alt={author.full_name}
-                    className="w-9 h-9 rounded-full object-cover border border-zinc-200"
-                  />
-                  <div className="leading-tight">
-                    <p className="text-xs font-extrabold text-zinc-900">
-                      {author.display_name || author.full_name}
-                    </p>
-                    <p className="text-[11px] text-zinc-500">
-                      @{author.username || 'poiani'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-white text-[10px] font-bold">
-                    Seguir
-                  </span>
-                  <span className="text-xs font-black text-zinc-900">
-                    Insight<span className="text-[#2563eb]">*</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-zinc-900 whitespace-pre-line leading-relaxed">
-                {postContent}
-                {postTags && postTags.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5 text-[#2563eb] font-medium">
-                    {postTags.map((t) => (
-                      <span key={t}>#{t}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {postImageUrl && (
-                <div className="space-y-1">
-                  <div className="rounded-xl overflow-hidden border border-zinc-200 max-h-48">
-                    <img
-                      src={postImageUrl}
-                      alt="Post"
-                      className="w-full h-full object-cover max-h-48"
-                    />
-                  </div>
-                  <p className="text-[10px] text-zinc-400">De insight* — Victor Poiani</p>
-                </div>
-              )}
-
-              <div className="pt-1 border-t border-zinc-100 text-[10px] text-zinc-500 space-y-1.5">
-                <p>
-                  {storyTimeDate} ·{' '}
-                  <strong className="text-zinc-800">
-                    {(post.views_count || 1) + likes * 3}
-                  </strong>{' '}
-                  visualizações
-                </p>
-                <div className="flex items-center gap-3 text-zinc-600 font-semibold">
-                  <span className="flex items-center gap-1">
-                    <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" /> {likes}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageCircle className="w-3.5 h-3.5" /> {repliesCount}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="px-4 py-1.5 rounded-xl bg-white text-zinc-900 shadow-lg flex items-center gap-1.5 text-xs font-extrabold hover:scale-105 transition-transform"
-            >
-              <Link2 className="w-3.5 h-3.5 text-[#2563eb]" />
-              <span>INSIGHT* · Ler publicação</span>
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-elevated border border-border text-xs font-semibold text-primary hover:border-accent transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-accent" />
-                  <span className="text-accent">Link copiado</span>
-                </>
-              ) : (
-                <>
-                  <Link2 className="w-3.5 h-3.5 text-accent" />
-                  <span>Copiar Link</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownloadStoryImage}
-              disabled={downloadingStory}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-background text-xs font-bold hover:bg-accent-hover disabled:opacity-50 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>
-                {downloadingStory ? 'A gerar Story...' : 'Baixar Imagem (PNG)'}
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Área expansível d Thread */}
+      {/* Área Expansível da Thread / Respostas */}
       {expandReplies && (
         <div className="mt-4 pt-4 border-t border-border space-y-4">
           <form
             onSubmit={handleSendReply}
             className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5"
           >
-            {!isAdmin && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-border">
-                <input
-                  type="text"
-                  value={visitorName}
-                  onChange={(e) => setVisitorName(e.target.value)}
-                  placeholder="Seu nome"
-                  maxLength={40}
-                  className="bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-                />
-                <input
-                  type="text"
-                  value={visitorHandle}
-                  onChange={(e) => setVisitorHandle(e.target.value)}
-                  placeholder="Seu @identificador (opcional)"
-                  maxLength={30}
-                  className="bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
-                />
+            {loggedUserProfile ? (
+              <div className="flex items-center justify-between pb-2 border-b border-border text-xs gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <img
+                    src={loggedUserProfile.avatar_url || '/assets/net/default-perfil'}
+                    alt={loggedUserProfile.full_name}
+                    className="w-5 h-5 rounded-full object-cover border border-border shrink-0"
+                  />
+                  <span className="font-bold text-primary truncate">
+                    {loggedUserProfile.display_name || loggedUserProfile.full_name}
+                  </span>
+                  <span className="text-muted truncate">
+                    @{loggedUserProfile.username}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 shrink-0">
+                  ● Autenticado
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border text-xs">
+                <span className="text-secondary">
+                  Entre ou crie uma conta para responder.
+                </span>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-hover text-white font-bold text-[11px] shrink-0 transition-colors"
+                >
+                  <LogIn className="w-3 h-3" />
+                  <span>Entrar / Criar Conta</span>
+                </Link>
               </div>
             )}
 
@@ -1659,9 +1441,11 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               placeholder={
-                isAdmin
-                  ? 'Adicionar nota ou continuar thread...'
-                  : 'Escrever resposta...'
+                loggedUserProfile
+                  ? isAdmin
+                    ? 'Adicionar nota ou continuar thread...'
+                    : `Responder como @${loggedUserProfile.username}...`
+                  : 'Inicie sessão para escrever uma resposta...'
               }
               maxLength={280}
               rows={2}
@@ -1713,79 +1497,96 @@ export function PostCard({ post, author, isAdmin, onDelete }: PostCardProps) {
               <button
                 type="submit"
                 disabled={(!replyText.trim() && !replySpotifyInput.trim()) || sendingReply}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-background text-xs font-bold disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold disabled:opacity-50"
               >
                 <Send className="w-3 h-3" />
-                <span>{sendingReply ? 'A enviar...' : 'Responder'}</span>
+                <span>{sendingReply ? 'Enviando...' : 'Responder'}</span>
               </button>
             </div>
           </form>
 
           {loadingReplies ? (
-            <p className="text-xs text-muted py-2">A carregar respostas...</p>
+            <p className="text-xs text-muted py-2">Carregando respostas...</p>
           ) : replies.length === 0 ? (
             <p className="text-xs text-muted py-2">
-              Nenhuma resposta registada.
+              Nenhuma resposta registrada ainda.
             </p>
           ) : (
             <div className="space-y-3 pl-3 border-l-2 border-border">
-              {replies.map((reply) => (
-                <div
-                  key={reply.id}
-                  className="p-3 rounded-xl bg-surface/60 border border-border space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {reply.avatar_url ? (
-                        <img
-                          src={reply.avatar_url}
-                          alt={reply.author_name || 'Autor'}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-bold text-accent">
-                          {(reply.author_name || 'V').charAt(0).toUpperCase()}
-                        </div>
+              {replies.map((reply) => {
+                const canDeleteReply =
+                  isAdmin ||
+                  loggedUserProfile?.role === 'admin' ||
+                  loggedUserProfile?.role === 'moderator' ||
+                  loggedUserProfile?.id === FOUNDER_PROFILE_ID ||
+                  (loggedUserProfile && reply.profile_id === loggedUserProfile.id);
+
+                const replyAuthorHref = getProfileHref(
+                  reply.profile_id,
+                  reply.author_handle
+                );
+
+                return (
+                  <div
+                    key={reply.id}
+                    className="p-3 rounded-xl bg-surface/60 border border-border space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <Link
+                        href={replyAuthorHref}
+                        className="flex items-center gap-2 group/replyauthor min-w-0"
+                      >
+                        {reply.avatar_url ? (
+                          <img
+                            src={reply.avatar_url}
+                            alt={reply.author_name || 'Autor'}
+                            className="w-6 h-6 rounded-full object-cover border border-border shrink-0"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-bold text-accent shrink-0">
+                            {(reply.author_name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-xs font-bold text-primary group-hover/replyauthor:text-accent transition-colors truncate">
+                          {reply.author_name || 'Membro'}
+                        </span>
+                        <span className="text-[11px] text-muted truncate">
+                          @{reply.author_handle || 'membro'}
+                        </span>
+                      </Link>
+
+                      {canDeleteReply && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReply(reply.id, reply.profile_id)}
+                          title="Excluir resposta"
+                          className="text-muted hover:text-danger shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                      <span className="text-xs font-bold text-primary">
-                        {reply.author_name || 'Visitante'}
-                      </span>
-                      <span className="text-[11px] text-muted">
-                        @{reply.author_handle || 'leitor'}
-                      </span>
                     </div>
 
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteReply(reply.id)}
-                        title="Excluir resposta"
-                        className="text-muted hover:text-danger"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    {reply.content && (
+                      <p className="text-xs text-primary whitespace-pre-line leading-relaxed break-words">
+                        {reply.content}
+                      </p>
+                    )}
+
+                    {reply.spotify_track_id && (
+                      <iframe
+                        src={`https://open.spotify.com/embed/track/${reply.spotify_track_id}?utm_source=generator&theme=0`}
+                        width="100%"
+                        height="80"
+                        frameBorder="0"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        loading="lazy"
+                        className="rounded-lg"
+                      />
                     )}
                   </div>
-
-                  {reply.content && (
-                    <p className="text-xs text-primary whitespace-pre-line leading-relaxed">
-                      {reply.content}
-                    </p>
-                  )}
-
-                  {reply.spotify_track_id && (
-                    <iframe
-                      src={`https://open.spotify.com/embed/track/${reply.spotify_track_id}?utm_source=generator&theme=0`}
-                      width="100%"
-                      height="80"
-                      frameBorder="0"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      className="rounded-lg"
-                    />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

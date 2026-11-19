@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 const MAX_ALLOWED_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB pós-compressão
 
@@ -25,7 +26,6 @@ function getR2Client(): S3Client {
   });
 }
 
-// Rota GET para você testar no navegador (http://localhost:3000/api/upload/r2)
 export async function GET() {
   const configured = isR2Configured();
   return NextResponse.json({
@@ -38,6 +38,20 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Verifica se o usuário está autenticado antes de assinar URL da CDN
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Acesso negado. Faça login para enviar arquivos.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { fileName, contentType, compressedSize, isGif } = body;
 
@@ -50,21 +64,22 @@ export async function POST(req: NextRequest) {
 
     if (Number(compressedSize) > MAX_ALLOWED_SIZE_BYTES) {
       return NextResponse.json(
-        { error: 'O vídeo excede o limite de 25MB mesmo após a compactação.' },
+        { error: 'O arquivo excede o limite de 25MB.' },
         { status: 413 }
       );
     }
 
-    // Se as chaves da Cloudflare ainda não estiverem no .env.local, avisa o front para usar o fallback
     if (!isR2Configured()) {
       return NextResponse.json({ fallbackToSupabase: true }, { status: 200 });
     }
 
     const r2 = getR2Client();
-    const folder = isGif ? 'gifs' : 'videos';
+    const folder = isGif ? 'gifs' : contentType.startsWith('video/') ? 'videos' : 'media';
     const yearMonth = new Date().toISOString().slice(0, 7);
     const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const r2Key = `${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
+
+    // Organiza o caminho por ID do usuário para isolamento e rastreio
+    const r2Key = `users/${user.id}/${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!.trim(),
@@ -72,7 +87,6 @@ export async function POST(req: NextRequest) {
       ContentType: contentType,
     });
 
-    // Gera URL assinada válida por 5 minutos para upload direto do navegador
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
     const basePublicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL!.trim().replace(/\/$/, '');
     const publicUrl = `${basePublicUrl}/${r2Key}`;
@@ -91,9 +105,36 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
     const { r2Key } = await req.json();
     if (!r2Key || !isR2Configured()) {
       return NextResponse.json({ deleted: false });
+    }
+
+    // Só permite apagar se o arquivo pertencer à pasta do próprio usuário ou se for Staff/Admin
+    const isOwnFile = String(r2Key).startsWith(`users/${user.id}/`);
+    if (!isOwnFile) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role')
+        .or(`user_id.eq.${user.id},id.eq.${user.id}`)
+        .maybeSingle();
+
+      const isStaff = prof?.role === 'admin' || prof?.role === 'moderator';
+      if (!isStaff) {
+        return NextResponse.json(
+          { error: 'Sem permissão para remover este arquivo.' },
+          { status: 403 }
+        );
+      }
     }
 
     const r2 = getR2Client();

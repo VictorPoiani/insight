@@ -36,7 +36,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
   },
   {
     level: 1,
-    name: 'Centelha',
+    name: 'Recruta',
     tagline: 'A primeira faísca que mantém o projeto aceso',
     minPoints: 1,
     color: '#b86b35',
@@ -52,7 +52,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
   },
   {
     level: 2,
-    name: 'Prisma',
+    name: 'Escudeiro',
     tagline: 'Reflete e amplia o alcance da comunidade',
     minPoints: 10,
     color: '#475569',
@@ -68,7 +68,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
   },
   {
     level: 3,
-    name: 'Mecenas',
+    name: 'Cavaleiro',
     tagline: 'Sustentação ativa e destaque no mural',
     minPoints: 50,
     color: '#b48219',
@@ -84,7 +84,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
   },
   {
     level: 4,
-    name: 'Arquiteto',
+    name: 'Imperador',
     tagline: 'Ajuda a moldar a engenharia e o futuro da plataforma',
     minPoints: 100,
     color: '#0284c7',
@@ -100,7 +100,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
   },
   {
     level: 5,
-    name: 'Singularidade',
+    name: 'Grão-Mestre',
     tagline: 'Espectro prismático completo e patente Prime do Insight*',
     minPoints: 250,
     color: '#4285F4',

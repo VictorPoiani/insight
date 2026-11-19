@@ -2,9 +2,49 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+function resolveValidNotificationUrl(request: Request): string | undefined {
+  const hostHeader = request.headers.get('host') || '';
+  const fallbackFromHost =
+    hostHeader && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1')
+      ? `https://${hostHeader}`
+      : '';
+
+  const rawEnv = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    ''
+  ).trim();
+
+  // Extrai URL limpa mesmo se houver caracteres extras ou formato markdown
+  const urlMatch = rawEnv.match(/https?:\/\/[^\s)\]]+/i);
+  const candidate = urlMatch ? urlMatch[0] : rawEnv || fallbackFromHost;
+
+  if (!candidate || candidate.includes('localhost') || candidate.includes('127.0.0.1')) {
+    return undefined;
+  }
+
+  const withProtocol = /^https?:\/\//i.test(candidate)
+    ? candidate
+    : `https://${candidate}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol !== 'https:') return undefined;
+    // Garante que existe um TLD válido (ex: .com, .br, .app)
+    if (!parsed.hostname.includes('.')) return undefined;
+    return `${parsed.origin}/api/webhooks/mercadopago`;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim().replace(
+      /^["']|["']$/g,
+      ''
+    );
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'MERCADOPAGO_ACCESS_TOKEN não configurado no servidor.' },
@@ -27,12 +67,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const siteUrl = (
-      process.env.NEXT_PUBLIC_SITE_URL || 'https://insight.app.br'
-    ).replace(/\/$/, '');
-
+    const notificationUrl = resolveValidNotificationUrl(request);
     const idempotencyKey = crypto.randomUUID();
     const roundedAmount = Number(amount.toFixed(2));
+
+    const paymentBody: Record<string, any> = {
+      transaction_amount: roundedAmount,
+      description: `Apoio Insight* (+${Math.floor(roundedAmount)} pts)`,
+      payment_method_id: 'pix',
+      payer: {
+        email: payerEmail,
+      },
+      metadata: {
+        profile_id: profileId,
+        donor_name: donorName,
+        message,
+      },
+    };
+
+    if (notificationUrl) {
+      paymentBody.notification_url = notificationUrl;
+    }
 
     // 1. Cria a cobrança PIX na API do Mercado Pago
     const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
@@ -42,20 +97,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
         'X-Idempotency-Key': idempotencyKey,
       },
-      body: JSON.stringify({
-        transaction_amount: roundedAmount,
-        description: `Apoio Insight* (+${Math.floor(roundedAmount)} pts)`,
-        payment_method_id: 'pix',
-        payer: {
-          email: payerEmail,
-        },
-        notification_url: `${siteUrl}/api/webhooks/mercadopago`,
-        metadata: {
-          profile_id: profileId,
-          donor_name: donorName,
-          message,
-        },
-      }),
+      body: JSON.stringify(paymentBody),
     });
 
     const mpData = await mpResponse.json();
@@ -65,6 +107,7 @@ export async function POST(request: Request) {
         {
           error:
             mpData?.message || 'Erro ao gerar cobrança PIX no Mercado Pago.',
+          sentNotificationUrl: notificationUrl || null,
         },
         { status: 502 }
       );
@@ -96,7 +139,11 @@ export async function POST(request: Request) {
 
     if (dbError) {
       return NextResponse.json(
-        { error: 'PIX gerado, mas houve erro ao registrar no banco: ' + dbError.message },
+        {
+          error:
+            'PIX gerado, mas houve erro ao registrar no banco: ' +
+            dbError.message,
+        },
         { status: 500 }
       );
     }

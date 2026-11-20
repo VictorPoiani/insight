@@ -11,13 +11,18 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
 import { NitroCosmetics } from '@/lib/nitro/catalog';
+import {
+  NITRO_KILL_SWITCH,
+  NitroEntitlement,
+  resolveNitroEntitlement,
+} from '@/lib/nitro/entitlement';
 import './nitro.css';
 
 /**
  * Interruptor geral: NEXT_PUBLIC_INSIGHT_NITRO=off desliga o Nitro inteiro
  * (inclusive para admins) sem precisar de deploy de código.
  */
-export const NITRO_KILL_SWITCH = process.env.NEXT_PUBLIC_INSIGHT_NITRO === 'off';
+export { NITRO_KILL_SWITCH };
 
 export interface NitroViewerPrefs {
   /** Reproduzir animações de abertura ao visitar perfis. */
@@ -32,8 +37,9 @@ const DEFAULT_PREFS: NitroViewerPrefs = { playIntros: true, animateLists: true }
 interface NitroContextValue {
   ready: boolean;
   viewer: Profile | null;
-  /** Beta fechada: só role = 'admin' acessa o Nitro e vê cosméticos. */
+  /** Pode usar o Nitro agora (assinatura, vitalício do Nível 5 ou admin na beta). */
   hasAccess: boolean;
+  entitlement: NitroEntitlement;
   prefs: NitroViewerPrefs;
   setPrefs: (next: NitroViewerPrefs) => void;
   /** Cosméticos salvos nesta sessão, por perfil (atualização instantânea na UI). */
@@ -45,6 +51,7 @@ const NitroContext = createContext<NitroContextValue>({
   ready: false,
   viewer: null,
   hasAccess: false,
+  entitlement: resolveNitroEntitlement(null),
   prefs: DEFAULT_PREFS,
   setPrefs: () => {},
   overrides: {},
@@ -118,10 +125,10 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
-  const hasAccess = !NITRO_KILL_SWITCH && viewer?.role === 'admin';
+  const entitlement = useMemo(() => resolveNitroEntitlement(viewer), [viewer]);
+  const hasAccess = entitlement.active;
 
   // Rainbow (benefício Nitro): logo e asteriscos de carregamento em espectro.
-  // Na beta fechada, o "assinante" é quem tem acesso (admin).
   const ownCosmetics = viewer ? (viewer.id in overrides ? overrides[viewer.id] : viewer.cosmetics) : null;
   const rainbowOn = hasAccess && ownCosmetics?.rainbow !== false;
 
@@ -156,8 +163,8 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, viewer, hasAccess, prefs, setPrefs, overrides, saveCosmetics }),
-    [ready, viewer, hasAccess, prefs, setPrefs, overrides, saveCosmetics]
+    () => ({ ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics }),
+    [ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics]
   );
 
   return <NitroContext.Provider value={value}>{children}</NitroContext.Provider>;

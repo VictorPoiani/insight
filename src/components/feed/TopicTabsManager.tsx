@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { hasContributorFeature } from '@/lib/contributorLevels';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
 import {
   CustomTopic,
@@ -342,6 +344,10 @@ export function TopicTabsManager({
   const [customTopics, setCustomTopics] = useState<CustomTopic[]>([]);
   const [switchingTabId, setSwitchingTabId] = useState<string | null>(null);
   const [expandCreate, setExpandCreate] = useState(false);
+  // Criar tópico personalizado: benefício do Nível 3 (Cavaleiro); staff sempre pode.
+  const { viewer } = useNitro();
+  const isStaff = viewer?.role === 'admin' || viewer?.role === 'moderator';
+  const canCreateTopics = isStaff || hasContributorFeature(viewer?.contributor_level ?? 0, 'create-topics');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>('private');
@@ -835,20 +841,29 @@ export function TopicTabsManager({
             <button
               type="button"
               onClick={() => {
+                if (!canCreateTopics) {
+                  alert('Criar tópicos personalizados é um benefício do Nível 3 (Cavaleiro). Veja em /apoie.');
+                  return;
+                }
                 setSelectedTemplate(null);
                 setExpandCreate(true);
               }}
-              title="Nova página ou workspace"
-              className="w-7 h-7 my-2 rounded-full border bg-elevated border-border text-secondary hover:text-accent hover:border-accent flex items-center justify-center transition-colors shrink-0"
+              title={canCreateTopics ? 'Nova página ou workspace' : 'Disponível a partir do Nível 3 (Cavaleiro)'}
+              aria-disabled={!canCreateTopics}
+              className={`w-7 h-7 my-2 rounded-full border bg-elevated border-border flex items-center justify-center transition-colors shrink-0 ${
+                canCreateTopics
+                  ? 'text-secondary hover:text-accent hover:border-accent'
+                  : 'text-muted opacity-60'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              {canCreateTopics ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
             </button>
           )}
         </div>
       </div>
 
       {/* Modal de Criação de Página / Workspace */}
-      {isAdmin && expandCreate && (
+      {isAdmin && canCreateTopics && expandCreate && (
         <div
           onClick={() => setExpandCreate(false)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"

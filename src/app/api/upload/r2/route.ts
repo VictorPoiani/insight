@@ -1,9 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { formatBytes, getUserUploadLimitBytes, MB } from '@/lib/contributorLevels';
 
-const MAX_ALLOWED_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB pós-compressão
+/**
+ * Upload direto ao Cloudflare R2.
+ *
+ * A cota de anexos é do Nível de Contribuinte e vale para o tamanho FINAL
+ * (pós-compressão). Garantias no servidor:
+ *  1. register_media_upload() (Supabase) recusa arquivos acima do limite do
+ *     nível e grava o tamanho exato de cada objeto;
+ *  2. a URL pré-assinada amarra Content-Length (e Content-Type): o R2 recusa
+ *     um corpo de outro tamanho;
+ *  3. o trigger posts_media_quota soma o peso real das mídias referenciadas no
+ *     post ao salvar e recusa se passar do limite.
+ */
+
+const MULTIPART_THRESHOLD = 100 * MB;
+const MIN_PART = 16 * MB;
+const MAX_PARTS = 10_000;
+
+/** Tipos servidos inline; o resto vira download (evita HTML/JS ativo no domínio da CDN). */
+const INLINE_TYPES = /^(image\/(png|jpe?g|webp|gif|avif)|video\/(mp4|webm|quicktime)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
 function isR2Configured(): boolean {
   return Boolean(
@@ -18,6 +46,8 @@ function isR2Configured(): boolean {
 function getR2Client(): S3Client {
   return new S3Client({
     region: 'auto',
+    // sem checksum automático do corpo vazio na URL pré-assinada
+    requestChecksumCalculation: 'WHEN_REQUIRED',
     endpoint: `https://${process.env.R2_ACCOUNT_ID!.trim()}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: process.env.R2_ACCESS_KEY_ID!.trim(),
@@ -25,6 +55,10 @@ function getR2Client(): S3Client {
     },
   });
 }
+
+const bucket = () => process.env.R2_BUCKET_NAME!.trim();
+const publicUrlFor = (key: string) =>
+  `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL!.trim().replace(/\/$/, '')}/${key}`;
 
 export async function GET() {
   const configured = isR2Configured();
@@ -36,9 +70,12 @@ export async function GET() {
   });
 }
 
+function quotaMessage(limit: number) {
+  return `O arquivo passa do limite de anexos do seu nível (${formatBytes(limit)} por post, após compressão).`;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verifica se o usuário está autenticado antes de assinar URL da CDN
     const supabase = await createServerSupabase();
     const {
       data: { user },
@@ -53,48 +90,148 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { fileName, contentType, compressedSize, isGif } = body;
+    const action: string = body.action || 'single';
 
-    if (!fileName || !contentType) {
-      return NextResponse.json(
-        { error: 'Parâmetros de arquivo inválidos.' },
-        { status: 400 }
+    // ------------------------------------------------ finalizar multipart
+    if (action === 'multipart-complete' || action === 'multipart-abort') {
+      const r2Key = String(body.r2Key || '');
+      const uploadId = String(body.uploadId || '');
+      if (!r2Key.startsWith(`users/${user.id}/`) || !uploadId || !isR2Configured()) {
+        return NextResponse.json({ error: 'Upload inválido.' }, { status: 400 });
+      }
+      const r2 = getR2Client();
+      if (action === 'multipart-abort') {
+        await r2.send(new AbortMultipartUploadCommand({ Bucket: bucket(), Key: r2Key, UploadId: uploadId })).catch(() => {});
+        return NextResponse.json({ aborted: true });
+      }
+
+      const { data: reg } = await supabase
+        .from('media_uploads')
+        .select('size_bytes')
+        .eq('r2_key', r2Key)
+        .maybeSingle();
+      if (!reg) return NextResponse.json({ error: 'Upload não registrado.' }, { status: 400 });
+
+      const parts = Array.isArray(body.parts) ? body.parts : [];
+      await r2.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: bucket(),
+          Key: r2Key,
+          UploadId: uploadId,
+          MultipartUpload: {
+            Parts: parts.map((p: { PartNumber: number; ETag: string }) => ({
+              PartNumber: Number(p.PartNumber),
+              ETag: String(p.ETag),
+            })),
+          },
+        })
       );
+
+      // confere o tamanho real gravado no bucket
+      const head = await r2.send(new HeadObjectCommand({ Bucket: bucket(), Key: r2Key }));
+      if (Number(head.ContentLength) !== Number(reg.size_bytes)) {
+        await r2.send(new DeleteObjectCommand({ Bucket: bucket(), Key: r2Key })).catch(() => {});
+        return NextResponse.json({ error: 'Tamanho enviado não confere com o registrado.' }, { status: 422 });
+      }
+      return NextResponse.json({ completed: true, publicUrl: publicUrlFor(r2Key), r2Key });
     }
 
-    if (Number(compressedSize) > MAX_ALLOWED_SIZE_BYTES) {
-      return NextResponse.json(
-        { error: 'O arquivo excede o limite de 25MB.' },
-        { status: 413 }
-      );
+    // ------------------------------------------------ novo upload
+    const { fileName, contentType, isGif } = body;
+    const size = Math.floor(Number(body.compressedSize));
+    const originalSize = Math.floor(Number(body.originalSize)) || null;
+
+    if (!fileName || !contentType || !Number.isFinite(size) || size <= 0) {
+      return NextResponse.json({ error: 'Parâmetros de arquivo inválidos.' }, { status: 400 });
+    }
+
+    // Limite do nível real (lido no banco, não no cliente)
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('contributor_level, role')
+      .or(`user_id.eq.${user.id},id.eq.${user.id}`)
+      .maybeSingle();
+    const limit = getUserUploadLimitBytes(prof?.contributor_level ?? 0, prof?.role);
+    if (size > limit) {
+      return NextResponse.json({ error: quotaMessage(limit), limit }, { status: 413 });
     }
 
     if (!isR2Configured()) {
       return NextResponse.json({ fallbackToSupabase: true }, { status: 200 });
     }
 
-    const r2 = getR2Client();
-    const folder = isGif ? 'gifs' : contentType.startsWith('video/') ? 'videos' : 'media';
+    const type = String(contentType).toLowerCase();
+    const servedType = INLINE_TYPES.test(type) ? type : 'application/octet-stream';
+    const folder = isGif
+      ? 'gifs'
+      : type.startsWith('video/')
+        ? 'videos'
+        : type.startsWith('image/')
+          ? 'images'
+          : 'files';
     const yearMonth = new Date().toISOString().slice(0, 7);
-    const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
-
-    // Organiza o caminho por ID do usuário para isolamento e rastreio
+    const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
     const r2Key = `users/${user.id}/${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!.trim(),
-      Key: r2Key,
-      ContentType: contentType,
+    // registra ANTES de assinar: o banco valida o limite de novo e guarda o tamanho exato
+    const { error: regError } = await supabase.rpc('register_media_upload', {
+      p_r2_key: r2Key,
+      p_size: size,
+      p_content_type: servedType,
+      p_original: originalSize,
     });
+    if (regError) {
+      const quota = regError.message.includes('post_media_quota_exceeded');
+      return NextResponse.json(
+        { error: quota ? quotaMessage(limit) : 'Não foi possível registrar o upload.' },
+        { status: quota ? 413 : 500 }
+      );
+    }
 
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
-    const basePublicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL!.trim().replace(/\/$/, '');
-    const publicUrl = `${basePublicUrl}/${r2Key}`;
+    const r2 = getR2Client();
+    const sign = { expiresIn: 3600, signableHeaders: new Set(['content-type', 'content-length']) };
+
+    if (action === 'multipart-create' || size > MULTIPART_THRESHOLD) {
+      const partSize = Math.max(MIN_PART, Math.ceil(size / MAX_PARTS));
+      const created = await r2.send(
+        new CreateMultipartUploadCommand({
+          Bucket: bucket(),
+          Key: r2Key,
+          ContentType: servedType,
+        })
+      );
+      const uploadId = created.UploadId!;
+      const parts = [];
+      for (let start = 0, n = 1; start < size; start += partSize, n++) {
+        const end = Math.min(size, start + partSize);
+        const url = await getSignedUrl(
+          r2,
+          new UploadPartCommand({ Bucket: bucket(), Key: r2Key, UploadId: uploadId, PartNumber: n, ContentLength: end - start }),
+          { expiresIn: 3 * 3600 }
+        );
+        parts.push({ partNumber: n, url, start, end });
+      }
+      return NextResponse.json({ mode: 'multipart', uploadId, parts, r2Key, publicUrl: publicUrlFor(r2Key), limit });
+    }
+
+    const uploadUrl = await getSignedUrl(
+      r2,
+      new PutObjectCommand({
+        Bucket: bucket(),
+        Key: r2Key,
+        ContentType: servedType,
+        ContentLength: size,
+      }),
+      sign
+    );
 
     return NextResponse.json({
+      mode: 'single',
       uploadUrl,
-      publicUrl,
+      contentType: servedType,
+      publicUrl: publicUrlFor(r2Key),
       r2Key,
+      limit,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro interno ao assinar URL R2';

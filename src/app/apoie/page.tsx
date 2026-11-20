@@ -1872,9 +1872,24 @@ export default function ApoiePage() {
                       {tier.tagline}
                     </p>
 
-                    <p className="text-xs text-muted">
-                      {tier.perks.join(' · ')}
-                    </p>
+                    <ul className="text-xs text-muted space-y-0.5">
+                      {tier.level > 1 && (
+                        <li className="text-[11px] font-semibold text-muted/80">
+                          Tudo do nível anterior, mais:
+                        </li>
+                      )}
+                      {tier.perks.map((perk) => (
+                        <li key={perk.label} className="flex items-center gap-1.5">
+                          <span aria-hidden>·</span>
+                          <span>{perk.label}</span>
+                          {perk.soon && (
+                            <span className="rounded-full border border-border px-1.5 text-[9px] font-bold uppercase tracking-wide">
+                              Em breve
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
 
                   <div className="sm:text-right shrink-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-1 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">

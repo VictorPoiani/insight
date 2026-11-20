@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
-import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
+import { uploadMediaToInsight, MediaQuotaError, type UploadR2Result } from '@/lib/mediaCompressor';
+import { formatBytes, getTierByLevel, getUserUploadLimitBytes } from '@/lib/contributorLevels';
+import { useNitro } from '@/components/nitro/NitroProvider';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
@@ -105,8 +107,30 @@ interface AvailableTopicOption {
   icon?: string | null;
 }
 
-const MAX_FILE_SIZE_MB = 5;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+/**
+ * Peso final (R2, pós-compressão) de todas as mídias do post. Só conta blocos
+ * cuja mídia ainda está anexada. É a mesma soma que o banco faz ao salvar.
+ */
+function sumPostMediaBytes(blocks: PostBlock[]): number {
+  let total = 0;
+  for (const b of blocks) {
+    if (b.imageUrl || b.videoUrl || b.fileUrl) total += b.mediaBytes || 0;
+    for (const n of b.mindMapNodes || []) if (n.mediaUrl) total += n.mediaBytes || 0;
+    for (const st of b.roadmapSteps || []) if (st.mediaUrl) total += st.mediaBytes || 0;
+  }
+  return total;
+}
+
+function uploadErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof MediaQuotaError) return err.message;
+  return err instanceof Error ? err.message : fallback;
+}
+
+function compressionBadge(r: UploadR2Result): string {
+  if (r.savedPercent > 0) return `${formatBytes(r.originalSize)} → ${formatBytes(r.compressedSize)} (-${r.savedPercent}%)`;
+  if (r.note) return `${formatBytes(r.compressedSize)} · ${r.note}`;
+  return `${formatBytes(r.compressedSize)} (otimizado)`;
+}
 
 const GIPHY_QUICK_TAGS = [
   { label: 'Em Alta', query: '' },
@@ -243,7 +267,7 @@ const BLOCK_MENU_ITEMS: {
   { type: 'chart', label: 'Gráfico', desc: 'Barras ou Rosca', icon: BarChart3 },
   { type: 'poll', label: 'Enquete', desc: 'Votação interativa', icon: CheckSquare },
   { type: 'table', label: 'Tabela', desc: 'Linhas e colunas', icon: Table },
-  { type: 'file', label: 'Arquivo', desc: `Anexo até ${MAX_FILE_SIZE_MB}MB`, icon: Paperclip },
+  { type: 'file', label: 'Arquivo', desc: 'Anexo na cota do post', icon: Paperclip },
   { type: 'spotify', label: 'Spotify', desc: 'Player de áudio', icon: Music },
   { type: 'divider', label: 'Divisória', desc: 'Linha separadora', icon: Minus },
 ];
@@ -258,13 +282,6 @@ export function extractSpotifyTrackId(urlOrId: string): string | null {
     return trimmed.split('spotify:track:')[1] || null;
   }
   return trimmed.length >= 2 ? trimmed : null;
-}
-
-function formatBytes(bytes?: number) {
-  if (!bytes) return '0 KB';
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(2)} MB`;
 }
 
 function getSpanLabel(span?: number) {
@@ -569,6 +586,15 @@ export function PostComposer({
   const [uploadProgressPct, setUploadProgressPct] = useState<number>(0);
   const [compressionBadges, setCompressionBadges] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Cota de anexos do Nível de Contribuinte (tamanho comprimido no R2, por post)
+  const { viewer } = useNitro();
+  const viewerTier = getTierByLevel(viewer?.contributor_level ?? 0);
+  const uploadLimit = getUserUploadLimitBytes(viewer?.contributor_level ?? 0, viewer?.role);
+  const usedBytes = sumPostMediaBytes(blocks);
+  const remainingBytes = Math.max(0, uploadLimit - usedBytes);
+  const quotaPct = Math.min(100, (usedBytes / uploadLimit) * 100);
+  const overQuota = usedBytes > uploadLimit;
 
   const [giphyQuery, setGiphyQuery] = useState<string>('');
   const [giphyMediaType, setGiphyMediaType] = useState<'gifs' | 'stickers'>('gifs');
@@ -1042,36 +1068,55 @@ export function PostComposer({
     setDragHoverCol(null);
   }
 
+  /** Progresso compartilhado pelos uploads (barra no bloco). */
+  function startUpload(blockId: string, label: string) {
+    setUploadingBlockId(blockId);
+    setUploadProgressText(label);
+    setUploadProgressPct(3);
+  }
+
+  function endUpload() {
+    setUploadingBlockId(null);
+    setUploadProgressText('');
+    setUploadProgressPct(0);
+  }
+
+  const onUploadStatus = (label: string, pct: number) => {
+    setUploadProgressText(label);
+    setUploadProgressPct(pct);
+  };
+
   async function handleBlockImageUpload(
     e: React.ChangeEvent<HTMLInputElement>,
     blockId: string
   ) {
     if (!isAdmin) return;
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       alert('Selecione um arquivo de imagem válido.');
       return;
     }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert(`A imagem deve ter no máximo ${MAX_FILE_SIZE_MB}MB.`);
-      return;
+
+    startUpload(blockId, 'Otimizando imagem...');
+    try {
+      const result = await uploadMediaToInsight(file, {
+        budgetBytes: remainingBytes,
+        asImage: true,
+        onStatus: onUploadStatus,
+      });
+      updateBlock(blockId, {
+        imageUrl: result.publicUrl,
+        r2Key: result.r2Key,
+        mediaBytes: result.compressedSize,
+      });
+      setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
+    } catch (err) {
+      alert(uploadErrorMessage(err, 'Erro ao enviar imagem.'));
+    } finally {
+      endUpload();
     }
-
-    setUploadingBlockId(blockId);
-    const ext = file.name.split('.').pop();
-    const fileName = `${authorId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-
-    const { error } = await supabase.storage.from('posts').upload(fileName, file);
-    setUploadingBlockId(null);
-
-    if (error) {
-      alert('Erro ao enviar imagem: ' + error.message);
-      return;
-    }
-
-    const { data: pubData } = supabase.storage.from('posts').getPublicUrl(fileName);
-    updateBlock(blockId, { imageUrl: pubData.publicUrl });
   }
 
   async function handleBlockVideoUpload(
@@ -1081,6 +1126,7 @@ export function PostComposer({
   ) {
     if (!isAdmin) return;
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     const isVideo = file.type.startsWith('video/');
@@ -1091,45 +1137,24 @@ export function PostComposer({
       return;
     }
 
-    setUploadingBlockId(blockId);
-    setUploadProgressText('Preparando compactação...');
-    setUploadProgressPct(5);
-
+    startUpload(blockId, 'Preparando compactação...');
     try {
-      const result = await uploadCompressedMediaToR2(
-        file,
-        authorId,
-        isGifBlock,
-        (statusLabel, pct) => {
-          setUploadProgressText(statusLabel);
-          setUploadProgressPct(pct);
-        }
-      );
-
+      const result = await uploadMediaToInsight(file, {
+        budgetBytes: remainingBytes,
+        forceGifLoop: isGifBlock,
+        onStatus: onUploadStatus,
+      });
       updateBlock(blockId, {
         videoUrl: result.publicUrl,
         r2Key: result.r2Key,
         isGif: result.isGif,
+        mediaBytes: result.compressedSize,
       });
-
-      const origMB = (result.originalSize / (1024 * 1024)).toFixed(2);
-      const compMB = (result.compressedSize / (1024 * 1024)).toFixed(2);
-      const badgeLabel =
-        result.savedPercent > 0
-          ? `${origMB}MB → ${compMB}MB (-${result.savedPercent}%)`
-          : `${compMB}MB (Otimizado)`;
-
-      setCompressionBadges((prev) => ({
-        ...prev,
-        [blockId]: badgeLabel,
-      }));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar vídeo/GIF.';
-      alert(msg);
+      setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
+    } catch (err) {
+      alert(uploadErrorMessage(err, 'Erro ao processar vídeo/GIF.'));
     } finally {
-      setUploadingBlockId(null);
-      setUploadProgressText('');
-      setUploadProgressPct(0);
+      endUpload();
     }
   }
 
@@ -1140,70 +1165,45 @@ export function PostComposer({
     itemId: string
   ) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file || !isAdmin) return;
 
-    setUploadingBlockId(blockId);
+    startUpload(blockId, 'Preparando mídia...');
     try {
-      let publicUrl = '';
-      let r2Key: string | null = null;
+      const isMotion = file.type.startsWith('video/') || file.type === 'image/gif';
+      const res = await uploadMediaToInsight(file, {
+        budgetBytes: remainingBytes,
+        forceGifLoop: file.type === 'image/gif',
+        asImage: !isMotion,
+        onStatus: onUploadStatus,
+      });
+      const publicUrl = res.publicUrl;
+      const r2Key = res.r2Key;
+      const mediaBytes = res.compressedSize;
 
-      if (file.type.startsWith('video/') || file.type === 'image/gif') {
-        const res = await uploadCompressedMediaToR2(
-          file,
-          authorId,
-          file.type === 'image/gif'
-        );
-        publicUrl = res.publicUrl;
-        r2Key = res.r2Key;
-      } else {
-        const presignRes = await fetch('/api/upload/r2', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type || 'image/jpeg',
-            originalSize: file.size,
-            compressedSize: file.size,
-            isGif: false,
-          }),
-        });
-        const presignData = await presignRes.json();
-        if (presignRes.ok && presignData.uploadUrl) {
-          await fetch(presignData.uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type || 'image/jpeg' },
-            body: file,
-          });
-          publicUrl = presignData.publicUrl;
-          r2Key = presignData.r2Key;
-        }
-      }
-
-      if (publicUrl) {
-        setBlocks((prev) =>
-          prev.map((b) => {
-            if (b.id !== blockId) return b;
-            if (targetType === 'mindmap_node') {
-              return {
-                ...b,
-                mindMapNodes: (b.mindMapNodes || []).map((n) =>
-                  n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key } : n
-                ),
-              };
-            }
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId) return b;
+          if (targetType === 'mindmap_node') {
             return {
               ...b,
-              roadmapSteps: (b.roadmapSteps || []).map((s) =>
-                s.id === itemId ? { ...s, mediaUrl: publicUrl } : s
+              mindMapNodes: (b.mindMapNodes || []).map((n) =>
+                n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key, mediaBytes } : n
               ),
             };
-          })
-        );
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Erro ao carregar mídia na Cloudflare R2');
+          }
+          return {
+            ...b,
+            roadmapSteps: (b.roadmapSteps || []).map((st) =>
+              st.id === itemId ? { ...st, mediaUrl: publicUrl, mediaBytes } : st
+            ),
+          };
+        })
+      );
+    } catch (err) {
+      alert(uploadErrorMessage(err, 'Erro ao carregar mídia na Cloudflare R2'));
     } finally {
-      setUploadingBlockId(null);
+      endUpload();
     }
   }
 
@@ -1213,34 +1213,37 @@ export function PostComposer({
   ) {
     if (!isAdmin) return;
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert(`O arquivo excede o limite máximo de ${MAX_FILE_SIZE_MB}MB.`);
+    if (file.size > remainingBytes) {
+      alert(
+        `O arquivo tem ${formatBytes(file.size)} e restam ${formatBytes(remainingBytes)} de anexos neste post (${viewerTier.name}).`
+      );
       return;
     }
 
-    setUploadingBlockId(blockId);
-    const ext = file.name.split('.').pop() || 'bin';
-    const safeStorageName = `${authorId}/files/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 6)}.${ext}`;
-
-    const { error } = await supabase.storage.from('posts').upload(safeStorageName, file);
-    setUploadingBlockId(null);
-
-    if (error) {
-      alert('Erro ao anexar arquivo: ' + error.message);
-      return;
+    startUpload(blockId, 'Enviando arquivo...');
+    try {
+      const res = await uploadMediaToInsight(file, {
+        budgetBytes: remainingBytes,
+        asFile: true,
+        onStatus: onUploadStatus,
+      });
+      const ext = file.name.split('.').pop() || 'bin';
+      updateBlock(blockId, {
+        fileUrl: res.publicUrl,
+        r2Key: res.r2Key,
+        fileName: file.name,
+        fileSize: res.compressedSize,
+        fileType: ext.toUpperCase(),
+        mediaBytes: res.compressedSize,
+      });
+    } catch (err) {
+      alert(uploadErrorMessage(err, 'Erro ao anexar arquivo.'));
+    } finally {
+      endUpload();
     }
-
-    const { data: pubData } = supabase.storage.from('posts').getPublicUrl(safeStorageName);
-    updateBlock(blockId, {
-      fileUrl: pubData.publicUrl,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: ext.toUpperCase(),
-    });
   }
 
   function normalizeBlocksForSave(
@@ -1354,6 +1357,12 @@ export function PostComposer({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isAdmin || isSubmitting) return;
+    if (overQuota) {
+      alert(
+        `Os anexos deste post somam ${formatBytes(usedBytes)} e o limite do seu nível (${viewerTier.name}) é ${formatBytes(uploadLimit)}. Remova alguma mídia para publicar.`
+      );
+      return;
+    }
 
     const validBlocks = normalizeBlocksForSave(blocks, visibility);
     if (validBlocks.length === 0) return;
@@ -1430,7 +1439,11 @@ export function PostComposer({
       if (!error && updatedData) {
         onPostUpdated?.({ ...(updatedData as Post), visibility });
       } else {
-        alert('Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido'));
+        alert(
+          error?.message?.includes('post_media_quota_exceeded')
+            ? `Os anexos passam do limite de ${formatBytes(uploadLimit)} por post do seu nível.`
+            : 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
+        );
       }
       return;
     }
@@ -2077,7 +2090,7 @@ export function PostComposer({
                         <ImageIcon className="w-5 h-5 text-accent mb-1" />
                         <span className="text-[11px] font-semibold text-primary">
                           {uploadingBlockId === block.id
-                            ? 'A enviar...'
+                            ? uploadProgressText || 'A enviar...'
                             : 'Selecionar imagem'}
                         </span>
                         <input
@@ -3247,15 +3260,15 @@ export function PostComposer({
                         <Paperclip className="w-4 h-4 text-accent mb-1" />
                         <span className="text-[11px] font-semibold text-primary">
                           {uploadingBlockId === block.id
-                            ? 'A enviar...'
+                            ? uploadProgressText || 'A enviar...'
                             : 'Anexar arquivo'}
                         </span>
                         <span className="text-[9px] text-muted mt-0.5 font-mono">
-                          Máx. {MAX_FILE_SIZE_MB}MB
+                          Restam {formatBytes(remainingBytes)} neste post
                         </span>
                         <input
                           type="file"
-                          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.zip,.rar,.png,.jpg"
+                          accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp,.mp3,.wav"
                           onChange={(e) => handleBlockFileUpload(e, block.id)}
                           className="hidden"
                         />
@@ -3626,6 +3639,33 @@ export function PostComposer({
           })}
         </div>
       </div>
+
+      {/* COTA DE ANEXOS DO POST (peso comprimido no R2) */}
+      {usedBytes > 0 && (
+        <div className="space-y-1" aria-live="polite">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-mono">
+            <span className={overQuota ? 'text-red-500 font-bold' : 'text-secondary'}>
+              {formatBytes(usedBytes)} / {formatBytes(uploadLimit)} usados neste post
+            </span>
+            <span className="text-muted">Nível {viewerTier.level} · {viewerTier.name}</span>
+          </div>
+          <div
+            className="h-1.5 rounded-full bg-elevated border border-border overflow-hidden"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(quotaPct)}
+            aria-label="Cota de anexos do post"
+          >
+            <div
+              className={`h-full rounded-full transition-[width] duration-300 ${
+                overQuota ? 'bg-red-500' : quotaPct > 85 ? 'bg-amber-500' : 'bg-accent'
+              }`}
+              style={{ width: `${quotaPct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* RODAPÉ DO COMPOSITOR */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">

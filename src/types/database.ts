@@ -44,6 +44,10 @@ export interface Profile {
   total_donated?: number | null;
   contributor_points?: number | null;
   contributor_level?: number | null;
+  /** Insight Nitro — assinatura (R$ 3,99/mês) ou vitalício no Nível 5. */
+  nitro_status?: 'none' | 'active' | 'past_due' | 'canceled' | 'expired' | null;
+  nitro_expires_at?: string | null;
+  has_lifetime_nitro?: boolean | null;
   /** Insight Nitro: itens equipados (snapshot gravado via RPC set_my_cosmetics). */
   cosmetics?: NitroCosmetics | null;
 }
@@ -145,6 +149,7 @@ export interface RoadmapStepItem {
   status: 'planned' | 'in_progress' | 'completed';
   dateLabel?: string;
   mediaUrl?: string | null;
+  mediaBytes?: number;
   checklist?: MindMapChecklistItem[];
 }
 
@@ -174,6 +179,7 @@ export interface MindMapNodeItem {
   checklist?: MindMapChecklistItem[];
   mediaUrl?: string | null;
   r2Key?: string | null;
+  mediaBytes?: number;
 }
 
 export interface MindMapEdgeItem {
@@ -255,6 +261,9 @@ export interface PostBlock {
   fileName?: string;
   fileSize?: number;
   fileType?: string;
+
+  /** Peso final no R2 (pós-compressão) da mídia deste bloco — entra na cota do post. */
+  mediaBytes?: number;
 
   tableData?: string[][];
 

@@ -28,6 +28,52 @@ import {
 import { IntroOverlay } from '@/components/nitro/ProfileIntro';
 import { NitroSettingsPanel } from '@/components/nitro/NitroSettingsPanel';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
+import { createClient } from '@/lib/supabase/client';
+import { NITRO_PRICE_BRL, NITRO_PUBLIC, describeNitroSource } from '@/lib/nitro/entitlement';
+
+const PRICE_LABEL = `R$ ${NITRO_PRICE_BRL.toFixed(2).replace('.', ',')}/mês`;
+
+/** Status do Nitro + convite do grupo VIP (só vem do banco para quem tem acesso). */
+function NitroStatusCard() {
+  const { entitlement } = useNitro();
+  const [vip, setVip] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    createClient()
+      .rpc('get_nitro_vip_invite')
+      .then(({ data }) => {
+        if (active && typeof data === 'string' && /^https:\/\/chat\.whatsapp\.com\//.test(data)) setVip(data);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-3.5 flex flex-wrap items-center gap-3">
+      <div className="flex-1 min-w-[180px]">
+        <p className="text-xs font-bold text-primary flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5 text-accent" /> Seu Nitro
+        </p>
+        <p className="text-[11px] text-muted">{describeNitroSource(entitlement)}</p>
+        <p className="text-[10px] text-muted mt-0.5">
+          Só cosméticos e comunidade VIP. Limites de upload, tópicos e comunidades vêm do seu Nível de Contribuinte.
+        </p>
+      </div>
+      {vip && (
+        <a
+          href={vip}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition-colors"
+        >
+          Grupo VIP no WhatsApp
+        </a>
+      )}
+    </div>
+  );
+}
 
 const KIND_ORDER: NitroKind[] = ['frame', 'title', 'tag', 'intro'];
 const KIND_PARAM: Record<string, NitroKind> = {
@@ -63,7 +109,12 @@ function LockedScreen() {
         <p className="text-sm text-secondary max-w-sm">
           Molduras animadas, títulos especiais, tags e animações de abertura para o seu perfil.
         </p>
-        <p className="text-xs text-muted">Em breve · acesso restrito durante a beta fechada.</p>
+        <p className="text-xs text-secondary">
+          {PRICE_LABEL} · <span className="font-semibold">grátis e vitalício</span> para quem chega ao Nível 5 (Grão-Mestre).
+        </p>
+        <p className="text-xs text-muted">
+          {NITRO_PUBLIC ? 'Assinaturas abrindo em breve.' : 'Em breve · acesso restrito durante a beta fechada.'}
+        </p>
       </div>
       <Link href="/" className="text-xs font-semibold text-accent hover:underline">
         Voltar para o início
@@ -157,13 +208,17 @@ function NitroGallery() {
           <p className="text-[11px] text-muted">Galeria de personalização de perfil</p>
         </div>
         <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-          <Lock className="w-3 h-3" /> Beta fechada · admin
+          <Lock className="w-3 h-3" /> {NITRO_PUBLIC ? PRICE_LABEL : 'Beta fechada · admin'}
         </span>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-0 xl:gap-5">
         {/* Coluna da galeria */}
         <div className="min-w-0">
+          <div className="px-4 sm:px-6 pt-5">
+            <NitroStatusCard />
+          </div>
+
           {/* Prévia (mobile e telas médias) */}
           <div className="xl:hidden px-4 sm:px-6 pt-5">
             <PreviewCard

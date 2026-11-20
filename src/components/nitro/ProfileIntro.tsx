@@ -91,7 +91,7 @@ export function IntroOverlay({ intro, onDone }: { intro: IntroItem; onDone: () =
       {!intro.scene && intro.particles &&
         particles.map((p) => (
           <span key={p.key} className={`nx-ip nx-ip--${intro.particles!.mode}`} style={p.style}>
-            {intro.particles!.mode === 'streak' ? null : intro.particles!.glyph}
+
           </span>
         ))}
 

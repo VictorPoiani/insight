@@ -1,896 +1,550 @@
-# Insight Nitro — Especificação técnica e de produto
+# Insight Nitro — Especificação v2
 
-> Status: **beta fechada em produção — acesso só para `role = 'admin'`** · Stack: Next.js 15 (App Router), TypeScript, Tailwind, Supabase, Cloudflare R2
-
-> **O que está no ar (20/11/2026)** — a estratégia de Preview da §1 foi substituída, a pedido, por uma beta fechada em produção:
-> - Gate por papel: só `profiles.role = 'admin'` acessa `/nitro`, a aba "Perfil & Nitro" e **enxerga** cosméticos. Demais usuários veem o item "Insight Nitro" com cadeado na barra lateral e uma tela "Em breve".
-> - Interruptor geral: `NEXT_PUBLIC_INSIGHT_NITRO=off` na Vercel desliga tudo (inclusive para admin).
-> - Banco: só `profiles.cosmetics` (snapshot) + trigger de proteção + RPC `set_my_cosmetics` (exige admin). Migração: `supabase/migrations/20261120000000_insight_nitro_admin_beta.sql`. As tabelas de catálogo/assinatura da §3 ficam para o lançamento.
-> - Catálogo: os 48 itens da §2 em `src/lib/nitro/catalog.ts`, renderizados 100% em CSS/SVG (`src/components/nitro/nitro.css`); assets na R2 (§3.5) ainda não são necessários.
-> - Propagação: perfil, posts, página de discussão (árvore, carrossel e composer) e barra lateral. Notificações e Explore ainda não.
-
-O Insight Nitro é uma galeria de personalização de perfil com assinatura mensal e coleções temáticas.
-O usuário equipa quatro tipos de item:
-
-| Tipo | O que muda |
-|---|---|
-| **Estilo de título** | Acabamento do nome de exibição (gradiente, brilho, animação) |
-| **Tag especial** | Selo ao lado do `@username` |
-| **Moldura** | Anel/ornamento em volta do avatar |
-| **Animação de abertura** | Efeito de entrada ao abrir a página `/u/[username]` |
-
-Além disso, o sistema de patentes (`src/lib/contributorLevels.ts`) passa a conceder **molduras de nível para todos os níveis (0–5)** e uma **animação de patente exclusiva para os níveis 4 (Imperador) e 5 (Grão-Mestre)**.
+> **Status:** proposta v2 · **Lançamento:** somente **Preview** na Vercel · **Mobile-first**
+> **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind · Supabase · Cloudflare R2
+>
+> A v1 (beta fechada só para admin, hoje em produção) está descrita no histórico do git deste arquivo.
+> Esta v2 **substitui** aquele modelo. O que já existe no código é reaproveitado; o que muda está marcado com **Δ**.
 
 ---
 
 ## Sumário
 
-1. [Feature flag e isolamento em Preview](#1-feature-flag-e-isolamento-em-preview)
+0. [O que já existe e o que muda](#0-o-que-já-existe-e-o-que-muda)
+1. [Gate de Preview, estrutura de pastas e UX mobile](#1-gate-de-preview-estrutura-de-pastas-e-ux-mobile)
 2. [Catálogo inicial](#2-catálogo-inicial)
-3. [Modelagem de dados](#3-modelagem-de-dados)
-4. [Fluxo de UI/UX](#4-fluxo-de-uiux)
-5. [Plano de entrega](#5-plano-de-entrega)
+3. [Regras de liberação, Rainbow e toggles](#3-regras-de-liberação-rainbow-e-toggles)
+4. [Supabase, tipos e pontos de integração](#4-supabase-tipos-e-pontos-de-integração)
+5. [Plano de entrega e QA](#5-plano-de-entrega-e-qa)
 
 ---
 
-## 1. Feature flag e isolamento em Preview
+## 0. O que já existe e o que muda
+
+| Peça | Hoje (v1, em produção) | v2 |
+|---|---|---|
+| Acesso | `role = 'admin'` em produção | **Δ** Preview + flag; produção não renderiza nada do Nitro |
+| Catálogo | 48 itens em `src/lib/nitro/catalog.ts`, só admin vê | **Δ** catálogo para **todos**; itens Nitro em prévia bloqueada |
+| Liberação | admin equipa qualquer item | **Δ** padrão · nível de contribuinte · Nitro · evento |
+| Alcunha | `profiles.nickname` + `nickname_color` (paleta fixa) | **Δ** alcunha ganha estilos (padrão, nível, Nitro) |
+| Rainbow | — | **Δ** logo e asteriscos de carregamento em rainbow para assinantes |
+| Motor visual | CSS/SVG (`nitro.css`), anima `filter`, hover nas listas | **Δ** só `transform`/`opacity`; "em tela" em vez de hover; WAAPI para aberturas |
+| Banco | `profiles.cosmetics` + `set_my_cosmetics` (exige admin) | **Δ** catálogo e assinatura no banco; RPC valida direito de uso |
+| Segurança | RLS revisada em 20/11/2026 (migrações `2026112001*`–`2026112003*`) | mantida; nada novo é gravável direto pelo cliente |
+
+---
+
+## 1. Gate de Preview, estrutura de pastas e UX mobile
 
 ### 1.1 Regra de ativação
 
-O Nitro só existe quando **as duas condições** são verdadeiras:
-
-```
-VERCEL_ENV === 'preview'  &&  NEXT_PUBLIC_ENABLE_INSIGHT_NITRO === 'true'
-```
-
-A checagem de ambiente é proposital: mesmo que alguém defina a flag por engano no target *Production*, o Nitro continua desligado. Para o lançamento público, a condição de ambiente é removida num PR explícito (ver [Fase 5](#5-plano-de-entrega)).
-
-**Configuração na Vercel (Project → Settings → Environment Variables):**
-
-| Variável | Production | Preview | Development |
-|---|---|---|---|
-| `NEXT_PUBLIC_ENABLE_INSIGHT_NITRO` | — (não definir) | `true` | `true` (opcional) |
-| `NEXT_PUBLIC_VERCEL_ENV` | automático | automático | — |
-
-`NEXT_PUBLIC_VERCEL_ENV` é exposta automaticamente quando a opção *Automatically expose System Environment Variables* está ligada (padrão). Em `next dev` ela não existe; por isso o helper aceita `NEXT_PUBLIC_NITRO_DEV_OVERRIDE=true` **apenas** quando `NODE_ENV === 'development'`.
-
-### 1.2 Helper único
-
-`src/lib/nitro/flags.ts`
-
 ```ts
-/**
- * Fonte única da verdade para o Insight Nitro.
- * NEXT_PUBLIC_* é embutido no bundle no build, então funciona em
- * Server e Client Components — e é avaliado por deploy (Preview ≠ Production).
- */
+// src/lib/nitro/flags.ts
 export function isNitroEnabled(): boolean {
-  const flag = process.env.NEXT_PUBLIC_ENABLE_INSIGHT_NITRO === 'true';
-  if (!flag) return false;
-
+  if (process.env.NEXT_PUBLIC_ENABLE_INSIGHT_NITRO !== 'true') return false;
   const env = process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.VERCEL_ENV;
   if (env === 'preview') return true;
-
-  return (
-    process.env.NODE_ENV === 'development' &&
-    process.env.NEXT_PUBLIC_NITRO_DEV_OVERRIDE === 'true'
-  );
+  return process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_NITRO_DEV_OVERRIDE === 'true';
 }
 ```
 
-### 1.3 Camadas de bloqueio
+- A checagem de ambiente é proposital: a flag definida por engano em *Production* **não** liga o Nitro.
+- **Vercel → Settings → Environment Variables:** `NEXT_PUBLIC_ENABLE_INSIGHT_NITRO=true` **somente** no target *Preview*. `NEXT_PUBLIC_VERCEL_ENV` é exposta automaticamente.
+- Δ O interruptor atual `NEXT_PUBLIC_INSIGHT_NITRO=off` continua valendo como desligamento de emergência em qualquer ambiente.
 
-Cada camada funciona sozinha; juntas, nada do Nitro aparece nem responde em produção.
+### 1.2 Camadas de bloqueio (produção)
 
-| Camada | Onde | Comportamento em produção |
+| Camada | Implementação | Em produção |
 |---|---|---|
-| **Rotas** | `src/app/nitro/layout.tsx` (Server Component) | `if (!isNitroEnabled()) notFound()` → 404 para `/nitro` e qualquer sub-rota |
-| **API** | `src/app/api/nitro/**/route.ts` | Primeira linha: `if (!isNitroEnabled()) return new NextResponse(null, { status: 404 })` |
-| **Navegação** | `LeftSidebar`, `MobileBottomNav`, `ProfileHeader`, `config/page.tsx` | Links, botões, banners e a aba "Perfil & Nitro" só renderizam se `isNitroEnabled()` |
-| **Renderização global** | `<UserIdentity>` e derivados ([§4.5](#45-propagação-global)) | Em produção, ignora `profiles.cosmetics` e renderiza o avatar/nome padrão |
-| **Dados** | Supabase | Ver [§1.4](#14-banco-de-dados-em-preview) |
+| Rota | `src/app/nitro/layout.tsx` (Server Component): `if (!isNitroEnabled()) notFound()` | `/nitro` → 404 |
+| UI | `NitroProvider.enabled = isNitroEnabled()`; todo botão, aba, chip, CTA e banner do Nitro verifica `enabled` | nada renderiza (nem o item com cadeado da barra lateral) |
+| Renderização | `CosmeticAvatar`, `CosmeticName`, `CosmeticTag`, `ProfileIntro`, Rainbow retornam o visual padrão se `!enabled` | avatares e nomes normais, mesmo com dados no banco |
+| Dados | RPCs funcionam em qualquer ambiente (o banco não sabe qual é), mas nada lido por produção depende delas | sem efeito visível |
 
-A camada de **renderização global** é a mais importante e a mais fácil de esquecer: se Preview e Production usam o mesmo Supabase, um testador que equipa uma moldura em Preview grava em `profiles.cosmetics`. Sem o gate no componente, a moldura apareceria para todo mundo em produção.
+> **Banco compartilhado.** Preview e Production usam o mesmo projeto Supabase. Por isso a camada de **renderização** é obrigatória: o que um testador equipa em Preview fica em `profiles.cosmetics`, e produção precisa ignorar. Alternativa mais isolada: Supabase Branch com as variáveis do Supabase apenas no target Preview.
 
-> ⚠️ **Middleware inativo.** O arquivo atual é `src/middleare.ts` (falta o "w"). O Next.js só executa `middleware.ts`, então ele **nunca roda hoje**. Não use middleware como bloqueio do Nitro. Renomear ativaria o refresh de sessão do Supabase em todas as rotas — mudança útil, mas deve ir num PR separado e testado à parte.
+> **Middleware.** `src/middleare.ts` tem erro de digitação e nunca roda; não é usado como bloqueio.
 
-### 1.4 Banco de dados em Preview
+> **Δ Transição:** ao ativar este gate, o Nitro **some de produção para o admin também**. O teste passa a acontecer na URL de Preview.
 
-- **Recomendado:** usar um **Supabase Branch** (ou projeto de staging) para Preview, configurando `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` apenas no target *Preview*. Assim os dados de teste nunca tocam produção.
-- **Se o banco for compartilhado:** as migrações abaixo são **aditivas** (só criam tabelas/colunas, nada é removido), e o gate de renderização ([§1.3](#13-camadas-de-bloqueio)) impede vazamento visual. As RPCs de escrita também podem checar uma allowlist (`nitro_testers`) durante o Preview.
-
-### 1.5 Estrutura de pastas
+### 1.3 Estrutura de pastas
 
 ```
 src/
 ├── app/
 │   ├── nitro/
-│   │   ├── layout.tsx              # gate (notFound) + shell da galeria
-│   │   ├── page.tsx                # galeria: coleções + categorias + preview ao vivo
-│   │   └── [collection]/page.tsx   # página de uma coleção (ex.: /nitro/infernal)
+│   │   ├── layout.tsx                 Δ gate no servidor (notFound)
+│   │   └── page.tsx                   galeria (reaproveitada; layout mobile novo)
 │   ├── api/nitro/
-│   │   ├── equip/route.ts          # POST → RPC set_profile_cosmetics
-│   │   └── subscription/route.ts   # status / (fase 5) checkout
-│   └── config/page.tsx             # + aba 'nitro' ("Perfil & Nitro")
-├── components/nitro/
-│   ├── UserIdentity.tsx            # avatar + nome + tag + patente (usado em todo lugar)
-│   ├── CosmeticAvatar.tsx          # avatar com moldura (static | animated)
-│   ├── CosmeticName.tsx            # nome com estilo de título
-│   ├── CosmeticTag.tsx             # tag especial
-│   ├── ProfileIntro.tsx            # animação de abertura (uma vez por sessão)
-│   ├── NitroCustomizeSheet.tsx     # editor rápido (aberto pelo perfil)
-│   ├── NitroItemCard.tsx           # card da galeria (estado: equipado/bloqueado)
-│   └── effects/                    # CSS/SVG de cada moldura, título e abertura
-│       ├── frames.css
-│       ├── titles.css
-│       └── intros.css
+│   │   └── checkout/route.ts          Fase 5 (Mercado Pago preapproval)
+│   └── config/page.tsx                aba "Perfil & Nitro" (já existe; ganha Rainbow e alcunha)
+├── components/
+│   ├── brand/
+│   │   ├── InsightAsterisk.tsx        Δ asterisco único (logo, spinners, loaders)
+│   │   └── InsightLogo.tsx            Δ "Insight*" único
+│   ├── ui/AsteriskLoader.tsx          passa a usar InsightAsterisk (substitui 6 cópias)
+│   └── nitro/
+│       ├── NitroProvider.tsx          Δ enabled + entitlements + toggles + Rainbow
+│       ├── Cosmetics.tsx              CosmeticAvatar / CosmeticName / CosmeticNickname / CosmeticTag
+│       ├── CustomizeSheet.tsx         Δ central de personalização (bottom sheet / drawer)
+│       ├── ItemTile.tsx               Δ tile com estados: livre, equipado, bloqueado-nível, bloqueado-Nitro
+│       ├── ProfileIntro.tsx           Δ usa IntroPlayer
+│       ├── intro/IntroPlayer.tsx      Δ timeline WAAPI (fases, pular, cancelar)
+│       ├── intro/scenes/*.tsx         Δ uma cena por abertura
+│       ├── frames/*.tsx               Δ camadas SVG por moldura (fundo, frente, partículas)
+│       ├── useInViewAnimation.ts      Δ anima só o que está na tela (orçamento)
+│       └── nitro.css                  Δ reescrito: só transform/opacity
 └── lib/nitro/
-    ├── flags.ts                    # isNitroEnabled()
-    ├── catalog.ts                  # catálogo tipado (espelho da tabela nitro_items)
-    ├── entitlements.ts             # canUseItem(item, profile, subscription)
-    ├── assets.ts                   # nitroAssetUrl(key) + fallback
-    └── useCosmetics.ts             # hook com Supabase Realtime
-supabase/migrations/
-└── 2026XXXX_insight_nitro.sql
+    ├── flags.ts                       Δ isNitroEnabled()
+    ├── catalog.ts                     Δ catálogo v2 (fonte única; gera o seed SQL)
+    ├── entitlements.ts                Δ canUse(item, viewer) — espelho da regra do banco
+    └── assets.ts                      URL R2 + fallback
+scripts/
+├── nitro-seed.ts                      Δ gera supabase/seed/nitro_items.sql a partir de catalog.ts
+└── nitro-upload-assets.ts             Δ envia WebP/PNG para R2 com Cache-Control imutável
 ```
+
+### 1.4 UX mobile
+
+**Central de personalização (`CustomizeSheet`)**
+
+| | Celular (< 768 px) | Desktop |
+|---|---|---|
+| Contêiner | bottom sheet em tela cheia (`100dvh`), alça de arrastar, fecha com gesto para baixo | drawer lateral de 440 px |
+| Prévia | avatar + nome + alcunha + tag fixos no topo; encolhem para uma barra de 56 px ao rolar | coluna fixa à esquerda do drawer |
+| Abas | Moldura · Nome & Alcunha · Tag · Abertura, em controle segmentado com rolagem horizontal | mesmas abas |
+| Coleções | chips com rolagem horizontal (`overscroll-x: contain`) | mesma linha |
+| Grade | 3 colunas a 360 px (tiles de 96 px, alvo de toque ≥ 44 px); 4 colunas ≥ 480 px | 4 colunas |
+| Ações | barra fixa no rodapé "Aplicar" / "Assinar Nitro", com `padding-bottom: env(safe-area-inset-bottom)` | rodapé do drawer |
+
+**Toque, sem depender de hover**
+
+- **Tocar** num item aplica a prévia no avatar do topo, inclusive em itens bloqueados.
+- **Pressionar e segurar** (450 ms) ou o botão "ⓘ" abre os detalhes: descrição, coleção, requisito e "Testar" para aberturas.
+- Item bloqueado na prévia mostra a faixa "Prévia · requer Insight Nitro" ou "Prévia · libera no nível 3 · Cavaleiro"; o botão "Aplicar" vira o CTA correspondente.
+- O atalho "Editar moldura" no avatar fica **sempre visível** em `@media (hover: none)`; no desktop continua aparecendo no hover.
+- Listas (feed, respostas, notificações): molduras animam **quando estão na tela**, não no hover (ver orçamento abaixo).
+
+**Sem overflow horizontal**
+
+- Molduras e ornamentos ficam em `position: absolute` dentro de um wrapper com `contain: layout paint` e reserva de espaço (`--nx-bleed`), para não empurrar o layout.
+- Camadas de abertura usam `position: fixed; inset: 0; overflow: hidden`.
+- Carrosséis usam `overscroll-behavior-x: contain` e `scroll-snap`.
+
+**Performance**
+
+| Regra | Como |
+|---|---|
+| Só propriedades de composição | animar apenas `transform` e `opacity`; brilhos são camadas pré-desfocadas com `opacity` animada (Δ remove `filter` animado do v1) |
+| Orçamento de animação | `useInViewAnimation`: no máximo **4** molduras animando ao mesmo tempo no feed (as mais centrais); as demais ficam estáticas |
+| Fora da tela | `IntersectionObserver` aplica `animation-play-state: paused` e desmonta partículas |
+| Aparelho fraco | `navigator.hardwareConcurrency <= 4`, `deviceMemory <= 4` ou `Save-Data` → "Animar em listas" começa desligado |
+| Assets | WebP animado em 2 tamanhos (128 e 256 px), escolhidos pelo tamanho × `devicePixelRatio`; pôster PNG de 1 frame |
+| Aberturas | WAAPI (`element.animate`), 60 fps, duração 1,2–1,8 s, pulam com toque/tecla; nunca bloqueiam o scroll depois de 300 ms |
+| Movimento reduzido | `prefers-reduced-motion` ou "Reduzir movimento" do Insight → tudo estático, sem aberturas, Rainbow com gradiente parado |
 
 ---
 
 ## 2. Catálogo inicial
 
-### 2.1 Coleções
+### 2.1 Linguagem visual (padrão "loja Nitro")
 
-| ID | Coleção | Paleta | Disponibilidade |
-|---|---|---|---|
-| `natal` | **Natal** | vermelho `#c1121f`, verde `#2d6a4f`, neve `#e0f2fe` | Sazonal (dez–jan), depois permanece para quem desbloqueou |
-| `infernal` | **Infernal** | brasa `#f97316`, magma `#7f1d1d`, carvão `#0c0a09` | Permanente |
-| `imperial` | **Imperial** | ouro `#d4a72c`, púrpura `#4c1d95` | Permanente |
-| `celestial` | **Celestial** | aurora `#5eead4` → `#a78bfa`, estelar `#fef9c3` | Permanente |
-| `anime` | **Anime** | sakura `#f9a8d4`, tinta `#111827` | Permanente |
-| `princess` | **Princess** | rosé `#fbcfe8`, pérola `#fdf2f8`, cristal `#c4b5fd` | Permanente |
-| `cyber` | **Cyber** | néon `#22d3ee`, magenta `#e11d48`, cromo `#94a3b8` | Permanente |
-| `cosmico` | **Cósmico** | nebulosa `#6d28d9` → `#ec4899`, espectro rainbow | Permanente |
-| `patentes` | **Patentes** | cores de `CONTRIBUTOR_TIERS` | Conquistada por nível, **não** faz parte da assinatura |
+Todo item **Nitro** precisa de pelo menos **3 camadas**:
 
-**Raridade** (só visual na galeria): `comum`, `rara`, `épica`, `lendária`.
+1. **Fundo**, atrás do avatar (aura, chamas, fumaça, folhagem).
+2. **Contorno**, o anel com gradiente ou textura.
+3. **Frente**, sobrepondo levemente o avatar (chapéu, orelhas, coroa, garras), com **partículas** e uma **varredura de luz** periódica.
 
-**Requisito de desbloqueio** (`requirement`):
+Movimento com intenção: antecipação → ação → acomodação (*ease-out* com leve *overshoot*), loops de 4–12 s com variação para não parecer mecânico. Itens **padrão** e de **nível** são deliberadamente mais simples, para o Nitro se destacar.
 
-- `nitro`: assinatura ativa.
-- `level`: patente mínima (`min_level`).
-- `event`: concedido por evento/campanha (fica em `nitro_unlocks`).
+### 2.2 Coleções
 
-### 2.2 Estilos de título (10)
+| ID | Coleção | Paleta |
+|---|---|---|
+| `natal` | Natal | vermelho `#c1121f`, verde `#2d6a4f`, neve `#e0f2fe` |
+| `infernal` | Infernal | brasa `#f97316`, magma `#7f1d1d`, carvão `#0c0a09` |
+| `imperial` | Imperial | ouro `#d4a72c`, púrpura `#4c1d95` |
+| `celestial` | Celestial | aurora `#5eead4` → `#a78bfa`, estelar `#fef9c3` |
+| `anime` | Anime | sakura `#f9a8d4`, tinta `#111827` |
+| `princess` | Princess | rosé `#fbcfe8`, pérola `#fdf2f8`, cristal `#c4b5fd` |
+| `selva` | **Selva/Natureza** | folha `#15803d`, musgo `#3f6212`, âmbar `#f59e0b` |
+| `sombras` | **Sombras/Monstros** | breu `#020617`, névoa `#334155`, olho `#a3e635` |
+| `cyber` | Cyber | néon `#22d3ee`, magenta `#e11d48` |
+| `cosmico` | Cósmico | nebulosa `#6d28d9` → `#ec4899` |
+| `oceano` | **Oceano** | abismo `#082f49`, onda `#0ea5e9`, espuma `#f0f9ff` |
+| `patentes` | Patentes | cores de `CONTRIBUTOR_TIERS` (conquistadas por nível) |
 
-Técnica base: `background-clip: text` com gradiente e `background-position` animado. **Fallback:** cor sólida `fallbackColor` quando a animação está desligada, sob `prefers-reduced-motion` ou em navegadores sem suporte.
+### 2.3 Estilos de Título & Alcunha — Nitro (10)
 
-| # | ID | Nome | Coleção | Raridade | Efeito | Fallback |
-|---|---|---|---|---|---|---|
-| 1 | `title-gold-brushed` | **Ouro Escovado** | Imperial | rara | Gradiente ouro em 4 paradas com faixa de brilho que atravessa o texto a cada 4 s | `#d4a72c` |
-| 2 | `title-celestial-aurora` | **Celestial Aurora** | Celestial | épica | Gradiente verde-água → violeta ondulando lentamente (8 s), leve `drop-shadow` | `#5eead4` |
-| 3 | `title-rainbow-prism` | **Rainbow Prismático** | Cósmico | lendária | Espectro completo deslizando em loop (6 s); com animação desligada vira gradiente estático | `#a78bfa` |
-| 4 | `title-infernal-embers` | **Brasas Infernais** | Infernal | épica | Laranja → vermelho com cintilação irregular (`steps`) simulando brasa | `#f97316` |
-| 5 | `title-christmas-frost` | **Gelo Natalino** | Natal | rara | Azul-gelo com cristais (`text-shadow` branco) e brilho intermitente | `#7dd3fc` |
-| 6 | `title-imperial-crown` | **Coroa Imperial** | Imperial | lendária | Ouro sobre púrpura; ícone de coroa (`Crown`) antes do nome | `#d4a72c` |
-| 7 | `title-sakura` | **Sakura Anime** | Anime | rara | Rosa → branco com pétala SVG que cai sobre o nome a cada 10 s | `#f9a8d4` |
-| 8 | `title-royal-princess` | **Real Princess** | Princess | rara | Rosé perolado com faíscas (`✦`) pulsando nas extremidades | `#f472b6` |
-| 9 | `title-cyber-chrome` | **Cromo Cyberpunk** | Cyber | épica | Cromo metálico com *glitch* RGB de 120 ms a cada 7 s | `#94a3b8` |
-| 10 | `title-cosmic-neon` | **Néon Cósmico** | Cósmico | épica | Magenta/ciano com `text-shadow` néon pulsando (respiração 3 s) | `#e879f9` |
-
-> O campo atual `profiles.nickname_color` continua existindo: é a cor do apelido. O estilo de título se aplica ao **nome de exibição** e tem precedência visual; sem estilo equipado, nada muda.
-
-### 2.3 Tags especiais (10)
-
-Renderizadas como pílula compacta (altura 18 px) depois do `@username`. Ícones do `lucide-react`, já instalado.
-
-| # | ID | Texto | Coleção | Ícone | Estilo |
-|---|---|---|---|---|---|
-| 1 | `tag-nitro-founder` | **Fundador Nitro** | Cósmico | `Zap` | Gradiente rainbow sutil; exclusiva de quem testou durante o Preview (`event`) |
-| 2 | `tag-honorary-santa` | **Noel Honorário** | Natal | `Gift` | Vermelho com borda verde e pontos de neve |
-| 3 | `tag-frost-guardian` | **Guardião do Gelo** | Natal | `Snowflake` | Azul-gelo translúcido |
-| 4 | `tag-infernal-pact` | **Pacto Infernal** | Infernal | `Flame` | Fundo carvão, texto brasa com brilho |
-| 5 | `tag-royal-blood` | **Sangue Real** | Imperial | `Crown` | Púrpura com filete dourado |
-| 6 | `tag-star-born` | **Filho das Estrelas** | Celestial | `Star` | Azul-noite com estrela cintilante |
-| 7 | `tag-senpai` | **Senpai 先輩** | Anime | `Sparkles` | Branco com contorno tinta, estilo mangá |
-| 8 | `tag-highness` | **Alteza** | Princess | `Gem` | Rosé perolado |
-| 9 | `tag-netrunner` | **Netrunner** | Cyber | `Cpu` | Fundo preto, texto ciano monoespaçado, borda néon |
-| 10 | `tag-cosmic-voyager` | **Viajante Cósmico** | Cósmico | `Orbit` | Gradiente nebulosa |
-
-### 2.4 Molduras animadas (10 Nitro)
-
-Duas técnicas, escolhidas por moldura:
-
-- **CSS/SVG puro** (padrão): anel com `conic-gradient` + máscara radial, ornamentos em SVG inline. Zero download, escala com o tamanho do avatar.
-- **Overlay em R2** (só quando há partículas complexas): WebP animado em `nitro/v1/frames/<id>/anim.webp` + pôster estático `static.webp`. O anel CSS sempre aparece por baixo, então se o asset falhar a moldura continua reconhecível.
-
-| # | ID | Nome | Coleção | Técnica | Animação | Modo estático |
-|---|---|---|---|---|---|---|
-| 1 | `frame-xmas-wreath` | **Guirlanda Natalina** | Natal | SVG + R2 (neve) | Flocos caindo pela borda; bolinhas piscando | Guirlanda sem neve |
-| 2 | `frame-royal-snowflake` | **Floco de Neve Real** | Natal | CSS/SVG | Seis cristais girando devagar (40 s/volta) | Cristais parados |
-| 3 | `frame-flame-crown` | **Coroa de Chamas** | Infernal | CSS + R2 (fogo) | Chamas subindo pela metade superior do anel | Anel brasa com gradiente |
-| 4 | `frame-abyss-horns` | **Chifres do Abismo** | Infernal | SVG | Chifres no topo; brilho vermelho "respirando" | Chifres sem brilho |
-| 5 | `frame-imperial-laurel` | **Laurel Imperial** | Imperial | SVG | Ramos de louro dourados com faixa de reflexo percorrendo as folhas | Louro dourado fosco |
-| 6 | `frame-aurora-halo` | **Halo Aurora** | Celestial | CSS | `conic-gradient` aurora girando (12 s) com desfoque suave | Gradiente parado |
-| 7 | `frame-sakura-petals` | **Pétalas de Sakura** | Anime | CSS + R2 (pétalas) | Pétalas orbitando e caindo | Anel rosa com 3 flores fixas |
-| 8 | `frame-crystal-tiara` | **Tiara de Cristal** | Princess | SVG | Tiara no topo; faíscas surgindo nas pedras | Tiara sem faíscas |
-| 9 | `frame-neon-circuit` | **Circuito Néon** | Cyber | SVG | Trilhas de circuito com pulso de luz percorrendo o `stroke-dashoffset` | Trilhas acesas sem pulso |
-| 10 | `frame-saturn-ring` | **Anel de Saturno** | Cósmico | SVG | Anel elíptico inclinado com lua orbitando (avatar como planeta) | Anel sem lua |
-
-### 2.5 Molduras de patente (6, coleção Patentes)
-
-Concedidas automaticamente pela patente: não exigem assinatura e não contam entre as 10 do Nitro. Cores e efeitos derivam de `CONTRIBUTOR_TIERS` e `TierEffectKey`, mantendo a identidade dos selos existentes.
-
-| Nível | Patente | ID | Moldura | Animação |
-|---|---|---|---|---|
-| 0 | Observador | `frame-tier-0` | Anel ardósia fino (`#64748b`) | Estática |
-| 1 | Recruta | `frame-tier-1` | Anel cobre com 3 faíscas fixas (`ember`) | Estática |
-| 2 | Escudeiro | `frame-tier-2` | Anel metálico com reflexo prismático (`prism`) | Estática |
-| 3 | Cavaleiro | `frame-tier-3` | Ouro escovado com rebites (`gold`) | Estática |
-| 4 | Imperador | `frame-tier-4` | Safira com grade técnica (`sapphire`) | **Animada:** pulso luminoso percorrendo a grade |
-| 5 | Grão-Mestre | `frame-tier-5` | Espectro prismático (`singularity`) | **Animada:** rotação do espectro + partículas |
-
-Cada usuário vê na galeria **todas as molduras de patente até o seu nível** (um Cavaleiro pode usar as dos níveis 0–3). As superiores aparecem bloqueadas, com "Disponível no nível X" e link para `/apoie`.
-
-> **Interpretação adotada:** "animação exclusiva dos níveis 4 e 5" foi lida como (a) as molduras de patente 4 e 5 são as únicas animadas da coleção Patentes e (b) esses níveis ganham uma **animação de abertura de patente** própria ([§2.7](#27-animações-de-abertura-de-patente-níveis-4-e-5)). Ambas respeitam o toggle `level_animation_enabled`.
-
-### 2.6 Animações de abertura (10 Nitro)
-
-Tocam ao abrir `/u/[username]`. Regras comuns:
-
-- Duração ≤ **1,2 s**; o conteúdo do perfil fica visível por baixo desde o início (sem bloquear leitura).
-- Pula com clique/tecla.
-- Toca **uma vez por perfil por sessão** (`sessionStorage`).
-- Implementadas com CSS (keyframes + `clip-path`/`mask`) em uma camada `position: fixed; pointer-events: none`. Assets de partículas no R2 quando necessário.
+Um estilo pode ser aplicado ao **nome de exibição** (título), à **alcunha**, ou aos dois (slots separados). Camadas: gradiente base + varredura de luz + glifo/partícula + brilho (camada de sombra com `opacity` animada).
 
 | # | ID | Nome | Coleção | Efeito |
 |---|---|---|---|---|
-| 1 | `intro-blizzard` | **Nevasca** | Natal | Rajada de neve atravessa a tela e "assenta" na capa |
-| 2 | `intro-gift-unwrap` | **Presente Aberto** | Natal | Fita vermelha se desfaz e revela o perfil do centro para fora |
-| 3 | `intro-hell-portal` | **Portal Infernal** | Infernal | Fenda de fogo abre no avatar e expande em círculo (`clip-path: circle`) |
-| 4 | `intro-imperial-decree` | **Decreto Imperial** | Imperial | Estandarte púrpura desce e se recolhe deixando poeira dourada |
-| 5 | `intro-star-shower` | **Chuva de Estrelas** | Celestial | Estrelas cadentes cruzam a capa; a última acende o avatar |
-| 6 | `intro-eclipse` | **Eclipse** | Celestial | Disco escuro passa sobre o avatar e revela uma coroa de luz |
-| 7 | `intro-speedlines` | **Linhas de Ação** | Anime | Speedlines radiais + "flash" branco, estilo corte de anime |
-| 8 | `intro-fairy-tale` | **Conto de Fadas** | Princess | Rastro de varinha desenha uma espiral de brilho até o nome |
-| 9 | `intro-glitch-boot` | **Boot Glitch** | Cyber | Tela "inicializa" com scanlines e glitch RGB antes de estabilizar |
-| 10 | `intro-hyperspace` | **Hiperespaço** | Cósmico | Estrelas esticam em linhas (salto) e o perfil "chega" |
+| 1 | `style-gold-brushed` | **Ouro Escovado** | Imperial | ouro em 4 tons com textura escovada (gradiente repetido fino); faixa de brilho a cada 4 s; centelha no último caractere |
+| 2 | `style-celestial-aurora` | **Celestial Aurora** | Celestial | aurora ondulando (8 s) + 3 estrelinhas cintilando acima das letras |
+| 3 | `style-rainbow-prism` | **Rainbow Prismático** | Cósmico | espectro completo deslizando + refração branca diagonal; respeita o toggle Rainbow |
+| 4 | `style-infernal-embers` | **Brasas Infernais** | Infernal | laranja/vermelho com cintilação por opacidade + brasas subindo das letras |
+| 5 | `style-christmas-frost` | **Gelo Natalino** | Natal | azul-gelo com cristais nas bordas das letras e um floco que cai do nome |
+| 6 | `style-imperial-crown` | **Coroa Imperial** | Imperial | ouro sobre púrpura; coroa animada (pequeno "pouso" com *overshoot*) antes do nome |
+| 7 | `style-sakura` | **Sakura Anime** | Anime | rosa → branco; pétalas cruzam o nome a cada 10 s |
+| 8 | `style-royal-princess` | **Real Princess** | Princess | rosé perolado com brilho iridescente e faíscas `✦` nas pontas |
+| 9 | `style-cyber-chrome` | **Cromo Cyberpunk** | Cyber | cromo metálico; glitch RGB de 120 ms (3 fatias com `translateX`) a cada 7 s |
+| 10 | `style-cosmic-neon` | **Néon Cósmico** | Cósmico | tubo de néon magenta/ciano: contorno + brilho que "liga" ao entrar na tela e respira |
 
-### 2.7 Animações de abertura de patente (níveis 4 e 5)
+### 2.4 Tags especiais — Nitro (10)
 
-Independentes das 10 do Nitro: o usuário pode ter as duas, mas **só uma toca** (prioridade: patente, se ligada; senão, a do Nitro).
+Pílula de 18 px; ícone `lucide-react`; acabamento com borda em gradiente e brilho que atravessa a tag a cada ~5 s.
 
-| Nível | ID | Nome | Efeito |
-|---|---|---|---|
-| 4 | `intro-tier-4` | **Ascensão Safira** | Grade técnica azul se monta sobre a capa e converge no selo Safira |
-| 5 | `intro-tier-5` | **Singularidade Prismática** | Ponto de luz no avatar explode no espectro do Grão-Mestre |
+| # | ID | Texto | Coleção | Ícone | Acabamento |
+|---|---|---|---|---|---|
+| 1 | `tag-nitro-founder` | **Fundador Nitro** | Cósmico | `Zap` | gradiente rainbow; **evento** (testadores do Preview) |
+| 2 | `tag-honorary-santa` | **Noel Honorário** | Natal | `Gift` | vermelho, borda verde, neve |
+| 3 | `tag-infernal-pact` | **Pacto Infernal** | Infernal | `Flame` | carvão com texto brasa pulsante |
+| 4 | `tag-royal-blood` | **Sangue Real** | Imperial | `Crown` | púrpura com filete dourado |
+| 5 | `tag-star-born` | **Filho das Estrelas** | Celestial | `Star` | azul-noite com estrela cintilante |
+| 6 | `tag-senpai` | **Senpai 先輩** | Anime | `Sparkles` | branco com contorno de mangá |
+| 7 | `tag-highness` | **Alteza** | Princess | `Gem` | rosé perolado iridescente |
+| 8 | `tag-jungle-king` | **Rei da Selva** | Selva | `PawPrint` | verde-musgo com pegada âmbar |
+| 9 | `tag-shadow-hunter` | **Caçador de Sombras** | Sombras | `Moon` | breu com contorno que "respira" verde-ácido |
+| 10 | `tag-netrunner` | **NETRUNNER** | Cyber | `Cpu` | preto, ciano monoespaçado, borda néon |
+
+### 2.5 Molduras animadas — Nitro (10)
+
+Inclui obrigatoriamente **chapéu**, **natureza** e **animais**. Técnica: **SVG em camadas** (preferido) ou **WebP animado na R2** quando há personagem ou partícula complexa, sempre com anel SVG por baixo como fallback.
+
+| # | ID | Nome | Coleção | Camadas (fundo · contorno · frente) | Movimento |
+|---|---|---|---|---|---|
+| 1 | `frame-santa-hat` | **Gorro do Noel** 🎩 *chapéu* | Natal | brilho quente · anel com pisca-pisca · **gorro inclinado com pompom** | pompom balança como pêndulo (rotate com amortecimento); luzes piscam em sequência; neve cai pela frente |
+| 2 | `frame-flame-crown` | **Coroa de Chamas** | Infernal | chamas atrás do avatar (WebP R2) · anel de magma · brasas na frente | chamas sobem em 2 velocidades (paralaxe); brasas soltas; pulso de calor no anel |
+| 3 | `frame-imperial-crown` | **Coroa Imperial** | Imperial | aura púrpura · louro dourado · **coroa** no topo | coroa "pousa" ao entrar na tela; varredura de luz pelas folhas a cada 5 s |
+| 4 | `frame-celestial-halo` | **Halo Celestial** | Celestial | aurora girando · anel estelar · **auréola** elíptica acima | aurora gira (14 s); 6 estrelas orbitam em elipse; auréola flutua ±3 px |
+| 5 | `frame-sakura-branch` | **Galho de Sakura** | Anime | névoa rosa · anel pétala · **galho florido** no canto superior | galho balança; pétalas caem e giram (8 variações de trajetória) |
+| 6 | `frame-enchanted-tiara` | **Tiara Encantada** | Princess | brilho perolado · anel cristal · **tiara** + 2 borboletas | borboletas voam em trajetórias em 8; faíscas nas pedras da tiara |
+| 7 | `frame-living-forest` | **Floresta Viva** 🌿 *natureza* | Selva | sombra de folhagem · **cipós** que contornam o anel · folhas e flores | cipós "crescem" ao entrar na tela (traçado SVG); folhas balançam; vaga-lumes piscam |
+| 8 | `frame-jaguar` | **Onça-Pintada** 🐆 *animal* | Selva | aura âmbar · anel com rosetas de onça · **orelhas** no topo e **cauda** contornando a base | orelhas mexem a cada ~6 s; cauda balança (rotate em 2 segmentos); olhos brilham no reflexo |
+| 9 | `frame-spirit-fox` | **Raposa Espiritual** 🦊 *animal* | Celestial | 3 caudas de luz atrás do avatar · anel lunar · **orelhas de raposa** | caudas ondulam em fase alternada; 3 chamas-fantasma (*kitsune-bi*) orbitam |
+| 10 | `frame-lurking-eyes` | **Olhos na Escuridão** | Sombras | fumaça escura girando · anel rachado · **olhos** e **tentáculo** espiando | olhos piscam em posições aleatórias; tentáculo surge e recua a cada ~9 s; névoa respira |
+
+**Itens da v1 fora deste conjunto** (Guirlanda Natalina, Floco de Neve Real, Chifres do Abismo, Laurel Imperial, Halo Aurora, Pétalas de Sakura, Tiara de Cristal, Circuito Néon, Anel de Saturno): vão para a coleção **Arquivo Beta**. Ficam disponíveis apenas para quem já os tinha equipado; não contam entre os 10.
+
+### 2.6 Animações de abertura — Nitro (10)
+
+Δ Todas passam a usar o **`IntroPlayer`**, uma timeline em fases com WAAPI:
+
+1. **Antecipação** (0–20%): escurecer, tremor ou sinal.
+2. **Impacto** (20–55%): o evento principal.
+3. **Revelação** (55–85%): o perfil aparece.
+4. **Acomodação** (85–100%): partículas assentam e a camada some.
+
+Inclui leve *camera shake* aplicado **só à camada da animação**, nunca à página. Duração 1,2–1,8 s. Toque ou tecla pula para a acomodação.
+
+| # | ID | Nome | Coleção | Roteiro |
+|---|---|---|---|---|
+| 1 | `intro-high-tide` | **Maré Alta** 🌊 *ondas* | Oceano | 3 ondas SVG em paralaxe sobem da base cobrindo a tela → a crista quebra com espuma (partículas) → a água recua para baixo revelando o perfil → gotas escorrem do avatar |
+| 2 | `intro-jaguar-claw` | **Garra de Onça** 🐾 | Selva | tela escurece e dois olhos âmbar acendem → **3 arranhões** cortam a tela na diagonal (traçado SVG com brilho) → a tela "rasga" nos cortes (`clip-path` em 4 pedaços que se afastam) → folhas caem |
+| 3 | `intro-lurking-monster` | **Monstro à Espreita** 👁 | Sombras | vinheta escura com névoa → pares de olhos piscam nos cantos → os olhos avançam (escala) → uma **mandíbula** de silhueta dá o bote de baixo → a escuridão estilhaça em partículas de sombra |
+| 4 | `intro-royal-blizzard` | **Nevasca Real** *(melhoria de "Nevasca")* | Natal | 3 camadas de neve em profundidade → geada avança das bordas (máscara radial) → o gelo **racha** a partir do avatar e cai em cacos |
+| 5 | `intro-hell-portal` | **Portal Infernal** *(melhoria)* | Infernal | rachaduras incandescentes se desenham no chão → erupção de magma (WebP R2) → o portal abre em íris a partir do avatar com brasas e distorção de calor pré-renderizada |
+| 6 | `intro-imperial-decree` | **Decreto Imperial** *(melhoria)* | Imperial | dois estandartes descem desenrolando (escala Y com sombreado de dobra) → o **selo dourado** carimba no centro (impacto + onda de choque) → estandartes sobem deixando poeira de ouro |
+| 7 | `intro-total-eclipse` | **Eclipse Total** *(melhoria de "Eclipse")* | Celestial | a lua cruza o sol → coroa solar se expande → efeito **anel de diamante** (flash pontual) → as estrelas florescem e a luz volta |
+| 8 | `intro-anime-cut` | **Corte de Anime** *(melhoria de "Linhas de Ação")* | Anime | linhas de velocidade convergem → **quadro de impacto** invertido (2 quadros preto/branco) → carimbo 見参 → o perfil entra com leve *zoom* |
+| 9 | `intro-fairy-tale` | **Conto de Fadas** *(melhoria)* | Princess | varinha desenha uma espiral de brilho (traçado SVG) → silhueta de castelo surge e dissolve → pétalas e faíscas assentam sobre o nome |
+| 10 | `intro-hyperspace` | **Salto Hiperespacial** *(melhoria de "Hiperespaço")* | Cósmico | estrelas paradas → esticam em linhas (warp) com aceleração → túnel de luz → *flash* e o perfil "chega" com desaceleração |
+
+"Boot Glitch", "Chuva de Estrelas" e "Presente Aberto" (v1) vão para **Arquivo Beta**.
+
+### 2.7 Itens padrão (liberados para todos)
+
+| Categoria | Itens |
+|---|---|
+| Moldura | Sem moldura · **Anel Clássico** (cor de destaque do usuário) · **Anel Duplo** · **Pontilhado** (todos estáticos) |
+| Título/Alcunha | as **8 cores atuais** da alcunha (paleta de `ProfileHeader`) · **Negrito Limpo** (sem cor) |
+| Tag | **Membro** · **Leitor(a)** · **Criador(a)** · **Dev** (pílulas neutras) |
+| Abertura | Sem abertura · **Revelação Suave** (fade + leve escala, 600 ms) |
+
+### 2.8 Itens de nível de contribuinte (Patentes)
+
+Cumulativos: o nível N libera tudo dos níveis ≤ N. As cores vêm de `CONTRIBUTOR_TIERS`.
+
+| Nível | Patente | Moldura | Estilo de título/alcunha | Tag | Abertura |
+|---|---|---|---|---|---|
+| 0 | Observador | `frame-tier-0` anel ardósia (estático) | — | — | — |
+| 1 | Recruta | `frame-tier-1` cobre com faíscas (estático) | **Cobre Vivo** | **Recruta** | — |
+| 2 | Escudeiro | `frame-tier-2` metal prismático (estático) | **Prisma Metálico** | **Escudeiro** | — |
+| 3 | Cavaleiro | `frame-tier-3` ouro com rebites e louro (estático) | **Ouro de Cavaleiro** | **Cavaleiro** | — |
+| 4 | Imperador | `frame-tier-4` safira com **grade técnica e pulso** (**animada**) | **Safira** | **Imperador** | **Ascensão Safira** (exclusiva) |
+| 5 | Grão-Mestre | `frame-tier-5` **espectro em rotação + partículas** (**animada**) | **Espectro do Grão-Mestre** | **Grão-Mestre** | **Singularidade Prismática** (exclusiva) |
+
+Só os níveis **4 e 5** têm animação própria (moldura animada e abertura). Ambas obedecem ao toggle **Animação de patente**.
 
 ---
 
-## 3. Modelagem de dados
+## 3. Regras de liberação, Rainbow e toggles
 
-### 3.1 Visão geral
+### 3.1 Quem pode aplicar o quê
 
+| Origem (`unlock`) | Aplica se… | Na galeria, para quem não tem |
+|---|---|---|
+| `default` | sempre | — |
+| `level` | `profiles.contributor_level >= min_level` | prévia com 🔒 + "Libera no nível N · Patente" e link para `/apoie` |
+| `nitro` | assinatura `trialing`/`active` com `current_period_end > now()` | prévia com selo **Nitro** + "Assinar Insight Nitro" |
+| `event` | linha em `nitro_unlocks` | prévia com "Item de evento" (sem CTA) |
+| `archive` | linha em `nitro_unlocks` (quem já usava na v1) | **não aparece** na galeria |
+
+- **Todo** o catálogo (exceto `archive`) aparece para **todos** os usuários em Preview, inclusive deslogados (que veem a prévia com o avatar padrão).
+- **Prévia nunca grava**: tocar num item bloqueado muda só a pré-visualização local.
+- A regra vale em dois lugares: `entitlements.ts`, para a UI, e o RPC `set_profile_cosmetics`, para o banco. **O banco é a autoridade.**
+
+### 3.2 Expiração
+
+- Itens `nitro` só renderizam enquanto `cosmetics.nitroUntil > agora`. Ao expirar, a UI cai para o padrão imediatamente.
+- Um job diário (`pg_cron`) limpa os slots no banco.
+- Itens de nível e de evento não expiram.
+
+### 3.3 Rainbow (benefício Nitro)
+
+**O que muda:** a logo **Insight\*** e **todos os asteriscos de carregamento** ganham degradê prismático animado.
+
+**Pré-requisito: unificar o asterisco.** Hoje o desenho está duplicado em 7 arquivos (`app/loading.tsx`, `app/page.tsx`, `app/login/page.tsx`, `app/post/[id]/page.tsx`, `app/u/[username]/page.tsx`, `TopicTabsManager.tsx`, `ui/AsteriskLoader.tsx`) e a logo em 3 componentes (`LeftSidebar`, `AppShell`, `SharePostModal`). Todos passam a usar:
+
+```tsx
+<InsightAsterisk size={38} spin />      // spinners e loaders
+<InsightLogo size="md" />               // "Insight" + <InsightAsterisk />
 ```
-nitro_collections 1─* nitro_items
-profiles 1─1 nitro_subscriptions        (assinatura)
-profiles 1─* nitro_unlocks *─1 nitro_items   (desbloqueios permanentes: evento, compra avulsa futura)
-profiles 1─1 profile_cosmetics *─1 nitro_items  (o que está equipado + toggles)
-profiles.cosmetics (jsonb)               ← snapshot gerado por trigger, lido por toda a UI
-```
 
-**Por que um snapshot em `profiles.cosmetics`?** Feed, Explore, notificações e perfil já carregam linhas de `profiles` (`select('*')`). Com o snapshot, os cosméticos chegam a todas essas telas **sem joins novos** e sem consultar o catálogo. A fonte da verdade continua sendo `profile_cosmetics`; o snapshot só pode ser escrito pela RPC.
+**Técnica (GPU-friendly):**
 
-### 3.2 Migração SQL
+- O asterisco vira uma **máscara** (`mask-image` com o SVG).
+- Sob a máscara fica um `div` com `conic-gradient` do espectro, que gira por `transform: rotate()`. Animação só de composição, sem repintura.
+- A palavra "Insight" usa gradiente com `background-clip: text` em deslocamento lento (12 s).
 
-`supabase/migrations/2026XXXX_insight_nitro.sql`
+**Ativação:** o `NitroProvider` define `<html data-nitro-rainbow="on">` quando `isNitroEnabled() && assinaturaAtiva && cosmetics.rainbow !== false`. Os componentes de marca leem esse atributo pelo CSS, sem custo de JavaScript.
+
+**Fora do escopo:** o e-mail da newsletter (`api/newsletter`) e a imagem exportada do `SharePostModal` continuam com a logo padrão, pois são gerados fora da sessão do usuário.
+
+**Movimento reduzido:** gradiente estático (sem rotação).
+
+### 3.4 Toggles
+
+**Do dono do perfil** (gravados no Supabase, valem para quem visita):
+
+| Toggle | Campo | Desligado |
+|---|---|---|
+| Exibir moldura | `frameEnabled` | remove a moldura (o item continua escolhido) |
+| Animar moldura | `frameAnimated` | moldura estática (pôster/SVG parado) |
+| Animação de abertura | `introEnabled` | nenhuma abertura Nitro no meu perfil |
+| Animação de patente | `levelAnimation` | moldura 4/5 estática e sem abertura de patente (só níveis 4 e 5) |
+| Animar títulos e alcunha | `nameAnimated` | gradientes ficam parados |
+| **Rainbow** | `rainbow` | logo e asteriscos voltam ao azul padrão (só para mim; não afeta outros) |
+
+**Do visitante** (preferência local, `insight-nitro-prefs`):
+
+| Toggle | Padrão |
+|---|---|
+| Reproduzir aberturas de outros perfis | ligado |
+| Animar molduras em listas | ligado (desligado em aparelho fraco ou `Save-Data`) |
+
+"Reduzir movimento" (aba Aparência) e `prefers-reduced-motion` **vencem todos os toggles**.
+
+---
+
+## 4. Supabase, tipos e pontos de integração
+
+### 4.1 Esquema
+
+Migração nova, aditiva: `supabase/migrations/2026XXXX_insight_nitro_v2.sql`.
 
 ```sql
--- =========================================================================
--- INSIGHT NITRO — catálogo, assinaturas, desbloqueios e itens equipados
--- Migração aditiva e idempotente.
--- =========================================================================
-
--- ---------- Tipos ----------
-do $$ begin
-  create type nitro_item_kind as enum ('title_style', 'tag', 'frame', 'intro');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type nitro_requirement as enum ('nitro', 'level', 'event');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type nitro_sub_status as enum ('trialing', 'active', 'past_due', 'canceled');
-exception when duplicate_object then null; end $$;
-
--- ---------- Catálogo ----------
-create table if not exists public.nitro_collections (
-  id          text primary key,              -- 'natal', 'infernal', ...
+-- Catálogo no banco (espelho de catalog.ts, gerado por scripts/nitro-seed.ts)
+create table public.nitro_items (
+  id          text primary key,
+  kind        text not null check (kind in ('frame','name_style','tag','intro')),
+  collection  text not null,
   name        text not null,
-  description text,
-  accent      text not null,                 -- cor principal (hex)
-  starts_at   timestamptz,                   -- coleções sazonais
-  ends_at     timestamptz,
-  sort        integer not null default 0
+  rarity      text not null default 'comum',
+  unlock      text not null check (unlock in ('default','level','nitro','event','archive')),
+  min_level   int  check (min_level between 0 and 5),
+  asset_key   text,             -- R2: nitro/v2/<kind>/<id>/anim.webp
+  poster_key  text,             -- R2: nitro/v2/<kind>/<id>/poster.png
+  is_active   boolean not null default true,
+  sort        int not null default 0,
+  check (unlock <> 'level' or min_level is not null)
 );
 
-create table if not exists public.nitro_items (
-  id               text primary key,         -- 'frame-aurora-halo'
-  kind             nitro_item_kind not null,
-  collection_id    text not null references public.nitro_collections(id),
-  name             text not null,
-  description      text,
-  rarity           text not null default 'comum'
-                   check (rarity in ('comum', 'rara', 'épica', 'lendária')),
-  requirement      nitro_requirement not null default 'nitro',
-  min_level        integer check (min_level between 0 and 5),
-  config           jsonb not null default '{}'::jsonb,  -- cores, ícone, fallbackColor, cssClass...
-  asset_key        text,                     -- chave R2 animada (opcional)
-  static_asset_key text,                     -- pôster estático (opcional)
-  is_active        boolean not null default true,
-  sort             integer not null default 0,
-  check (requirement <> 'level' or min_level is not null)
-);
-
-create index if not exists nitro_items_kind_idx on public.nitro_items(kind, collection_id);
-
--- ---------- Assinatura ----------
-create table if not exists public.nitro_subscriptions (
+create table public.nitro_subscriptions (
   profile_id         uuid primary key references public.profiles(id) on delete cascade,
-  status             nitro_sub_status not null,
+  status             text not null check (status in ('trialing','active','past_due','canceled')),
   current_period_end timestamptz not null,
-  provider           text not null default 'manual',  -- 'manual' (Preview) | 'mercadopago'
+  provider           text not null default 'manual',   -- 'manual' | 'trial' | 'mercadopago'
   provider_ref       text,
-  created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
 
--- ---------- Desbloqueios permanentes ----------
-create table if not exists public.nitro_unlocks (
-  profile_id uuid not null references public.profiles(id) on delete cascade,
-  item_id    text not null references public.nitro_items(id) on delete cascade,
-  source     text not null default 'event',   -- 'event' | 'grant' | 'purchase'
+create table public.nitro_unlocks (
+  profile_id uuid references public.profiles(id) on delete cascade,
+  item_id    text references public.nitro_items(id) on delete cascade,
+  source     text not null default 'event',             -- 'event' | 'archive' | 'grant'
   granted_at timestamptz not null default now(),
   primary key (profile_id, item_id)
 );
 
--- ---------- Itens equipados + toggles ----------
-create table if not exists public.profile_cosmetics (
-  profile_id               uuid primary key references public.profiles(id) on delete cascade,
-  title_style_id           text references public.nitro_items(id) on delete set null,
-  tag_id                   text references public.nitro_items(id) on delete set null,
-  frame_id                 text references public.nitro_items(id) on delete set null,
-  intro_id                 text references public.nitro_items(id) on delete set null,
-  frame_enabled            boolean not null default true,  -- false = remove a moldura
-  frame_animated           boolean not null default true,  -- false = moldura estática
-  intro_enabled            boolean not null default true,  -- abertura do Nitro
-  level_animation_enabled  boolean not null default true,  -- moldura animada + abertura de patente (níveis 4/5)
-  updated_at               timestamptz not null default now()
-);
+-- Configuração global (ex.: liberar teste grátis no Preview)
+create table public.app_config (key text primary key, value jsonb not null);
+insert into public.app_config values ('nitro_trials_enabled', 'false') on conflict do nothing;
 
--- Snapshot lido por toda a UI
-alter table public.profiles
-  add column if not exists cosmetics jsonb;
-
--- Allowlist de testadores durante o Preview (opcional)
-create table if not exists public.nitro_testers (
-  profile_id uuid primary key references public.profiles(id) on delete cascade
-);
-
--- ---------- RLS ----------
-alter table public.nitro_collections   enable row level security;
-alter table public.nitro_items         enable row level security;
-alter table public.nitro_subscriptions enable row level security;
-alter table public.nitro_unlocks       enable row level security;
-alter table public.profile_cosmetics   enable row level security;
-alter table public.nitro_testers       enable row level security;
-
-create or replace function public.current_profile_id()
-returns uuid language sql stable security definer set search_path = public as $$
-  select id from public.profiles where user_id = auth.uid() or id = auth.uid() limit 1
-$$;
-
-drop policy if exists "nitro_collections_read" on public.nitro_collections;
-create policy "nitro_collections_read" on public.nitro_collections for select using (true);
-
-drop policy if exists "nitro_items_read" on public.nitro_items;
-create policy "nitro_items_read" on public.nitro_items for select using (is_active);
-
-drop policy if exists "nitro_subs_read_own" on public.nitro_subscriptions;
-create policy "nitro_subs_read_own" on public.nitro_subscriptions
-  for select using (profile_id = public.current_profile_id());
-
-drop policy if exists "nitro_unlocks_read_own" on public.nitro_unlocks;
-create policy "nitro_unlocks_read_own" on public.nitro_unlocks
-  for select using (profile_id = public.current_profile_id());
-
-drop policy if exists "profile_cosmetics_read_own" on public.profile_cosmetics;
-create policy "profile_cosmetics_read_own" on public.profile_cosmetics
-  for select using (profile_id = public.current_profile_id());
--- Sem policies de INSERT/UPDATE/DELETE: toda escrita passa pelas RPCs abaixo.
-
--- ---------- Proteção do snapshot ----------
--- O usuário consegue dar UPDATE na própria linha de profiles (editar bio etc.).
--- Este trigger impede que ele escreva cosmetics diretamente.
-create or replace function public.protect_profile_cosmetics()
-returns trigger language plpgsql as $$
-begin
-  if new.cosmetics is distinct from old.cosmetics
-     and coalesce(current_setting('insight.cosmetics_writer', true), '') <> 'on' then
-    new.cosmetics := old.cosmetics;
-  end if;
-  return new;
-end $$;
-
-drop trigger if exists profiles_protect_cosmetics on public.profiles;
-create trigger profiles_protect_cosmetics
-  before update on public.profiles
-  for each row execute function public.protect_profile_cosmetics();
-
--- ---------- Direito de uso ----------
-create or replace function public.nitro_can_use(p_profile uuid, p_item text)
-returns boolean language plpgsql stable security definer set search_path = public as $$
-declare
-  it public.nitro_items;
-  lvl integer;
-begin
-  select * into it from public.nitro_items where id = p_item and is_active;
-  if not found then return false; end if;
-
-  if exists (select 1 from public.nitro_unlocks where profile_id = p_profile and item_id = p_item) then
-    return true;
-  end if;
-
-  if it.requirement = 'level' then
-    select coalesce(contributor_level, 0) into lvl from public.profiles where id = p_profile;
-    return lvl >= it.min_level;
-  end if;
-
-  if it.requirement = 'nitro' then
-    return exists (
-      select 1 from public.nitro_subscriptions
-      where profile_id = p_profile
-        and status in ('trialing', 'active')
-        and current_period_end > now()
-    );
-  end if;
-
-  return false; -- 'event' só via nitro_unlocks
-end $$;
-
--- ---------- Snapshot ----------
-create or replace function public.rebuild_profile_cosmetics(p_profile uuid)
-returns void language plpgsql security definer set search_path = public as $$
-declare
-  pc  public.profile_cosmetics;
-  lvl integer;
-  sub_until timestamptz;
-  snap jsonb;
-begin
-  select * into pc from public.profile_cosmetics where profile_id = p_profile;
-  select coalesce(contributor_level, 0) into lvl from public.profiles where id = p_profile;
-  select current_period_end into sub_until from public.nitro_subscriptions
-    where profile_id = p_profile and status in ('trialing', 'active');
-
-  snap := jsonb_strip_nulls(jsonb_build_object(
-    'v', 1,
-    'title', (select jsonb_build_object('id', i.id, 'config', i.config, 'req', i.requirement)
-              from public.nitro_items i where i.id = pc.title_style_id),
-    'tag',   (select jsonb_build_object('id', i.id, 'name', i.name, 'config', i.config, 'req', i.requirement)
-              from public.nitro_items i where i.id = pc.tag_id),
-    'frame', (select jsonb_build_object('id', i.id, 'config', i.config, 'req', i.requirement,
-                                        'asset', i.asset_key, 'static', i.static_asset_key)
-              from public.nitro_items i where i.id = pc.frame_id and pc.frame_enabled),
-    'intro', (select jsonb_build_object('id', i.id, 'req', i.requirement)
-              from public.nitro_items i where i.id = pc.intro_id and pc.intro_enabled),
-    'frameAnimated', coalesce(pc.frame_animated, true),
-    'levelAnimation', case when lvl >= 4 then coalesce(pc.level_animation_enabled, true) end,
-    'nitroUntil', sub_until
-  ));
-
-  perform set_config('insight.cosmetics_writer', 'on', true);
-  update public.profiles set cosmetics = snap where id = p_profile;
-  perform set_config('insight.cosmetics_writer', 'off', true);
-end $$;
-
--- ---------- RPC de equipar / configurar ----------
--- Parâmetros nulos = "não alterar". Para desequipar um slot, passe '' (string vazia).
-create or replace function public.set_profile_cosmetics(
-  p_title_style_id text default null,
-  p_tag_id         text default null,
-  p_frame_id       text default null,
-  p_intro_id       text default null,
-  p_frame_enabled  boolean default null,
-  p_frame_animated boolean default null,
-  p_intro_enabled  boolean default null,
-  p_level_animation_enabled boolean default null
-) returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  me uuid := public.current_profile_id();
-  slot record;
-begin
-  if me is null then raise exception 'not_authenticated'; end if;
-
-  -- Durante o Preview: só testadores (remover na Fase 5)
-  if not exists (select 1 from public.nitro_testers where profile_id = me) then
-    raise exception 'nitro_preview_only';
-  end if;
-
-  -- Valida tipo e direito de uso de cada slot informado
-  for slot in
-    select * from (values
-      ('title_style'::nitro_item_kind, p_title_style_id),
-      ('tag'::nitro_item_kind,         p_tag_id),
-      ('frame'::nitro_item_kind,       p_frame_id),
-      ('intro'::nitro_item_kind,       p_intro_id)
-    ) as s(kind, item_id)
-    where item_id is not null and item_id <> ''
-  loop
-    if not exists (select 1 from public.nitro_items where id = slot.item_id and kind = slot.kind) then
-      raise exception 'invalid_item %', slot.item_id;
-    end if;
-    if not public.nitro_can_use(me, slot.item_id) then
-      raise exception 'locked_item %', slot.item_id;
-    end if;
-  end loop;
-
-  insert into public.profile_cosmetics (profile_id) values (me)
-  on conflict (profile_id) do nothing;
-
-  update public.profile_cosmetics set
-    title_style_id = case when p_title_style_id is null then title_style_id else nullif(p_title_style_id, '') end,
-    tag_id         = case when p_tag_id         is null then tag_id         else nullif(p_tag_id, '') end,
-    frame_id       = case when p_frame_id       is null then frame_id       else nullif(p_frame_id, '') end,
-    intro_id       = case when p_intro_id       is null then intro_id       else nullif(p_intro_id, '') end,
-    frame_enabled  = coalesce(p_frame_enabled,  frame_enabled),
-    frame_animated = coalesce(p_frame_animated, frame_animated),
-    intro_enabled  = coalesce(p_intro_enabled,  intro_enabled),
-    level_animation_enabled = coalesce(p_level_animation_enabled, level_animation_enabled),
-    updated_at = now()
-  where profile_id = me;
-
-  perform public.rebuild_profile_cosmetics(me);
-  return (select cosmetics from public.profiles where id = me);
-end $$;
-
-grant execute on function public.set_profile_cosmetics(text, text, text, text, boolean, boolean, boolean, boolean)
-  to authenticated;
-
--- ---------- Expiração ----------
--- Remove itens 'nitro' de quem perdeu a assinatura (rodar diariamente via pg_cron).
--- A UI também esconde itens 'nitro' quando nitroUntil < agora, então não há janela visível.
-create or replace function public.nitro_expire_cosmetics()
-returns void language plpgsql security definer set search_path = public as $$
-declare r record;
-begin
-  for r in
-    select pc.profile_id from public.profile_cosmetics pc
-    where not exists (
-      select 1 from public.nitro_subscriptions s
-      where s.profile_id = pc.profile_id and s.status in ('trialing', 'active')
-        and s.current_period_end > now()
-    )
-  loop
-    update public.profile_cosmetics pc set
-      title_style_id = case when public.nitro_can_use(r.profile_id, title_style_id) then title_style_id end,
-      tag_id         = case when public.nitro_can_use(r.profile_id, tag_id)         then tag_id end,
-      frame_id       = case when public.nitro_can_use(r.profile_id, frame_id)       then frame_id end,
-      intro_id       = case when public.nitro_can_use(r.profile_id, intro_id)       then intro_id end
-    where pc.profile_id = r.profile_id;
-    perform public.rebuild_profile_cosmetics(r.profile_id);
-  end loop;
-end $$;
--- select cron.schedule('nitro-expire', '17 4 * * *', 'select public.nitro_expire_cosmetics()');
-
--- ---------- Realtime ----------
--- profiles já deve estar na publicação; caso não esteja:
--- alter publication supabase_realtime add table public.profiles;
+-- RLS: leitura do catálogo pública; assinatura e unlocks só o próprio usuário lê;
+-- nenhuma escrita direta pelo cliente (só RPCs abaixo e service role).
 ```
 
-**Seed do catálogo:** um arquivo `supabase/seed/nitro_catalog.sql` com `insert ... on conflict (id) do update` para as 9 coleções e os 48 itens das seções 2.2–2.7 (10 títulos + 10 tags + 10 molduras + 6 molduras de patente + 10 aberturas + 2 aberturas de patente). O mesmo conteúdo vive em `src/lib/nitro/catalog.ts`, que é a origem; um script (`npm run nitro:seed-sql`) gera o SQL a partir dele, evitando divergência.
+**Funções (`SECURITY DEFINER`, `search_path = public`):**
 
-### 3.3 Tipos TypeScript
+| Função | Quem chama | O que faz |
+|---|---|---|
+| `nitro_can_use(profile, item)` | interna | aplica a tabela 3.1 |
+| `set_profile_cosmetics(p jsonb)` | logado | **substitui `set_my_cosmetics`**: valida tipo de slot e direito de uso de cada item e grava o snapshot. Exceção: um slot que mantém um item já equipado (ex.: `archive`) é aceito. |
+| `start_nitro_trial()` | logado | só se `app_config.nitro_trials_enabled = true`; cria `trialing` por 7 dias, 1 vez por perfil. É o botão "Ativar teste" no Preview. |
+| `nitro_expire_cosmetics()` | `pg_cron` diário | limpa slots `nitro` vencidos e reconstrói o snapshot |
+| `rebuild_profile_cosmetics(profile)` | interna | grava `profiles.cosmetics` (via `insight.cosmetics_writer`, já protegido por trigger) |
 
-`src/types/database.ts` (acréscimos)
+O trigger `profiles_protect_cosmetics` e as regras de RLS de 20/11 continuam como estão.
+
+**Assets na R2**
+
+- Chaves versionadas e imutáveis: `nitro/v2/frames/<id>/anim-128.webp`, `anim-256.webp`, `poster.png`; `nitro/v2/intros/<id>/<camada>.webp`.
+- Upload por `scripts/nitro-upload-assets.ts` com `Cache-Control: public, max-age=31536000, immutable`, usando as mesmas credenciais de `/api/upload/r2`. Não usar o endpoint de upload de usuário, que gera nomes aleatórios.
+- Arte nova = pasta `v3`; nunca sobrescrever uma chave publicada.
+- Orçamento: overlay ≤ 150 KB; pôster ≤ 20 KB.
+- **Fallback:** se `NEXT_PUBLIC_R2_PUBLIC_URL` faltar ou a imagem falhar, a camada SVG/CSS da moldura continua visível.
+
+### 4.2 Tipos TypeScript
 
 ```ts
-export type NitroItemKind = 'title_style' | 'tag' | 'frame' | 'intro';
-export type NitroRequirement = 'nitro' | 'level' | 'event';
-export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
-export type NitroCollectionId =
-  | 'natal' | 'infernal' | 'imperial' | 'celestial'
-  | 'anime' | 'princess' | 'cyber' | 'cosmico' | 'patentes';
+export type NitroKind = 'frame' | 'name_style' | 'tag' | 'intro';
+export type NitroUnlock = 'default' | 'level' | 'nitro' | 'event' | 'archive';
 
-export interface NitroItemConfig {
-  cssClass?: string;          // classe em effects/*.css
-  fallbackColor?: string;     // títulos: cor sólida sem animação
-  colors?: string[];          // paradas de gradiente
-  icon?: string;              // nome do ícone lucide (tags/títulos)
-  technique?: 'css' | 'svg' | 'r2';
-  durationMs?: number;        // aberturas (≤ 1200)
-}
-
-export interface NitroItem {
+export interface NitroItemBase {
   id: string;
-  kind: NitroItemKind;
-  collection_id: NitroCollectionId;
+  kind: NitroKind;
   name: string;
-  description?: string | null;
-  rarity: NitroRarity;
-  requirement: NitroRequirement;
-  min_level?: number | null;
-  config: NitroItemConfig;
-  asset_key?: string | null;
-  static_asset_key?: string | null;
-  is_active: boolean;
-  sort: number;
+  collection: NitroCollectionId;
+  rarity: 'comum' | 'rara' | 'épica' | 'lendária';
+  unlock: NitroUnlock;
+  minLevel?: 0 | 1 | 2 | 3 | 4 | 5;
+  description: string;
 }
 
-export interface NitroSubscription {
-  profile_id: string;
-  status: 'trialing' | 'active' | 'past_due' | 'canceled';
-  current_period_end: string;
-  provider: 'manual' | 'mercadopago';
+export interface FrameItem extends NitroItemBase {
+  kind: 'frame';
+  layers: {
+    back?: LayerSpec;          // atrás do avatar
+    ring: RingSpec;            // contorno (gradiente/textura)
+    front?: LayerSpec;         // chapéu, orelhas, coroa…
+    particles?: ParticleSpec;
+  };
+  asset?: { anim: string; poster: string };  // R2 (opcional)
+  animated: boolean;           // false para padrão e níveis 0–3
 }
 
-export interface ProfileCosmeticsSettings {
-  profile_id: string;
-  title_style_id: string | null;
-  tag_id: string | null;
-  frame_id: string | null;
-  intro_id: string | null;
-  frame_enabled: boolean;
-  frame_animated: boolean;
-  intro_enabled: boolean;
-  level_animation_enabled: boolean;
+export interface NameStyleItem extends NitroItemBase {
+  kind: 'name_style';
+  gradient: string[];
+  effect: 'shine' | 'flow' | 'ember' | 'frost' | 'glitch' | 'neon' | 'solid';
+  fallbackColor: string;
+  glyph?: 'crown' | 'sparkle' | 'petal' | 'snow' | 'ember';
 }
 
-/** Snapshot em profiles.cosmetics — o que a UI lê em todo lugar. */
-interface CosmeticRef {
-  id: string;
-  req: NitroRequirement;
-  config?: NitroItemConfig;
+export interface TagItem extends NitroItemBase {
+  kind: 'tag';
+  label: string;
+  icon: string;                // nome do ícone lucide
+  bg: string; fg: string; border: string;
+  shimmer?: boolean;
 }
 
-export interface ProfileCosmeticsSnapshot {
-  v: 1;
-  title?: CosmeticRef;
-  tag?: CosmeticRef & { name: string };
-  frame?: CosmeticRef & { asset?: string; static?: string };
-  intro?: CosmeticRef;
+export interface IntroItem extends NitroItemBase {
+  kind: 'intro';
+  scene: IntroSceneId;         // componente em intro/scenes
+  durationMs: number;          // 1200–1800
+  assets?: string[];           // camadas R2 (opcional)
+}
+
+/** profiles.cosmetics (snapshot v2) */
+export interface ProfileCosmeticsV2 {
+  v: 2;
+  frame?: string | null;
+  nameStyle?: string | null;
+  nicknameStyle?: string | null;
+  tag?: string | null;
+  intro?: string | null;
+  frameEnabled: boolean;
   frameAnimated: boolean;
-  /** Presente só para níveis 4 e 5. */
-  levelAnimation?: boolean;
-  /** Fim do período pago; itens 'nitro' somem da UI depois disso. */
-  nitroUntil?: string;
-}
-
-// Em Profile:
-//   cosmetics?: ProfileCosmeticsSnapshot | null;
-```
-
-### 3.4 Regras de resolução (cliente)
-
-`src/lib/nitro/entitlements.ts` decide **o que renderizar** a partir do snapshot, sem nenhuma consulta:
-
-```ts
-export function resolveFrame(profile: Profile): ResolvedFrame | null {
-  if (!isNitroEnabled()) return null;                  // gate de produção
-  const c = profile.cosmetics;
-  const level = profile.contributor_level ?? 0;
-
-  // 1. Moldura equipada (se ainda válida)
-  if (c?.frame && isStillEntitled(c.frame, c)) {
-    return { id: c.frame.id, animated: c.frameAnimated, ...c.frame };
-  }
-  // 2. Sem moldura equipada → nenhuma (a de patente é escolha explícita na galeria)
-  return null;
-}
-
-function isStillEntitled(ref: CosmeticRef, c: ProfileCosmeticsSnapshot) {
-  if (ref.req !== 'nitro') return true;               // patente/evento não expiram
-  return Boolean(c.nitroUntil && new Date(c.nitroUntil) > new Date());
+  introEnabled: boolean;
+  levelAnimation: boolean;
+  nameAnimated: boolean;
+  rainbow: boolean;
+  nitroUntil?: string | null;  // fim da assinatura (UI esconde itens 'nitro' depois disso)
+  updatedAt: string;
 }
 ```
 
-Uma animação só roda se **todas** forem verdadeiras:
+**Migração do snapshot v1 → v2:** `title` → `nameStyle`; IDs `title-*` → `style-*`; itens fora do catálogo v2 → `nitro_unlocks` com `source = 'archive'` para quem os usava.
 
-1. O dono deixou ligada (`frameAnimated`, `intro_enabled`, `levelAnimation`).
-2. O visitante não desligou (preferência local `playOthersAnimations`, padrão `true`).
-3. Não há `prefers-reduced-motion: reduce` nem `data-reduce-motion="true"` (preferência já existente em `/config`).
-4. O tamanho do avatar é ≥ `md` ou o item está em foco/hover ([§4.5](#45-propagação-global)).
+### 4.3 Pontos de integração na UI
 
-### 3.5 Assets na Cloudflare R2
-
-- **Estrutura de chaves**, versionada e imutável:
-  `nitro/v1/frames/<id>/anim.webp`, `nitro/v1/frames/<id>/static.webp`, `nitro/v1/intros/<id>/particles.webp`
-- **Upload:** script de staff (`scripts/nitro-upload-assets.ts`) com as credenciais R2 já usadas por `/api/upload/r2`, enviando `Cache-Control: public, max-age=31536000, immutable`. Não reutilizar o endpoint de upload de usuários, que gera chaves aleatórias.
-- **Nova versão de arte** = nova pasta (`v2`) + atualização de `asset_key` no catálogo. Nunca sobrescrever uma chave publicada, para não ficar com cache antigo na CDN.
-- **URL e fallback:**
-
-```ts
-// src/lib/nitro/assets.ts
-export function nitroAssetUrl(key?: string | null): string | null {
-  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim().replace(/\/$/, '');
-  if (!key || !base) return null;
-  return `${base}/${key}`;
-}
-```
-
-  `<CosmeticAvatar>` sempre renderiza o anel CSS/SVG primeiro. O overlay do R2 é um `<img loading="lazy" decoding="async">` que, em `onError`, se remove. Com R2 indisponível, a moldura continua aparecendo na versão CSS.
-
-- **Orçamento de peso:** overlay animado ≤ 150 KB, pôster ≤ 20 KB, dimensão 256×256 (renderizado em até 128 px no perfil).
-
----
-
-## 4. Fluxo de UI/UX
-
-### 4.1 Botão ao lado de "Seguir" (`ProfileHeader.tsx`)
-
-A área de ações hoje mostra **Seguir/Seguindo** para visitantes e, no próprio perfil, o botão de editar (ícone `Bolt`). O Nitro acrescenta, quando `isNitroEnabled()`:
-
-| Quem vê | Botão | Ação |
-|---|---|---|
-| **Dono do perfil** | `Palette` + "Personalizar" (mesmo estilo pílula do Seguir) | Abre `NitroCustomizeSheet` na aba **Moldura** ("Editar moldura") |
-| **Dono do perfil**, hover no avatar | Selo com lápis "Editar moldura" no canto do avatar | Mesmo sheet, aba Moldura |
-| **Visitante** | Chip discreto abaixo do nome: "Moldura *Halo Aurora* · Celestial" (só se houver item equipado) | Abre `/nitro/celestial` com o item em destaque |
-
-O chip do visitante é a principal via de descoberta: quem gosta de uma moldura chega à galeria em um clique.
-
-### 4.2 Editor rápido (`NitroCustomizeSheet`)
-
-Bottom sheet no mobile e painel lateral (420 px) no desktop.
-
-```
-┌────────────────────────────────────────────┐
-│  Personalizar perfil                     ✕ │
-│  ┌──────────────────────────────────────┐  │
-│  │      [avatar com moldura ao vivo]    │  │  ← preview com o avatar e nome reais
-│  │      Nome com estilo · @user [TAG]   │  │
-│  └──────────────────────────────────────┘  │
-│  [Moldura] [Título] [Tag] [Abertura]       │  ← abas
-│  Coleção: (Todas) Natal Infernal ...       │  ← chips de filtro
-│  ┌────┐ ┌────┐ ┌────┐ ┌────┐               │
-│  │ ◎  │ │ ◎  │ │ 🔒 │ │ ◎  │  ...          │  ← grade; bloqueado mostra o requisito
-│  └────┘ └────┘ └────┘ └────┘               │
-│  ☑ Animar moldura   ☐ Sem moldura          │
-│                 [Cancelar] [Salvar]        │
-└────────────────────────────────────────────┘
-```
-
-- Clicar num item **só altera o preview**. Salvar chama `POST /api/nitro/equip`, que chama a RPC `set_profile_cosmetics`.
-- Itens bloqueados ficam visíveis e podem ser pré-visualizados, com o requisito no rodapé do card ("Nitro", "Nível 4 · Imperador", "Evento"). Salvar um item bloqueado abre o CTA correspondente (assinar ou `/apoie`).
-- A aba **Abertura** tem botão "▶ Testar" que toca a animação sobre o preview.
-- A aba **Moldura** começa com a seção "Suas patentes" (molduras de nível desbloqueadas) e depois as coleções Nitro.
-
-### 4.3 Galeria `/nitro`
-
-1. **Hero:** nome, preço mensal, status da assinatura do usuário e preview com o avatar dele.
-2. **Coleções:** carrossel horizontal de cards (mesmo padrão do carrossel de respostas), cada um com a paleta da coleção e contagem de itens.
-3. **Categorias:** abas Títulos · Tags · Molduras · Aberturas, com filtro por coleção e por "Disponíveis para mim".
-4. **Card do item:** preview ao vivo, nome, coleção, raridade, requisito e botão **Equipar** / **Equipado ✓** / **Desbloquear**.
-5. **Painel de preview** fixo à direita no desktop: mostra como o perfil fica com a combinação escolhida.
-
-`/nitro/[collection]` reaproveita a mesma página com o filtro de coleção aplicado e um cabeçalho temático.
-
-### 4.4 Aba de configurações (`/config` → "Perfil & Nitro")
-
-Nova aba no `ConfigTabId` (`'appearance' | 'account' | 'notifications' | 'nitro' | 'staff'`), visível só com `isNitroEnabled()`. É a central de controle.
-
-**Bloco 1 — Assinatura**
-- Status (Ativa até 19/12 · Teste · Inativa) e botão Gerenciar/Assinar.
-
-**Bloco 2 — Itens equipados**
-- Quatro linhas (Título, Tag, Moldura, Abertura), cada uma com miniatura, nome, botão **Trocar** (abre o sheet na aba certa) e **Remover**.
-
-**Bloco 3 — Animações do meu perfil** (gravadas no Supabase, valem para todos os visitantes)
-
-| Toggle | Coluna | Efeito quando desligado |
-|---|---|---|
-| Exibir moldura | `frame_enabled` | Remove a moldura; avatar volta ao padrão |
-| Animar moldura | `frame_animated` | Moldura fica estática (pôster/CSS parado) |
-| Animação de abertura | `intro_enabled` | Nenhuma abertura do Nitro toca no meu perfil |
-| Animação de patente | `level_animation_enabled` | Moldura de patente 4/5 fica estática e a abertura de patente não toca. **Só aparece para níveis 4 e 5**; para os demais, mostra "Disponível a partir do nível 4 · Imperador" desabilitado |
-
-**Bloco 4 — Animações de outros perfis** (preferência local, junto de `insight-preferences`)
-- **Reproduzir aberturas ao visitar perfis** (padrão: ligado)
-- **Animar molduras em listas e no feed** (padrão: ligado)
-- Nota: "Reduzir movimento", na aba Aparência, desliga tudo isso automaticamente.
-
-Toda alteração é otimista: o toggle muda na hora e, se a RPC falhar, volta ao estado anterior com aviso.
-
-### 4.5 Propagação global
-
-Um único componente, `<UserIdentity>`, substitui o par avatar + nome espalhado pelo app:
+Um componente composto substitui os pares avatar + nome espalhados pelo app:
 
 ```tsx
-<UserIdentity
-  profile={profile}          // precisa de: avatar_url, display_name, username, contributor_level, cosmetics
-  size="xs" | "sm" | "md" | "lg"
-  show={{ name: true, handle: true, tag: true, tier: true }}
-  href                       // link para /u/[username] (padrão: sim)
-/>
+<UserIdentity profile={p} size="xs" | "sm" | "md" | "lg" show={{ nickname, tag, tier }} />
 ```
-
-Ele compõe `CosmeticAvatar`, `CosmeticName`, `CosmeticTag` e o `ContributorLevelPill` existente. **Política de animação por tamanho**, para não pesar no feed:
-
-| Tamanho | Onde | Moldura | Título |
-|---|---|---|---|
-| `lg` (112–128 px) | Cabeçalho do perfil | Animada (se permitido) | Animado |
-| `md` (40 px) | Card de post, Explore | Estática; anima no hover ou quando o card está em foco | Animado |
-| `sm` (28–32 px) | Respostas, notificações, carrosséis | Estática; anima no hover | Estático (gradiente parado) |
-| `xs` (≤ 24 px) | Sidebar, menções, listas densas | Só o anel de cor, sem ornamentos | Cor de fallback |
-
-Animações fora da tela pausam com `IntersectionObserver` (`animation-play-state: paused`).
-
-**Pontos de integração**
 
 | Local | Arquivo | Mudança |
 |---|---|---|
-| Cabeçalho do perfil | `src/components/feed/ProfileHeader.tsx` | `UserIdentity size="lg"` + botão Personalizar + `<ProfileIntro>` |
-| Página do perfil | `src/app/u/[username]/page.tsx` | Monta `<ProfileIntro>` na primeira renderização |
-| Cabeçalho do post | `src/components/feed/PostCard.tsx` | Avatar/nome do autor → `UserIdentity size="md"` |
-| Respostas (árvore) | `src/components/replies/ReplyThread.tsx` | `UserIdentity size="sm"` (requer perfil do autor, ver abaixo) |
-| Carrossel de respostas | `src/components/replies/ReplyCarousel.tsx` | `UserIdentity size="sm"` |
-| Composer de resposta | `src/components/replies/ReplyComposer.tsx` | Avatar do usuário logado com moldura |
-| Notificações | `src/app/notificacoes/page.tsx` | Ator → `UserIdentity size="sm"` (o join `actor` já existe; incluir `cosmetics, contributor_level`) |
-| Explore / membros | `src/app/page.tsx` (carrossel e aba Membros) | `UserIdentity size="md"` |
-| Barra lateral | `src/components/layout/LeftSidebar.tsx` | Usuário logado `size="xs"` |
-| Cartão de compartilhamento | `src/components/feed/SharePostModal.tsx` | Moldura estática no card exportado |
+| **Perfil** | `components/feed/ProfileHeader.tsx` | `UserIdentity size="lg"`; **botão "Personalizar" ao lado de "Seguir"** (no próprio perfil, ocupa o lugar do Seguir; em perfis alheios, o chip "Moldura X · Coleção" leva à galeria); atalho "Editar moldura" visível no toque; alcunha via `CosmeticNickname` |
+| **Abertura de perfil** | `app/u/[username]/page.tsx` | `<ProfileIntro>` → `IntroPlayer` |
+| **Posts** | `components/feed/PostCard.tsx` | autor com `UserIdentity size="md"` (já usa `CosmeticAvatar`/`CosmeticName`/`CosmeticTag`) |
+| **Respostas e threads** | `components/replies/ReplyThread.tsx`, `ReplyCarousel.tsx`, `ReplyComposer.tsx`, `app/post/[id]/page.tsx` | `UserIdentity size="sm"` (o mapa `authorProfiles` já existe) |
+| **Notificações** | `app/notificacoes/page.tsx` | incluir `cosmetics, contributor_level` no join `actor`; `UserIdentity size="sm"` |
+| **Explore / membros** | `app/page.tsx` (carrossel "Membros da comunidade" e aba Membros) | `UserIdentity size="md"` |
+| **Tópicos** | `components/feed/TopicTabsManager.tsx` | o spinner passa a usar `InsightAsterisk` (Rainbow); o cabeçalho do workspace mostra o dono com `UserIdentity size="xs"` |
+| **Barra lateral** | `components/layout/LeftSidebar.tsx` | `InsightLogo`; item "Insight Nitro" **só em Preview** (Δ some o item com cadeado em produção); usuário logado `size="xs"` |
+| **Topo mobile** | `components/layout/AppShell.tsx` | `InsightLogo`; atalho Nitro no menu do topo (Preview) |
+| **Navegação mobile** | `components/layout/MobileBottomNav.tsx` | sem item novo; acesso pelo perfil e por Configurações |
+| **Configurações** | `app/config/page.tsx` → aba **Perfil & Nitro** | status da assinatura (+ "Ativar teste" no Preview), itens equipados e todos os toggles da 3.4 (inclui **Rainbow**) |
+| **Loaders** | `app/loading.tsx`, `app/page.tsx`, `app/login/page.tsx`, `app/post/[id]/page.tsx`, `app/u/[username]/page.tsx`, `ui/AsteriskLoader.tsx` | trocar cópias por `InsightAsterisk` |
 
-**Respostas precisam do perfil atual.** Hoje `replies` guarda `author_name` e `avatar_url` copiados no momento da criação. Para mostrar cosméticos (e refletir troca de avatar), a página `/post/[id]` deve buscar os perfis dos autores numa consulta só:
+**Política de animação por tamanho**
 
-```ts
-const ids = [...new Set(replies.map((r) => r.profile_id).filter(Boolean))];
-const { data } = await supabase
-  .from('profiles')
-  .select('id, username, display_name, full_name, avatar_url, contributor_level, cosmetics')
-  .in('id', ids);
-```
-
-e passar um `profilesById` ao `ReplyThread`. Os campos copiados continuam como fallback para respostas de perfis excluídos.
-
-**Sincronização reativa.** `useCosmetics()` assina o Realtime em `profiles` filtrando pelo `id` do usuário logado. Ao salvar em qualquer aba ou dispositivo, o snapshot novo chega e atualiza o próprio avatar na sidebar, composer e perfil sem recarregar. Para perfis de terceiros, o snapshot vem junto com os dados já carregados por cada tela; não há assinatura por usuário exibido.
-
-### 4.6 Animação de abertura (`<ProfileIntro>`)
-
-1. Monta no `u/[username]` depois que o perfil carrega.
-2. Escolhe a animação: patente (níveis 4/5, `levelAnimation !== false`) **ou** a do Nitro (`intro` válida); senão, não faz nada.
-3. Aborta se: Nitro desligado, visitante desligou aberturas, `prefers-reduced-motion`/`data-reduce-motion`, ou `sessionStorage['nitro-intro-<profileId>']` existe.
-4. Renderiza a camada fixa (`pointer-events: none` exceto para o clique de pular), grava a chave na sessão e se desmonta no `animationend` ou após `durationMs + 200 ms`.
-5. O dono vê a própria abertura na primeira visita da sessão, para conferir o efeito; o botão "Testar" do editor reproduz de novo quando quiser.
-
-### 4.7 Acessibilidade
-
-- Toda animação respeita `prefers-reduced-motion` e a preferência "Reduzir movimento" já existente.
-- Nenhuma animação pisca mais que 3 vezes por segundo (o *glitch* do Cromo Cyberpunk e o *flash* das Linhas de Ação ficam abaixo desse limite).
-- Molduras são decorativas (`aria-hidden`); o `alt` do avatar continua sendo o nome.
-- Títulos com gradiente mantêm contraste ≥ 4.5:1 na cor de fallback em todos os temas (`light`, `dark`, `night`, `oled`).
+| Tamanho | Onde | Moldura | Título/alcunha |
+|---|---|---|---|
+| `lg` (112–128 px) | perfil, central de personalização | animada | animado |
+| `md` (40 px) | posts, Explore | animada quando na tela (orçamento de 4) | animado |
+| `sm` (28–36 px) | respostas, notificações, carrosséis | animada quando na tela (orçamento) ou estática em aparelho fraco | estático |
+| `xs` (≤ 24 px) | barra lateral, menções | só o anel, sem ornamentos | cor sólida |
 
 ---
 
-## 5. Plano de entrega
+## 5. Plano de entrega e QA
 
-| Fase | Entrega | Critério de pronto |
+| Fase | Entrega | Pronto quando |
 |---|---|---|
-| **0 — Base** | `flags.ts`, migração SQL num Supabase Branch, variáveis de Preview na Vercel | `/nitro` responde 404 num deploy de produção e 200 num Preview |
-| **1 — Renderizadores** | `CosmeticAvatar`, `CosmeticName`, `CosmeticTag`, `effects/*.css`, `catalog.ts` com os 48 itens (versão CSS/SVG) | Página interna de QA renderiza todos os itens nos 4 tamanhos, com e sem animação |
-| **2 — Galeria e edição** | `/nitro`, `NitroCustomizeSheet`, botão no `ProfileHeader`, aba "Perfil & Nitro", RPC de equipar | Testador equipa, troca e remove itens; toggles persistem e sincronizam entre abas |
-| **3 — Assets R2** | Overlays WebP das molduras/aberturas marcadas como `r2`, script de upload | Com R2 bloqueado no DevTools, as molduras continuam aparecendo (fallback CSS) |
-| **4 — Propagação** | `UserIdentity` em todos os pontos da tabela 4.5; perfis dos autores nas respostas | Moldura e tag visíveis em feed, post, respostas, notificações, Explore e sidebar; Lighthouse do feed sem regressão > 5 pontos |
-| **5 — Lançamento** | Cobrança recorrente (Mercado Pago, mesmo provedor do Pix atual), remoção da allowlist `nitro_testers`, remoção da checagem `VERCEL_ENV` | PR de lançamento revisado; flag definida no target Production |
+| **0 — Gate** | `flags.ts`, `nitro/layout.tsx`, `NitroProvider.enabled`; variáveis no target Preview | produção: `/nitro` dá 404 e nada do Nitro aparece (nem para o admin); Preview: tudo aparece |
+| **1 — Marca** | `InsightAsterisk` + `InsightLogo`, substituindo as 7 cópias; Rainbow com toggle | todos os spinners e logos idênticos ao atual sem Nitro; rainbow com Nitro |
+| **2 — Banco** | migração v2, seed gerado de `catalog.ts`, `set_profile_cosmetics`, `start_nitro_trial`, migração v1 → v2 | RPC recusa item `nitro` sem assinatura e `level` acima do nível, mesmo chamado direto |
+| **3 — Central mobile** | `CustomizeSheet`, `ItemTile`, prévia bloqueada, botão ao lado de Seguir, aba de configurações | fluxo inteiro testado em 360×740 com toque, sem overflow horizontal |
+| **4 — Itens** | 10 + 10 + 10 + 10 itens Nitro, padrões, patentes, `IntroPlayer`, assets R2 | página interna de QA mostra cada item em 4 tamanhos e com movimento reduzido |
+| **5 — Propagação** | `UserIdentity` em todos os pontos da tabela 4.3; orçamento de animação | feed com 30 posts animados a ≥ 55 fps num Android intermediário |
+| **6 — Lançamento** | cobrança (Mercado Pago preapproval), remoção do gate de Preview | decisão explícita de lançar; flag no target Production |
 
-**Assinatura durante o Preview:** sem cobrança. A staff concede acesso inserindo linhas em `nitro_subscriptions` com `provider = 'manual'` (e em `nitro_testers`), e pode testar expiração ajustando `current_period_end`.
+### Checklist de QA
 
-### Checklist de QA (Preview)
-
-- [ ] Deploy de produção: `/nitro`, `/nitro/infernal` e `/api/nitro/equip` retornam 404; nenhum botão/aba/chip do Nitro aparece.
-- [ ] Deploy de produção com dados de Nitro no banco: avatares e nomes aparecem sem moldura/título.
-- [ ] Usuário fora de `nitro_testers` recebe `nitro_preview_only` ao tentar equipar.
-- [ ] Usuário sem assinatura não consegue equipar item `nitro` mesmo chamando a RPC diretamente.
-- [ ] `update profiles set cosmetics = ...` feito pelo próprio usuário é ignorado pelo trigger.
-- [ ] Assinatura expirada: itens `nitro` somem da UI imediatamente e do banco após o job diário; molduras de patente permanecem.
-- [ ] Nível 3 não vê o toggle de animação de patente habilitado; nível 4 vê e ele funciona.
-- [ ] "Reduzir movimento" ligado: nenhuma moldura anima, nenhuma abertura toca.
-- [ ] Abertura toca uma vez por sessão por perfil e pode ser pulada com clique ou tecla.
-- [ ] Trocar a moldura numa aba atualiza a sidebar em outra aba aberta (Realtime).
+- [ ] **Produção:** sem item, botão, aba, chip, banner ou rota do Nitro; avatares, nomes, logo e asteriscos idênticos ao padrão, mesmo para perfis com `cosmetics` no banco.
+- [ ] **Preview, deslogado:** galeria visível com prévias; nada pode ser aplicado.
+- [ ] **Preview, nível 0 sem Nitro:** aplica só itens padrão e `frame-tier-0`; itens Nitro e de nível acima mostram cadeado e CTA.
+- [ ] **Preview, nível 3 sem Nitro:** aplica padrões e itens de nível 0–3; toggle "Animação de patente" aparece desabilitado.
+- [ ] **Preview, nível 4/5:** moldura de patente animada e abertura exclusiva; toggle desliga as duas.
+- [ ] **Assinante:** aplica os 40 itens Nitro; Rainbow aparece na logo e em todos os spinners e some com o toggle.
+- [ ] **Assinatura expirada:** itens Nitro e Rainbow somem na hora; itens de nível ficam.
+- [ ] **RPC direto:** `set_profile_cosmetics` com item bloqueado é recusado.
+- [ ] **Mobile 360 px:** sheet sem overflow horizontal; alvos ≥ 44 px; nenhuma ação depende de hover; "Editar moldura" visível.
+- [ ] **Movimento reduzido:** nenhuma animação, nenhuma abertura, Rainbow estático.
+- [ ] **Desempenho:** no máximo 4 molduras animando no feed; animações pausam fora da tela; nenhuma animação de `filter` ou `box-shadow`.

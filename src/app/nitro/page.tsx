@@ -99,10 +99,10 @@ function NitroGallery() {
 
   const dirty = useMemo(() => {
     const keys: (keyof NitroCosmetics)[] = [
-      'frame', 'title', 'tag', 'intro', 'frameEnabled', 'frameAnimated', 'introEnabled', 'levelAnimation',
+      'frame', 'title', 'tag', 'intro', 'frameEnabled', 'frameAnimated', 'introEnabled', 'levelAnimation', 'rainbow',
     ];
     const norm = (v: unknown, k: keyof NitroCosmetics) =>
-      v === undefined || v === null ? (k.endsWith('Enabled') || k.endsWith('Animated') || k === 'levelAnimation' ? true : null) : v;
+      v === undefined || v === null ? (k.endsWith('Enabled') || k.endsWith('Animated') || k === 'levelAnimation' || k === 'rainbow' ? true : null) : v;
     return keys.some((k) => norm(draft[k], k) !== norm(savedCosmetics[k], k));
   }, [draft, savedCosmetics]);
 

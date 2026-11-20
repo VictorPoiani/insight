@@ -358,5 +358,7 @@ export interface NitroCosmetics {
   frameAnimated?: boolean;
   introEnabled?: boolean;
   levelAnimation?: boolean;
+  /** Rainbow na logo e nos asteriscos de carregamento (benefício Nitro). */
+  rainbow?: boolean;
   updatedAt?: string;
 }

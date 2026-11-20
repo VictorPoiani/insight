@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
 import {
   CustomTopic,
@@ -70,33 +71,11 @@ function TopicAsteriskSpinner({
   size?: 'xs' | 'md';
   color?: string;
 }) {
-  const armAngles = [0, 45, 90, 135];
 
   if (size === 'xs') {
     return (
       <span className="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0">
-        <svg
-          viewBox="0 0 200 200"
-          className="w-full h-full animate-spin"
-          style={{ color: color || '#3898ec', animationDuration: '1.1s' }}
-        >
-          <g transform="translate(100, 100)">
-            {armAngles.map((angle) => (
-              <rect
-                key={angle}
-                x="-18"
-                y="-86"
-                width="36"
-                height="172"
-                rx="7"
-                ry="7"
-                transform={`rotate(${angle})`}
-                fill="currentColor"
-              />
-            ))}
-            <circle r="28" fill="currentColor" />
-          </g>
-        </svg>
+        <InsightAsterisk fill="solid" className="w-full h-full animate-spin" style={{ color: color || '#3898ec', animationDuration: '1.1s' }} />
       </span>
     );
   }
@@ -104,24 +83,7 @@ function TopicAsteriskSpinner({
   return (
     <div className="w-full py-10 flex flex-col items-center justify-center gap-2.5 select-none">
       <div className="w-8 h-8 animate-spin" style={{ animationDuration: '1.35s' }}>
-        <svg viewBox="0 0 200 200" className="w-full h-full">
-          <g transform="translate(100, 100)">
-            {armAngles.map((angle) => (
-              <rect
-                key={angle}
-                x="-17"
-                y="-86"
-                width="34"
-                height="172"
-                rx="6"
-                ry="6"
-                transform={`rotate(${angle})`}
-                fill={color || '#3898ec'}
-              />
-            ))}
-            <circle r="26" fill={color || '#3898ec'} />
-          </g>
-        </svg>
+        <InsightAsterisk fill="solid" color={color || '#3898ec'} className="w-full h-full" />
       </div>
     </div>
   );

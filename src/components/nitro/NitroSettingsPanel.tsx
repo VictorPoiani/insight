@@ -136,6 +136,20 @@ export function NitroSettingsPanel({ value, onChange, level, showEquipped, disab
       </section>
 
       <section>
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted">Benefícios Nitro</h3>
+        <p className="text-[11px] text-muted mb-1">Só para você.</p>
+        <div className="divide-y divide-border">
+          <ToggleRow
+            label="Rainbow na logo e nos carregamentos"
+            hint="Logo Insight* e asteriscos de carregamento com espectro animado."
+            checked={value.rainbow !== false}
+            disabled={disabled}
+            onChange={(v) => set({ rainbow: v })}
+          />
+        </div>
+      </section>
+
+      <section>
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted">Ao visitar outros perfis</h3>
         <p className="text-[11px] text-muted mb-1">Só neste dispositivo.</p>
         <div className="divide-y divide-border">

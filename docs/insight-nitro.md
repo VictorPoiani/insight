@@ -1,10 +1,17 @@
 # Insight Nitro — Especificação v2
 
-> **Status:** proposta v2 · **Lançamento:** somente **Preview** na Vercel · **Mobile-first**
+> **Status:** v2 em implementação · **Acesso:** beta fechada em produção (vitrine para todos, uso só admin) · **Mobile-first**
 > **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind · Supabase · Cloudflare R2
 >
 > A v1 (beta fechada só para admin, hoje em produção) está descrita no histórico do git deste arquivo.
 > Esta v2 **substitui** aquele modelo. O que já existe no código é reaproveitado; o que muda está marcado com **Δ**.
+
+> **Decisão de 20/11/2026 — modelo de acesso enquanto não há lançamento:**
+> - **Todos** veem que o Nitro existe: item "Insight Nitro" com cadeado na barra lateral (desktop) e no menu do topo (celular), e a página `/nitro` mostra "Em breve".
+> - **Ninguém além do admin** acessa a galeria, os detalhes ou aplica itens; cosméticos só aparecem para quem tem acesso.
+> - O gate de **Preview** da §1 fica como opção para quando houver testadores externos; não está ativo.
+>
+> **Já entregue da v2:** asterisco e logo unificados (`components/brand/`), **Rainbow** com toggle (§3.3), molduras animando "na tela" com orçamento de 4 em vez de hover, remoção de `filter` animado, atalho "Editar moldura" visível no toque, item do Nitro no menu mobile.
 
 ---
 

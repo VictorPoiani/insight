@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { ProfileHeader } from '@/components/feed/ProfileHeader';
 import { ProfileIntro } from '@/components/nitro/ProfileIntro';
+import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
   TopicTabsManager,
   DEFAULT_TABS,
@@ -44,7 +45,6 @@ function ProfileAsteriskLoader({
 }) {
   const sizeMap = { sm: 24, md: 38, lg: 52 };
   const px = sizeMap[size];
-  const armAngles = [0, 45, 90, 135];
 
   return (
     <div
@@ -84,26 +84,7 @@ function ProfileAsteriskLoader({
           }}
           className="relative z-10 drop-shadow-[0_6px_16px_rgba(37,99,235,0.32)]"
         >
-          <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
-            <g transform="translate(100, 100)">
-              {armAngles.map((angle) => (
-                <rect
-                  key={angle}
-                  x="-17"
-                  y="-86"
-                  width="34"
-                  height="172"
-                  rx="6"
-                  ry="6"
-                  transform={`rotate(${angle})`}
-                  fill={color}
-                  stroke="#93c5fd"
-                  strokeWidth="1.2"
-                />
-              ))}
-              <circle r="26" fill={color} />
-            </g>
-          </svg>
+          <InsightAsterisk fill="solid" color={color} stroke="#93c5fd" className="w-full h-full" />
         </div>
       </div>
 

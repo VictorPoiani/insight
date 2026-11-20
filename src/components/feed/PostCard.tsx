@@ -554,7 +554,7 @@ export function PostCard({
               <span className="text-xs text-muted truncate">
                 @{author.username || 'insight'}
               </span>
-              <CosmeticTag profile={author} className="shrink-0" />
+              <CosmeticTag profile={author} className="hidden sm:inline-flex shrink-0" />
             </div>
             <time className="text-[11px] sm:text-xs text-muted block">
               {formattedDate}

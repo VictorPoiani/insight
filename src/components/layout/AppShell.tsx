@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { InsightLogo } from '@/components/brand/InsightLogo';
 import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
+import { NitroMenuItem } from '@/components/nitro/NitroMenuItem';
 import { Menu, X, Heart, Info, FileText, Shield } from 'lucide-react';
 
 const FULLSCREEN_ROUTES = ['/login'];
@@ -49,9 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
         <Link href="/" className="inline-flex items-center">
-          <span className="text-xl font-extrabold tracking-tight text-primary">
-            Insight<span className="text-accent">*</span>
-          </span>
+          <InsightLogo className="text-xl" />
         </Link>
 
         <div ref={menuRef} className="relative">
@@ -66,6 +66,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {menuOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-surface/95 backdrop-blur-xl border border-border shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <NitroMenuItem onNavigate={() => setMenuOpen(false)} />
+              <div className="my-1 border-t border-border/70" />
               <Link
                 href="/apoie"
                 className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors"

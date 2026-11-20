@@ -1,6 +1,7 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { observeFrame } from './inViewBudget';
 import {
   Cpu,
   Crown,
@@ -70,7 +71,8 @@ export function CosmeticAvatar({ profile, size, children, className = '', live, 
     cosmetics?.frameAnimated !== false &&
     (!isTier || cosmetics?.levelAnimation !== false);
   const isLive = live ?? size >= 64;
-  const mode = !animated ? 'nx-static' : isLive ? 'nx-live' : prefs.animateLists ? 'nx-hover' : 'nx-static';
+  // nx-auto: anima quando está na tela (orçamento) ou no hover do desktop
+  const mode = !animated ? 'nx-static' : isLive ? 'nx-live' : prefs.animateLists ? 'nx-auto' : 'nx-static';
 
   return (
     <FrameShell frame={frame} size={size} mode={mode} className={className}>
@@ -88,7 +90,7 @@ function FrameShell({
 }: {
   frame: FrameItem;
   size: number;
-  mode: 'nx-static' | 'nx-live' | 'nx-hover';
+  mode: 'nx-static' | 'nx-live' | 'nx-auto';
   className: string;
   children: ReactNode;
 }) {
@@ -100,9 +102,15 @@ function FrameShell({
     '--nx-glowc': frame.glow || 'transparent',
   };
   const animatedOrnament = mode === 'nx-live';
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (mode !== 'nx-auto' || !ref.current) return;
+    return observeFrame(ref.current);
+  }, [mode]);
 
   return (
-    <span className={`nx-frame ${mode} ${className}`} style={style}>
+    <span ref={ref} className={`nx-frame ${mode} ${className}`} style={style}>
       {frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
       <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />
       {children}
@@ -435,7 +443,7 @@ export function FramePreview({
 }) {
   const frame = getNitroItem(frameId, 'frame');
   if (!frame) return <>{children}</>;
-  const mode = frame.alwaysStatic ? 'nx-static' : live ? 'nx-live' : 'nx-hover';
+  const mode = frame.alwaysStatic ? 'nx-static' : live ? 'nx-live' : 'nx-auto';
   return (
     <FrameShell frame={frame} size={size} mode={mode} className="">
       {children}

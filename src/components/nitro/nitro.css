@@ -112,7 +112,7 @@
   animation: nx-twinkle 2.2s ease-in-out var(--d) infinite;
 }
 
-/* Modos: live = sempre animando; hover = só ao passar o mouse; static = parado */
+/* Modos: live = sempre animando; auto = na tela/hover; static = parado */
 .nx-frame .nx-anim,
 .nx-frame .nx-svg-spin,
 .nx-frame .nx-dash,
@@ -121,18 +121,20 @@
   animation-play-state: paused;
 }
 
-.nx-frame.nx-live .nx-anim,
-.nx-frame.nx-live .nx-svg-spin,
-.nx-frame.nx-live .nx-dash,
-.nx-frame.nx-live .nx-blink,
-.nx-frame.nx-live .nx-pulse-svg,
-.nx-frame.nx-hover:hover .nx-anim {
+/* live = sempre (perfil); nx-on = na tela, dentro do orçamento (toque);
+   hover = desktop */
+.nx-frame:is(.nx-live, .nx-on) :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg),
+.nx-frame.nx-auto:hover :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg) {
   animation-play-state: running;
 }
 
-.nx-frame.nx-live .nx-particles,
-.nx-frame.nx-hover:hover .nx-particles {
+.nx-frame:is(.nx-live, .nx-on) .nx-particles,
+.nx-frame.nx-auto:hover .nx-particles {
   display: block;
+}
+
+.nx-frame {
+  contain: layout;
 }
 
 .nx-frame.nx-static .nx-anim {
@@ -202,6 +204,7 @@
 
 .nx-title--pulse {
   animation: nx-flow 5s linear infinite, nx-tglow 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 0.35em var(--nx-tglow));
 }
 
 .nx-title--glitch {
@@ -419,14 +422,14 @@ html[data-reduce-motion='true'] .nx-intro {
 /* -------------------------------------------------------------- KEYFRAMES */
 
 @keyframes nx-spin { to { transform: rotate(360deg); } }
-@keyframes nx-bright { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.45) saturate(1.2); } }
+@keyframes nx-bright { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
 @keyframes nx-flicker {
-  0%, 100% { filter: brightness(1); }
-  12% { filter: brightness(1.35); }
-  27% { filter: brightness(0.85); }
-  41% { filter: brightness(1.25) hue-rotate(-8deg); }
-  63% { filter: brightness(0.95); }
-  82% { filter: brightness(1.4); }
+  0%, 100% { opacity: 1; }
+  12% { opacity: 0.86; }
+  27% { opacity: 0.7; }
+  41% { opacity: 0.95; }
+  63% { opacity: 0.78; }
+  82% { opacity: 1; }
 }
 @keyframes nx-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @keyframes nx-pfall {
@@ -449,14 +452,14 @@ html[data-reduce-motion='true'] .nx-intro {
   55%, 100% { background-position: -60% 0, 0 0; }
 }
 @keyframes nx-tglow {
-  0%, 100% { filter: drop-shadow(0 0 0.15em var(--nx-tglow)); }
-  50% { filter: drop-shadow(0 0 0.55em var(--nx-tglow)); }
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
 }
 @keyframes nx-glitch {
-  0%, 92%, 100% { transform: none; filter: none; }
-  93% { transform: translateX(1px) skewX(-6deg); filter: drop-shadow(2px 0 #f0f) drop-shadow(-2px 0 #0ff); }
-  95% { transform: translateX(-2px); filter: drop-shadow(-2px 0 #f0f) drop-shadow(2px 0 #0ff); }
-  97% { transform: translateX(1px) skewX(4deg); filter: none; }
+  0%, 92%, 100% { transform: none; opacity: 1; }
+  93% { transform: translateX(1px) skewX(-6deg); opacity: 0.85; }
+  95% { transform: translateX(-2px); opacity: 1; }
+  97% { transform: translateX(1px) skewX(4deg); }
 }
 @keyframes nx-petal {
   0%, 80%, 100% { transform: translateY(0) rotate(0deg); opacity: 1; }
@@ -501,10 +504,10 @@ html[data-reduce-motion='true'] .nx-intro {
   100% { opacity: 0; transform: scale(1) rotate(4deg); }
 }
 @keyframes nx-glitchfx {
-  0% { opacity: 1; transform: translateX(0); filter: hue-rotate(0deg); }
-  25% { transform: translateX(-8px); filter: hue-rotate(90deg); }
-  50% { transform: translateX(6px); }
-  75% { transform: translateX(-3px); filter: hue-rotate(-90deg); }
+  0% { opacity: 1; transform: translateX(0); }
+  25% { transform: translateX(-8px); opacity: 0.8; }
+  50% { transform: translateX(6px); opacity: 1; }
+  75% { transform: translateX(-3px); opacity: 0.85; }
   100% { opacity: 0; transform: none; }
 }
 @keyframes nx-ifall {

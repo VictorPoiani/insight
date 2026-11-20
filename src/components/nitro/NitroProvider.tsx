@@ -61,10 +61,15 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PREFS_KEY);
-      if (raw) setPrefsState({ ...DEFAULT_PREFS, ...JSON.parse(raw) });
+      if (raw) {
+        setPrefsState({ ...DEFAULT_PREFS, ...JSON.parse(raw) });
+        return;
+      }
     } catch {
       // armazenamento indisponível: usa o padrão
     }
+    // Sem preferência salva: aparelho fraco ou economia de dados começa sem animar listas
+    if (isLowPowerDevice()) setPrefsState({ ...DEFAULT_PREFS, animateLists: false });
   }, []);
 
   const setPrefs = useCallback((next: NitroViewerPrefs) => {
@@ -115,6 +120,17 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
 
   const hasAccess = !NITRO_KILL_SWITCH && viewer?.role === 'admin';
 
+  // Rainbow (benefício Nitro): logo e asteriscos de carregamento em espectro.
+  // Na beta fechada, o "assinante" é quem tem acesso (admin).
+  const ownCosmetics = viewer ? (viewer.id in overrides ? overrides[viewer.id] : viewer.cosmetics) : null;
+  const rainbowOn = hasAccess && ownCosmetics?.rainbow !== false;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (rainbowOn) root.setAttribute('data-nitro-rainbow', 'on');
+    else root.removeAttribute('data-nitro-rainbow');
+  }, [rainbowOn]);
+
   const saveCosmetics = useCallback(
     async (next: NitroCosmetics) => {
       if (!viewer || !hasAccess) return { ok: false, error: 'Acesso restrito.' };
@@ -127,6 +143,7 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
         frameAnimated: next.frameAnimated ?? true,
         introEnabled: next.introEnabled ?? true,
         levelAnimation: next.levelAnimation ?? true,
+        rainbow: next.rainbow ?? true,
       };
       const { data, error } = await supabase.rpc('set_my_cosmetics', { p_cosmetics: payload });
       if (error) return { ok: false, error: error.message };
@@ -161,6 +178,20 @@ export function useProfileCosmetics(
   if (!hasAccess || !profile) return null;
   if (profile.id in overrides) return overrides[profile.id];
   return profile.cosmetics || null;
+}
+
+/** Aparelho com poucos núcleos/memória ou modo de economia de dados. */
+export function isLowPowerDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean };
+  };
+  return (
+    (nav.hardwareConcurrency ?? 8) <= 2 ||
+    (nav.deviceMemory ?? 8) <= 2 ||
+    Boolean(nav.connection?.saveData)
+  );
 }
 
 /** true quando o usuário pediu menos movimento (SO ou preferência do Insight). */

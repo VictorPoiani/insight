@@ -1305,7 +1305,7 @@ export function ProfileHeader({
                 href="/nitro?tab=frame"
                 title="Editar moldura"
                 aria-label="Editar moldura"
-                className="absolute -bottom-1 -left-1 z-10 w-8 h-8 rounded-full bg-background border border-border text-accent flex items-center justify-center shadow-md opacity-0 group-hover/frame:opacity-100 focus:opacity-100 transition-opacity"
+                className="absolute -bottom-1 -left-1 z-10 w-8 h-8 rounded-full bg-background border border-border text-accent flex items-center justify-center shadow-md opacity-0 group-hover/frame:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
               >
                 <Palette className="w-3.5 h-3.5" />
               </Link>

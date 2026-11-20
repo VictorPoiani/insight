@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { InsightLogo } from '@/components/brand/InsightLogo';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -302,9 +303,7 @@ export function LeftSidebar() {
         >
           {!isCollapsed && (
             <Link href="/" className="inline-flex items-center truncate">
-              <span className="text-2xl font-extrabold tracking-tight text-primary">
-                Insight<span className="text-accent">*</span>
-              </span>
+              <InsightLogo className="text-2xl" />
             </Link>
           )}
 

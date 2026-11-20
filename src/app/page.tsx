@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { PostComposer } from '@/components/feed/PostComposer';
+import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
   Search,
   Users,
@@ -37,7 +38,6 @@ function AsteriskLoader({
 }) {
   const sizeMap = { xs: 14, sm: 22, md: 38, lg: 52 };
   const px = sizeMap[size];
-  const armAngles = [0, 45, 90, 135];
 
   if (size === 'xs') {
     return (
@@ -45,28 +45,7 @@ function AsteriskLoader({
         style={{ width: px, height: px }}
         className="inline-flex items-center justify-center shrink-0"
       >
-        <svg
-          viewBox="0 0 200 200"
-          className="w-full h-full animate-spin text-accent"
-          style={{ animationDuration: '1.15s' }}
-        >
-          <g transform="translate(100, 100)">
-            {armAngles.map((angle) => (
-              <rect
-                key={angle}
-                x="-18"
-                y="-86"
-                width="36"
-                height="172"
-                rx="7"
-                ry="7"
-                transform={`rotate(${angle})`}
-                fill="currentColor"
-              />
-            ))}
-            <circle r="28" fill="currentColor" />
-          </g>
-        </svg>
+        <InsightAsterisk fill="solid" className="w-full h-full animate-spin text-accent" style={{ animationDuration: '1.15s' }} />
       </span>
     );
   }
@@ -105,33 +84,7 @@ function AsteriskLoader({
           }}
           className="relative z-10 drop-shadow-[0_6px_16px_rgba(37,99,235,0.35)]"
         >
-          <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
-            <defs>
-              <linearGradient id="homeAsteriskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#60a5fa" />
-                <stop offset="50%" stopColor="#3898ec" />
-                <stop offset="100%" stopColor="#2563eb" />
-              </linearGradient>
-            </defs>
-            <g transform="translate(100, 100)">
-              {armAngles.map((angle) => (
-                <rect
-                  key={angle}
-                  x="-17"
-                  y="-86"
-                  width="34"
-                  height="172"
-                  rx="6"
-                  ry="6"
-                  transform={`rotate(${angle})`}
-                  fill="url(#homeAsteriskGrad)"
-                  stroke="#93c5fd"
-                  strokeWidth="1.5"
-                />
-              ))}
-              <circle r="26" fill="url(#homeAsteriskGrad)" />
-            </g>
-          </svg>
+          <InsightAsterisk fill="gradient" stroke="#93c5fd" className="w-full h-full" />
         </div>
       </div>
 

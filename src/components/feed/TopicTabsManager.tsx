@@ -5,7 +5,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { useNitro } from '@/components/nitro/NitroProvider';
-import { hasContributorFeature } from '@/lib/contributorLevels';
+import { getTopicLimit } from '@/lib/contributorLevels';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
 import {
   CustomTopic,
@@ -344,10 +344,15 @@ export function TopicTabsManager({
   const [customTopics, setCustomTopics] = useState<CustomTopic[]>([]);
   const [switchingTabId, setSwitchingTabId] = useState<string | null>(null);
   const [expandCreate, setExpandCreate] = useState(false);
-  // Criar tópico personalizado: benefício do Nível 3 (Cavaleiro); staff sempre pode.
+  // Tópicos personalizados: logado cria até 4; Nível 3+ até 8; staff sem limite (o banco confere).
   const { viewer } = useNitro();
-  const isStaff = viewer?.role === 'admin' || viewer?.role === 'moderator';
-  const canCreateTopics = isStaff || hasContributorFeature(viewer?.contributor_level ?? 0, 'create-topics');
+  const topicLimit = getTopicLimit(viewer?.contributor_level ?? 0, viewer?.role);
+  const ownTopicCount = customTopics.filter((t) => !t.profile_id || t.profile_id === viewer?.id).length;
+  const canCreateTopics = Boolean(viewer) && ownTopicCount < topicLimit;
+  const limitMessage =
+    topicLimit >= 8
+      ? `Você chegou ao limite de ${topicLimit} tópicos. Exclua um para criar outro.`
+      : `Você chegou ao limite de ${topicLimit} tópicos. Com o Nível 3 (Cavaleiro) você pode ter até 8 — veja em /apoie.`;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>('private');
@@ -689,7 +694,11 @@ export function TopicTabsManager({
     setSaving(false);
 
     if (error || !data) {
-      alert('Erro ao criar tópico: ' + (error?.message || 'Erro desconhecido'));
+      alert(
+        error?.message?.includes('topic_limit_reached')
+          ? limitMessage
+          : 'Erro ao criar tópico: ' + (error?.message || 'Erro desconhecido')
+      );
       return;
     }
 
@@ -842,13 +851,17 @@ export function TopicTabsManager({
               type="button"
               onClick={() => {
                 if (!canCreateTopics) {
-                  alert('Criar tópicos personalizados é um benefício do Nível 3 (Cavaleiro). Veja em /apoie.');
+                  alert(viewer ? limitMessage : 'Entre na sua conta para criar tópicos.');
                   return;
                 }
                 setSelectedTemplate(null);
                 setExpandCreate(true);
               }}
-              title={canCreateTopics ? 'Nova página ou workspace' : 'Disponível a partir do Nível 3 (Cavaleiro)'}
+              title={
+                canCreateTopics
+                  ? `Nova página ou workspace${Number.isFinite(topicLimit) ? ` (${ownTopicCount}/${topicLimit})` : ''}`
+                  : limitMessage
+              }
               aria-disabled={!canCreateTopics}
               className={`w-7 h-7 my-2 rounded-full border bg-elevated border-border flex items-center justify-center transition-colors shrink-0 ${
                 canCreateTopics

@@ -24,7 +24,7 @@ export type ContributorFeature =
   | 'ranking'
   | 'early-access'
   | 'create-communities'
-  | 'create-topics'
+  | 'extra-topics'
   | 'ai-features'
   | 'priority-support'
   | 'ai-extra-credits'
@@ -77,6 +77,7 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
     unlocks: [],
     perks: [
       { label: 'Acesso padrão à comunidade Insight*' },
+      { label: 'Até 4 tópicos personalizados' },
       { label: 'Até 50 MB de anexos por post (após compressão)' },
     ],
   },
@@ -131,10 +132,10 @@ export const CONTRIBUTOR_TIERS: ContributorTier[] = [
     glowRgba: 'rgba(234, 179, 8, 0.34)',
     effect: 'gold',
     postUploadLimitBytes: 2 * GB,
-    unlocks: ['ai-features', 'create-topics'],
+    unlocks: ['ai-features', 'extra-topics'],
     perks: [
       { label: 'Até 2 GB de anexos por post (após compressão)' },
-      { label: 'Criação de tópicos personalizados' },
+      { label: 'Até 8 tópicos personalizados (o padrão é 4)' },
       { label: 'Recursos de IA', soon: true },
       { label: 'Moldura de patente ouro escovado e tag Cavaleiro' },
     ],
@@ -231,6 +232,12 @@ export function getUserUploadLimitBytes(
 ): number {
   if (role === 'admin') return CONTRIBUTOR_TIERS[CONTRIBUTOR_TIERS.length - 1].postUploadLimitBytes;
   return getTierByLevel(level).postUploadLimitBytes;
+}
+
+/** Quantos tópicos personalizados a pessoa pode ter (igual a public.topic_limit). */
+export function getTopicLimit(level: number | null | undefined, role?: string | null): number {
+  if (role === 'admin' || role === 'moderator') return Number.POSITIVE_INFINITY;
+  return getTierByLevel(level).level >= 3 ? 8 : 4;
 }
 
 export function formatBytes(bytes?: number | null): string {

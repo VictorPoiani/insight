@@ -151,7 +151,14 @@ export type IntroSceneId =
   | 'tsunami'
   | 'portal'
   | 'anime-cut'
-  | 'hyperspace';
+  | 'hyperspace'
+  | 'blizzard'
+  | 'gift'
+  | 'decree'
+  | 'star-shower'
+  | 'eclipse'
+  | 'fairy'
+  | 'glitch-boot';
 
 export type NitroItem = FrameItem | TitleItem | TagItem | IntroItem;
 
@@ -360,31 +367,31 @@ const FRAMES: FrameItem[] = [
 
 const INTROS: IntroItem[] = [
   { id: 'intro-blizzard', kind: 'intro', name: 'Nevasca', collection: 'natal', rarity: 'rara', requirement: NITRO,
-    description: 'Uma rajada de neve atravessa a tela.', durationMs: 1200,
+    description: 'Rajadas de neve em três planos e um cristal de gelo que cresce e se estilhaça.', durationMs: 2200, scene: 'blizzard',
     reveal: { kind: 'curtain', colors: ['rgba(224,242,254,0.95)', 'rgba(125,211,252,0.85)'] },
     particles: { glyph: '❄', mode: 'fall', count: 28, colors: ['#ffffff', '#e0f2fe', '#bae6fd'] } },
   { id: 'intro-gift-unwrap', kind: 'intro', name: 'Presente Aberto', collection: 'natal', rarity: 'épica', requirement: NITRO,
-    description: 'A fita se desfaz e revela o perfil.', durationMs: 1100,
+    description: 'O presente cai, treme, a tampa voa e explode em confete.', durationMs: 2100, scene: 'gift',
     reveal: { kind: 'split', colors: ['#b91c1c', '#15803d'] }, particles: { glyph: '✦', mode: 'burst', count: 18, colors: ['#facc15', '#ffffff'] } },
   { id: 'intro-hell-portal', kind: 'intro', name: 'Portal Infernal', collection: 'infernal', rarity: 'lendária', requirement: NITRO,
     description: 'Brasas em espiral, núcleo incandescente e um anel de fogo que se abre.', durationMs: 2000, scene: 'portal',
     reveal: { kind: 'iris', colors: ['#1c0a00', '#7f1d1d', '#f97316'] }, particles: { glyph: '🔥', mode: 'burst', count: 14 } },
   { id: 'intro-imperial-decree', kind: 'intro', name: 'Decreto Imperial', collection: 'imperial', rarity: 'épica', requirement: NITRO,
-    description: 'O estandarte se recolhe deixando poeira dourada.', durationMs: 1200,
+    description: 'A coroa desce, o pergaminho se desenrola e o selo real bate.', durationMs: 2300, scene: 'decree',
     reveal: { kind: 'curtain', colors: ['#3b0764', '#581c87'] }, particles: { glyph: '✦', mode: 'fall', count: 22, colors: ['#facc15', '#fde68a'] } },
   { id: 'intro-star-shower', kind: 'intro', name: 'Chuva de Estrelas', collection: 'celestial', rarity: 'rara', requirement: NITRO,
-    description: 'Estrelas cadentes cruzam a capa.', durationMs: 1200,
+    description: 'Cometas riscam o céu e uma estrela cadente floresce em luz.', durationMs: 2100, scene: 'star-shower',
     particles: { glyph: '★', mode: 'cross', count: 12, colors: ['#fef9c3', '#ffffff', '#a5f3fc'] } },
   { id: 'intro-eclipse', kind: 'intro', name: 'Eclipse', collection: 'celestial', rarity: 'épica', requirement: NITRO,
-    description: 'A escuridão se fecha numa coroa de luz.', durationMs: 1200,
+    description: 'A lua cobre o sol, a coroa acende e o anel de diamante revela o perfil.', durationMs: 2300, scene: 'eclipse',
     reveal: { kind: 'circle', colors: ['#020617', '#0f172a'] }, fx: 'flash' },
   { id: 'intro-speedlines', kind: 'intro', name: 'Corte de Anime', collection: 'anime', rarity: 'épica', requirement: NITRO,
     description: 'Painéis diagonais, estouro com retícula e carimbo 見参.', durationMs: 1700, scene: 'anime-cut', fx: 'speedlines' },
   { id: 'intro-fairy-tale', kind: 'intro', name: 'Conto de Fadas', collection: 'princess', rarity: 'épica', requirement: NITRO,
-    description: 'Um rastro de brilho em espiral.', durationMs: 1200,
+    description: 'Uma fada traça uma espiral de brilho, o castelo surge e tudo floresce.', durationMs: 2300, scene: 'fairy',
     reveal: { kind: 'iris', colors: ['#fdf2f8', '#fbcfe8', '#e9d5ff'] }, particles: { glyph: '✧', mode: 'burst', count: 22, colors: ['#f472b6', '#c084fc', '#fde68a'] } },
   { id: 'intro-glitch-boot', kind: 'intro', name: 'Boot Glitch', collection: 'cyber', rarity: 'épica', requirement: NITRO,
-    description: 'A tela inicializa com scanlines e glitch RGB.', durationMs: 1000,
+    description: 'O CRT liga, o boot roda e o sinal estabiliza com aberração RGB.', durationMs: 1900, scene: 'glitch-boot',
     reveal: { kind: 'curtain', colors: ['#020617', '#0e7490'] }, fx: 'glitch' },
   { id: 'intro-hyperspace', kind: 'intro', name: 'Vórtice Cósmico', collection: 'cosmico', rarity: 'lendária', requirement: NITRO,
     description: 'Uma nebulosa gira em espiral até explodir em luz.', durationMs: 1900, scene: 'hyperspace',

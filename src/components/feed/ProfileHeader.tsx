@@ -695,14 +695,15 @@ export function ProfileHeader({
       return totalUserFollowers;
     }
 
-    const [{ count: emailCount }, { count: pushCount }] = await Promise.all([
-      supabase.from('subscribers').select('*', { count: 'exact', head: true }),
-      supabase
-        .from('push_subscriptions')
-        .select('*', { count: 'exact', head: true }),
-    ]);
+    // Perfil fundador: o banco soma follows + newsletter + push
+    // (recompute_followers_count). As listas de inscritos são privadas.
+    const { data: founderRow } = await supabase
+      .from('profiles')
+      .select('followers_count')
+      .eq('id', profile.id)
+      .maybeSingle();
 
-    const total = (emailCount || 0) + (pushCount || 0) + (directFollows || 0);
+    const total = Math.max(Number(founderRow?.followers_count) || 0, directFollows || 0);
     setFollowersCount(total);
     return total;
   }, [isFounderProfile, profile.id, supabase]);
@@ -1164,15 +1165,11 @@ export function ProfileHeader({
 
     setSubmittingSub(true);
 
-    const { error } = await supabase.from('subscribers').upsert(
-      {
-        email: cleanEmail,
-        notify_official_updates: true,
-        notify_mode: 'all',
-        interested_tags: [],
-      },
-      { onConflict: 'email' }
-    );
+    const { error } = await supabase.rpc('subscribe_newsletter', {
+      p_email: cleanEmail,
+      p_notify_mode: 'all',
+      p_interested_tags: [],
+    });
 
     if (error) {
       setSubmittingSub(false);

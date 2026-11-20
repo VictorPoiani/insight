@@ -393,10 +393,18 @@ export default function NotificacoesPage() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    setIsAdmin(Boolean(session?.user));
+    // Só a conta admin publica atualizações oficiais (o banco exige o mesmo)
+    let viewerIsAdmin = false;
     if (session?.user?.id) {
       setAuthorId(session.user.id);
+      const { data: viewerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle();
+      viewerIsAdmin = viewerProfile?.role === 'admin';
     }
+    setIsAdmin(viewerIsAdmin);
 
     const collected: OfficialUpdateRecord[] = [];
     let detectedTable: 'updates' | 'official_updates' | 'notifications' = 'updates';

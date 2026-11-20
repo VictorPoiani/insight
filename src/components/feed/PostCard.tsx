@@ -213,9 +213,19 @@ export function PostCard({
           .maybeSingle();
 
         if (active) setHasLiked(Boolean(existingLike));
+
+        const { data: existingRepost } = await supabase
+          .from('post_reposts')
+          .select('post_id')
+          .eq('post_id', post.id)
+          .eq('profile_id', typedProf.id)
+          .maybeSingle();
+
+        if (active) setHasReposted(Boolean(existingRepost));
       } else {
         setLoggedUserProfile(null);
         setHasLiked(false);
+        setHasReposted(false);
       }
     }
 
@@ -328,32 +338,32 @@ export function PostCard({
 
     setBlocksState(optimisticBlocks);
     setVotedOptions(nextVotedMap);
-    try {
-      localStorage.setItem(`insight-votes-${post.id}`, JSON.stringify(nextVotedMap));
-    } catch {
-      // Ignora erro de quota
-    }
 
     setVotingBlockId(blockId);
     try {
-      const { data: freshPost } = await supabase
-        .from('posts')
-        .select('blocks')
-        .eq('id', post.id)
-        .single();
+      // O banco registra o voto por pessoa e ajusta a contagem (vote_poll)
+      const { data, error } = await supabase.rpc('vote_poll', {
+        target_post_id: post.id,
+        target_block_id: blockId,
+        option_ids: nextVotedForBlock,
+      });
 
-      const baseBlocks =
-        freshPost && Array.isArray(freshPost.blocks) && freshPost.blocks.length > 0
-          ? (freshPost.blocks as PostBlock[])
-          : blocksState;
+      if (error || !data) {
+        setBlocksState(blocksState);
+        setVotedOptions(votedOptions);
+        alert('Não foi possível registrar seu voto. Tente novamente.');
+        return;
+      }
 
-      const serverUpdatedBlocks = applyVoteDelta(baseBlocks);
-      setBlocksState(serverUpdatedBlocks);
-
-      await supabase
-        .from('posts')
-        .update({ blocks: serverUpdatedBlocks })
-        .eq('id', post.id);
+      const result = data as { blocks: PostBlock[]; selected: string[] };
+      const confirmedMap = { ...votedOptions, [blockId]: result.selected || [] };
+      if (Array.isArray(result.blocks)) setBlocksState(result.blocks);
+      setVotedOptions(confirmedMap);
+      try {
+        localStorage.setItem(`insight-votes-${post.id}`, JSON.stringify(confirmedMap));
+      } catch {
+        // Ignora erro de quota
+      }
     } finally {
       setVotingBlockId(null);
     }
@@ -378,10 +388,9 @@ export function PostCard({
       setHasLiked(Boolean((data as any).liked));
       setLikes(Number((data as any).likes_count) || 0);
     } else if (error) {
-      await supabase
-        .from('posts')
-        .update({ likes_count: nextLikes })
-        .eq('id', post.id);
+      // Reverte o otimista: a curtida só é gravada pela RPC toggle_post_like
+      setHasLiked(!nextLiked);
+      setLikes(likes);
     }
   }
 
@@ -396,12 +405,21 @@ export function PostCard({
     setHasReposted(nextReposted);
     setReposts(nextReposts);
 
-    await supabase
-      .from('posts')
-      .update({ reposts_count: nextReposts })
-      .eq('id', post.id);
+    const { data: repostData, error: repostError } = await supabase.rpc('toggle_post_repost', {
+      target_post_id: post.id,
+    });
 
-    if (nextReposted && author.id !== loggedUserProfile.id) {
+    if (repostError || !repostData) {
+      setHasReposted(!nextReposted);
+      setReposts(reposts);
+      return;
+    }
+
+    const repostResult = repostData as { reposted: boolean; reposts_count: number };
+    setHasReposted(Boolean(repostResult.reposted));
+    setReposts(Number(repostResult.reposts_count) || 0);
+
+    if (repostResult.reposted && author.id !== loggedUserProfile.id) {
       const snippet = (postContent || '').slice(0, 110);
       await supabase.from('notifications').insert({
         recipient_id: author.id,

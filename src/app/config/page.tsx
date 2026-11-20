@@ -238,11 +238,8 @@ export default function ConfigPage() {
       const clean = targetEmail.trim().toLowerCase();
       if (!clean || !clean.includes('@')) return;
 
-      const { data } = await supabase
-        .from('subscribers')
-        .select('notify_mode, interested_tags')
-        .eq('email', clean)
-        .maybeSingle();
+      const { data: prefs } = await supabase.rpc('get_newsletter_prefs', { p_email: clean });
+      const data = prefs as { notify_mode?: string; interested_tags?: string[] } | null;
 
       if (data) {
         setNotifyMode((data.notify_mode as NotifyMode) || 'all');
@@ -693,15 +690,11 @@ export default function ConfigPage() {
 
     setSavingSub(true);
 
-    const { error } = await supabase.from('subscribers').upsert(
-      {
-        email: cleanEmail,
-        notify_official_updates: true,
-        notify_mode: notifyMode,
-        interested_tags: notifyMode === 'tags' ? subTags : [],
-      },
-      { onConflict: 'email' }
-    );
+    const { error } = await supabase.rpc('subscribe_newsletter', {
+      p_email: cleanEmail,
+      p_notify_mode: notifyMode,
+      p_interested_tags: notifyMode === 'tags' ? subTags : [],
+    });
 
     if (error) {
       setSavingSub(false);

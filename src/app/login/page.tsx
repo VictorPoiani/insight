@@ -419,18 +419,22 @@ export default function LoginPage() {
           throw new Error('Digite o código completo no formato XXXX-XXXX-XXXX.');
         }
 
-        const { data: invite, error: inviteErr } = await supabase
-          .from('invite_codes')
-          .select('*')
-          .eq('code', cleanCode)
-          .maybeSingle();
+        // A lista de convites é privada: a validação acontece no banco
+        const { data: inviteStatus, error: inviteErr } = await supabase.rpc(
+          'check_invite_code',
+          { p_code: cleanCode }
+        );
 
-        if (inviteErr || !invite) {
+        if (inviteErr || inviteStatus === 'invalid' || !inviteStatus) {
           throw new Error('Código de convite inválido ou não encontrado.');
         }
 
-        if (invite.uses_count >= invite.max_uses) {
+        if (inviteStatus === 'exhausted') {
           throw new Error('Este código de convite já atingiu o limite máximo de acessos.');
+        }
+
+        if (inviteStatus === 'expired') {
+          throw new Error('Este código de convite expirou.');
         }
       }
 
@@ -456,18 +460,7 @@ export default function LoginPage() {
       }
 
       if (IS_CLOSED_BETA && cleanCode) {
-        const { data: invite } = await supabase
-          .from('invite_codes')
-          .select('id, uses_count')
-          .eq('code', cleanCode)
-          .maybeSingle();
-
-        if (invite) {
-          await supabase
-            .from('invite_codes')
-            .update({ uses_count: (invite.uses_count || 0) + 1 })
-            .eq('id', invite.id);
-        }
+        await supabase.rpc('redeem_invite_code', { p_code: cleanCode });
       }
 
       window.location.href = `/u/${encodeURIComponent(cleanUsername)}`;

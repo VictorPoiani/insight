@@ -218,14 +218,14 @@ export default function AboutPage() {
     async function fetchLiveStats() {
       const [postsRes, subsRes, topicsRes, updatesRes] = await Promise.all([
         supabase.from('posts').select('*', { count: 'exact', head: true }),
-        supabase.from('subscribers').select('*', { count: 'exact', head: true }),
+        supabase.rpc('count_newsletter_subscribers'),
         supabase.from('custom_topics').select('*', { count: 'exact', head: true }),
         supabase.from('updates').select('*', { count: 'exact', head: true }),
       ]);
 
       setStats({
         posts: postsRes.count ?? 8,
-        subscribers: subsRes.count ?? 2,
+        subscribers: typeof subsRes.data === 'number' ? subsRes.data : 2,
         topics: 5 + (topicsRes.count ?? 0),
         updates: updatesRes.count ?? 1,
       });

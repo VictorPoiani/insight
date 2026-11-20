@@ -788,11 +788,8 @@ export function ProfileHeader({
         }
       }
 
-      const nextTotal = await refreshTotalFollowersCount();
-      await supabase
-        .from('profiles')
-        .update({ followers_count: nextTotal })
-        .eq('id', profile.id);
+      // followers_count é recalculado pelo banco (trigger em follows)
+      await refreshTotalFollowersCount();
     } finally {
       setFollowLoading(false);
     }
@@ -874,11 +871,8 @@ export function ProfileHeader({
         }
 
         setPushSubscribed(true);
-        const total = await refreshTotalFollowersCount();
-        await supabase
-          .from('profiles')
-          .update({ followers_count: total })
-          .eq('id', profile.id);
+        // followers_count é recalculado pelo banco (trigger em push_subscriptions)
+        await refreshTotalFollowersCount();
       }
     } catch (err: any) {
       alert(err?.message || 'Não foi possível configurar o Web Push.');
@@ -1188,11 +1182,8 @@ export function ProfileHeader({
 
     localStorage.setItem('insight-subscriber-email', cleanEmail);
 
-    const total = await refreshTotalFollowersCount();
-    await supabase
-      .from('profiles')
-      .update({ followers_count: total })
-      .eq('id', profile.id);
+    // followers_count é recalculado pelo banco (trigger em subscribers)
+    await refreshTotalFollowersCount();
 
     await fetch('/api/newsletter', {
       method: 'POST',

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { observeFrame } from './inViewBudget';
 import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
 import { NitroFxCanvas } from './NitroFxCanvas';
+import { CRITTERS } from './critters';
+import { SaturnBack, SaturnFront } from './saturn';
 import {
   Cpu,
   Crown,
@@ -113,9 +115,13 @@ function FrameShell({
 
   return (
     <span ref={ref} className={`nx-frame ${mode} ${className}`} style={style}>
-      {!frame.fx && frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
+      {!frame.fx && !frame.critter && frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
       {frame.back && <BackArt kind={frame.back} />}
-      {!frame.fx && <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />}
+      {frame.critter && CRITTERS[frame.critter].back && (
+        <svg aria-hidden className="nx-deco nx-orn nx-back" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: CRITTERS[frame.critter].back! }} />
+      )}
+      {frame.ornament === 'saturn' && <SaturnBack animated={mode !== 'nx-static'} />}
+      {!frame.fx && !frame.critter && <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />}
       {children}
       {frame.fx &&
         // WebGL ao vivo só em avatares grandes (poucos por página); o resto usa WebP leve
@@ -124,7 +130,11 @@ function FrameShell({
         ) : (
           <FxLayer fx={frame.fx} />
         ))}
-      {frame.ornament &&
+      {frame.critter && (
+        <svg aria-hidden className="nx-deco nx-orn" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: CRITTERS[frame.critter].front }} />
+      )}
+      {frame.ornament === 'saturn' && <SaturnFront animated={mode !== 'nx-static'} />}
+      {frame.ornament && frame.ornament !== 'saturn' &&
         (FRONT_ART_KINDS.includes(frame.ornament) ? (
           <FrontArt kind={frame.ornament} />
         ) : (

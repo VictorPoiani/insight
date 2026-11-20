@@ -197,6 +197,63 @@ vec4 fxFire(vec2 p, vec3 c0, vec3 c1, vec3 c2, vec3 c3, float strength) {
   return over(s, over(flame, g));
 }
 
+// 0 — Coroa de Chamas: línguas de fogo finas e recortadas, mais altas no topo
+float flameTongues(float a, float h, float N, float seed, float hMax, float top) {
+  float best = 0.0;
+  float u = a * N;
+  float ci = floor(u);
+  for (int k = -1; k <= 1; k++) {
+    float id = mod(ci + float(k), N);
+    float rnd = h11(id + seed * 13.1);
+    float rnd2 = h11(id * 1.7 + seed * 5.3 + 2.0);
+    // altura com cintilação periódica no loop
+    float flick = 0.78 + 0.22 * sin(TAU * (uT * 2.0 + rnd2));
+    float H = hMax * mix(0.5, 1.0, rnd) * flick * (0.42 + 0.58 * top);
+    float x = u - (ci + float(k) + 0.5);
+    // a ponta ondula para os lados conforme sobe
+    x += 0.22 * h / max(H, 1e-3) * sin(TAU * (uT * 2.0 + rnd) + h * 9.0);
+    float t = clamp(h / max(H, 1e-3), 0.0, 1.0);
+    float w = 0.5 * pow(1.0 - t, 0.75) * (0.75 + 0.25 * smoothstep(0.0, 0.25, t));
+    float d = abs(x) - w;
+    float inside = smoothstep(0.06, -0.06, d) * step(h, H);
+    float core = 1.0 - smoothstep(0.0, w + 0.02, abs(x)) * 0.55;
+    float heat = inside * (0.18 + 0.82 * pow(1.0 - t, 1.3) * core);
+    best = max(best, heat);
+  }
+  return best;
+}
+
+vec4 fxCrown(vec2 p) {
+  vec3 c0 = vec3(0.6, 0.06, 0.0), c1 = vec3(0.98, 0.33, 0.03), c2 = vec3(1.0, 0.74, 0.16), c3 = vec3(1.0, 0.98, 0.85);
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+  float a = ang / TAU + 0.5;
+  float h = (r - R) / (0.5 - R);
+  float top = 0.5 + 0.5 * sin(ang);
+  top = top * top;
+  // turbulência fina que rasga as bordas das línguas
+  float n = flowFbm(vec2(a * 36.0, h * 7.0), vec2(0.0, 4.0), 36.0, 3.0);
+  float ad = a + (n - 0.5) * 0.012;
+  float hd = h + (n - 0.5) * 0.06;
+  float big = flameTongues(ad, hd, 22.0, 1.0, 0.62, top);
+  float small = flameTongues(ad + 0.5 / 22.0, hd, 22.0, 7.0, 0.36, top) * 0.9;
+  float heat = max(big, small);
+  heat *= 0.8 + 0.35 * n;
+  heat *= smoothstep(-0.02, 0.03, h);
+  // aro incandescente fino colado na foto
+  float rim = gauss(r - R * 1.01, 0.006);
+  heat = max(heat, rim);
+  heat = clamp(heat, 0.0, 1.0);
+  vec3 col = heatRamp(0.12 + heat * 0.9, c0, c1, c2, c3);
+  float alpha = smoothstep(0.02, 0.14, heat);
+  vec4 flame = vec4(col * alpha, alpha);
+  float glow = gauss(r - R - 0.02, 0.06) * (0.18 + 0.3 * top);
+  vec4 g = vec4(c1 * glow * 0.55, glow * 0.55);
+  float sp = risingSparks(p, 40.0, 0.22, 3.0, 0.0036) * (0.35 + 0.65 * top);
+  vec4 s = vec4(mix(c2, c3, 0.6) * sp, sp);
+  return over(s, over(flame, g));
+}
+
 // 1 — Aurora
 vec4 fxAurora(vec2 p) {
   float r = length(p);
@@ -595,7 +652,7 @@ vec4 fxPetals(vec2 p, bool fireflies) {
 void main() {
   vec2 p = (gl_FragCoord.xy / uRes) - 0.5;
   vec4 c = vec4(0.0);
-  if (uFx == 0) c = fxFire(p, vec3(0.55, 0.04, 0.0), vec3(0.95, 0.3, 0.02), vec3(1.0, 0.72, 0.12), vec3(1.0, 0.97, 0.82), 1.0);
+  if (uFx == 0) c = fxCrown(p);
   else if (uFx == 1) c = fxAurora(p);
   else if (uFx == 2) c = fxElectric(p);
   else if (uFx == 3) c = fxOcean(p);

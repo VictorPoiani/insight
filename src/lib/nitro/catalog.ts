@@ -1,3 +1,5 @@
+import type { CritterId } from '@/components/nitro/critters';
+
 /**
  * Catálogo do Insight Nitro (beta fechada).
  * Fonte única dos itens: os efeitos são descritos por dados e renderizados por
@@ -19,6 +21,7 @@ export type NitroCollectionId =
   | 'selva'
   | 'sombras'
   | 'oceano'
+  | 'bichos'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -87,6 +90,8 @@ export interface FrameItem extends BaseItem {
   back?: FrameBackLayer;
   /** Efeito procedural pré-renderizado (public/nitro/frames/<fx>-*.webp). Substitui anel e brilho CSS. */
   fx?: FrameFx;
+  /** Ilustração de bichinho (components/nitro/critters.ts), camadas atrás e na frente da foto. */
+  critter?: CritterId;
   particles?: { glyph: string; mode: ParticleMode; count: number; color?: string };
   /** Molduras de patente 0–3 são sempre estáticas. */
   alwaysStatic?: boolean;
@@ -166,6 +171,7 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'selva', name: 'Selva & Natureza', description: 'Onças, cipós, vaga-lumes e tempestades.', colors: ['#15803d', '#f59e0b'] },
   { id: 'sombras', name: 'Sombras & Monstros', description: 'O que espreita no escuro.', colors: ['#020617', '#a3e635'] },
   { id: 'oceano', name: 'Oceano', description: 'Ondas em xilogravura e marés.', colors: ['#1e3a5f', '#f7f3e8'] },
+  { id: 'bichos', name: 'Bichinhos', description: 'Orelhas, patinhas e amigos ilustrados em volta da foto.', colors: ['#f9b8c6', '#f6a04d'] },
   { id: 'patentes', name: 'Patentes', description: 'Conquistadas pelos níveis de contribuinte.', colors: ['#4285F4', '#d4a72c'] },
 ];
 
@@ -293,10 +299,6 @@ const FRAMES: FrameItem[] = [
     description: 'Orelhas atentas, cauda que balança e anel de rosetas.',
     ring: { colors: ['#b45309', '#1c1917', '#f59e0b', '#1c1917', '#d97706', '#1c1917', '#fbbf24', '#1c1917', '#b45309'], anim: 'none', width: 0.08 },
     glow: 'rgba(245,158,11,0.45)', ornament: 'jaguar' },
-  { id: 'frame-spirit-fox', kind: 'frame', name: 'Raposa Espiritual', collection: 'anime', rarity: 'lendária', requirement: NITRO, fx: 'spirit',
-    description: 'Três caudas de luz atrás do avatar e chamas-fantasma em órbita.',
-    ring: { colors: ['#fb923c', '#fde68a', '#f472b6', '#fb923c'], anim: 'spin', width: 0.06 },
-    glow: 'rgba(251,146,60,0.5)', back: 'fox-tails', ornament: 'fox' },
   { id: 'frame-lurking-eyes', kind: 'frame', name: 'Olhos na Escuridão', collection: 'sombras', rarity: 'lendária', requirement: NITRO, fx: 'shadow',
     description: 'Fumaça escura, olhos que piscam e um tentáculo que espia.',
     ring: { colors: ['#020617', '#1e293b', '#3f6212', '#020617'], anim: 'spin', width: 0.08 },
@@ -305,10 +307,32 @@ const FRAMES: FrameItem[] = [
     description: 'Onda em xilogravura com garras de espuma quebrando no avatar.',
     ring: { colors: ['#1e3a5f', '#3b6e8f', '#9ec5d6', '#f7f3e8', '#1e3a5f'], anim: 'none', width: 0.07 },
     ornament: 'wave' },
-  { id: 'frame-storm-cloud', kind: 'frame', name: 'Nuvem de Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO, fx: 'electric',
-    description: 'Nuvem carregada, chuva caindo e relâmpagos.',
-    ring: { colors: ['#334155', '#64748b', '#93c5fd', '#334155'], anim: 'pulse', width: 0.06 },
-    glow: 'rgba(147,197,253,0.4)', ornament: 'storm' },
+  { id: 'frame-storm-cloud', kind: 'frame', name: 'Nuvem de Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO, critter: 'storm-cloud',
+    description: 'Nuvens fofinhas no topo, um raio que pisca e gotinhas caindo.',
+    ring: { colors: ['#334155', '#64748b', '#93c5fd', '#334155'], anim: 'none', width: 0.06 } },
+
+  // ---- Bichinhos ilustrados ----
+  { id: 'frame-cat-ribbon', kind: 'frame', name: 'Gatinho de Fita', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'cat-ribbon',
+    description: 'Orelhas de gato tricolor, laço de cetim, patinhas e plaquinha de coração.',
+    ring: { colors: ['#f9b8c6'], anim: 'none' } },
+  { id: 'frame-bunny-daisy', kind: 'frame', name: 'Coelhinho Algodão', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'bunny-daisy',
+    description: 'Orelhas caídas atrás da foto e coroa de margaridas.',
+    ring: { colors: ['#ffd7e1'], anim: 'none' } },
+  { id: 'frame-fox-shrine', kind: 'frame', name: 'Raposa do Santuário', collection: 'bichos', rarity: 'lendária', requirement: NITRO, critter: 'fox-shrine',
+    description: 'Orelhas de raposa com corda trançada, papéis shide e sininhos.',
+    ring: { colors: ['#f7a15a'], anim: 'none' } },
+  { id: 'frame-shiba-nap', kind: 'frame', name: 'Soneca do Shiba', collection: 'bichos', rarity: 'lendária', requirement: NITRO, critter: 'shiba-nap',
+    description: 'Um shiba dormindo em cima da foto, respirando devagar.',
+    ring: { colors: ['#f3a352'], anim: 'none' } },
+  { id: 'frame-ghost-hug', kind: 'frame', name: 'Abraço Fantasma', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'ghost-hug',
+    description: 'Um fantasminha espiando e segurando a sua foto.',
+    ring: { colors: ['#d9cbf5'], anim: 'none' } },
+  { id: 'frame-bear-honey', kind: 'frame', name: 'Ursinho do Mel', collection: 'bichos', rarity: 'rara', requirement: NITRO, critter: 'bear-honey',
+    description: 'Orelhas redondas, patinhas com pote de mel e uma abelha.',
+    ring: { colors: ['#b07a4c'], anim: 'none' } },
+  { id: 'frame-frog-king', kind: 'frame', name: 'Sapo Rei', collection: 'bichos', rarity: 'rara', requirement: NITRO, critter: 'frog-king',
+    description: 'Um sapinho de coroa no topo, inflando o papo.',
+    ring: { colors: ['#9be15d'], anim: 'none' } },
 
   // ---- Patentes (todos os níveis; animadas só 4 e 5) ----
   { id: 'frame-tier-0', kind: 'frame', name: 'Observador', collection: 'patentes', rarity: 'comum', requirement: { type: 'level', min: 0 },

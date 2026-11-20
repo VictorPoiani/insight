@@ -16,6 +16,9 @@ export type NitroCollectionId =
   | 'princess'
   | 'cyber'
   | 'cosmico'
+  | 'selva'
+  | 'sombras'
+  | 'oceano'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -51,7 +54,18 @@ export type FrameOrnament =
   | 'saturn'
   | 'wreath'
   | 'snowflake'
-  | 'grid';
+  | 'grid'
+  | 'santa-hat'
+  | 'vines'
+  | 'jaguar'
+  | 'fox'
+  | 'lurking'
+  | 'wave'
+  | 'storm'
+  | 'halo';
+
+/** Camada desenhada ATRÁS do avatar (profundidade). */
+export type FrameBackLayer = 'flames' | 'fox-tails' | 'smoke' | 'foliage' | 'storm-cloud';
 
 export type ParticleMode = 'fall' | 'orbit' | 'rise' | 'twinkle';
 
@@ -65,6 +79,7 @@ export interface FrameItem extends BaseItem {
   };
   glow?: string;
   ornament?: FrameOrnament;
+  back?: FrameBackLayer;
   particles?: { glyph: string; mode: ParticleMode; count: number; color?: string };
   /** Molduras de patente 0–3 são sempre estáticas. */
   alwaysStatic?: boolean;
@@ -112,8 +127,19 @@ export interface IntroItem extends BaseItem {
     colors?: string[];
   };
   fx?: 'flash' | 'glitch' | 'speedlines';
+  /** Cena dedicada (motor de cenas). Sem cena, usa o motor genérico em camadas. */
+  scene?: IntroSceneId;
   durationMs: number;
 }
+
+export type IntroSceneId =
+  | 'monster'
+  | 'jaguar'
+  | 'storm'
+  | 'tsunami'
+  | 'portal'
+  | 'anime-cut'
+  | 'hyperspace';
 
 export type NitroItem = FrameItem | TitleItem | TagItem | IntroItem;
 
@@ -130,6 +156,9 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'princess', name: 'Princess', description: 'Pérolas, cristais e contos de fada.', colors: ['#fbcfe8', '#c4b5fd'] },
   { id: 'cyber', name: 'Cyber', description: 'Néon, cromo e circuitos.', colors: ['#22d3ee', '#e11d48'] },
   { id: 'cosmico', name: 'Cósmico', description: 'Nebulosas, órbitas e hiperespaço.', colors: ['#6d28d9', '#ec4899'] },
+  { id: 'selva', name: 'Selva & Natureza', description: 'Onças, cipós, vaga-lumes e tempestades.', colors: ['#15803d', '#f59e0b'] },
+  { id: 'sombras', name: 'Sombras & Monstros', description: 'O que espreita no escuro.', colors: ['#020617', '#a3e635'] },
+  { id: 'oceano', name: 'Oceano', description: 'Ondas em xilogravura e marés.', colors: ['#1e3a5f', '#f7f3e8'] },
   { id: 'patentes', name: 'Patentes', description: 'Conquistadas pelos níveis de contribuinte.', colors: ['#4285F4', '#d4a72c'] },
 ];
 
@@ -216,7 +245,7 @@ const FRAMES: FrameItem[] = [
   { id: 'frame-flame-crown', kind: 'frame', name: 'Coroa de Chamas', collection: 'infernal', rarity: 'lendária', requirement: NITRO,
     description: 'Chamas subindo pela borda.',
     ring: { colors: ['#fde047', '#f97316', '#dc2626', '#7f1d1d', '#f97316', '#fde047'], anim: 'flicker', width: 0.09 },
-    glow: 'rgba(249,115,22,0.7)', particles: { glyph: '🔥', mode: 'rise', count: 6 } },
+    glow: 'rgba(249,115,22,0.7)', back: 'flames', particles: { glyph: '🔥', mode: 'rise', count: 6 } },
   { id: 'frame-abyss-horns', kind: 'frame', name: 'Chifres do Abismo', collection: 'infernal', rarity: 'épica', requirement: NITRO,
     description: 'Chifres no topo e um brilho vermelho respirando.',
     ring: { colors: ['#450a0a', '#991b1b', '#dc2626', '#450a0a'], anim: 'pulse', width: 0.07 }, glow: 'rgba(220,38,38,0.65)',
@@ -228,7 +257,7 @@ const FRAMES: FrameItem[] = [
   { id: 'frame-aurora-halo', kind: 'frame', name: 'Halo Aurora', collection: 'celestial', rarity: 'épica', requirement: NITRO,
     description: 'Aurora boreal girando em volta do avatar.',
     ring: { colors: ['#5eead4', '#38bdf8', '#a78bfa', '#f0abfc', '#5eead4'], anim: 'spin', width: 0.09 },
-    glow: 'rgba(94,234,212,0.55)', particles: { glyph: '✦', mode: 'twinkle', count: 5, color: '#f0fdfa' } },
+    glow: 'rgba(94,234,212,0.55)', ornament: 'halo', particles: { glyph: '✦', mode: 'twinkle', count: 5, color: '#f0fdfa' } },
   { id: 'frame-sakura-petals', kind: 'frame', name: 'Pétalas de Sakura', collection: 'anime', rarity: 'rara', requirement: NITRO,
     description: 'Pétalas orbitando e caindo.',
     ring: { colors: ['#fbcfe8', '#f9a8d4', '#fdf2f8', '#f472b6', '#fbcfe8'], anim: 'none', width: 0.07 },
@@ -245,6 +274,36 @@ const FRAMES: FrameItem[] = [
     description: 'Anel planetário com uma lua em órbita.',
     ring: { colors: ['#6d28d9', '#db2777', '#f59e0b', '#6d28d9'], anim: 'spin', width: 0.05 }, glow: 'rgba(219,39,119,0.5)',
     ornament: 'saturn' },
+
+  // ---- Novas: chapéu, natureza, animais, monstros, oceano ----
+  { id: 'frame-santa-hat', kind: 'frame', name: 'Gorro do Noel', collection: 'natal', rarity: 'épica', requirement: NITRO,
+    description: 'Gorro inclinado com pompom balançando e pisca-pisca.',
+    ring: { colors: ['#dc2626', '#facc15', '#16a34a', '#38bdf8', '#dc2626', '#facc15', '#16a34a', '#38bdf8', '#dc2626'], anim: 'pulse', width: 0.06 },
+    glow: 'rgba(250,204,21,0.35)', ornament: 'santa-hat', particles: { glyph: '❄', mode: 'fall', count: 6, color: '#ffffff' } },
+  { id: 'frame-living-forest', kind: 'frame', name: 'Floresta Viva', collection: 'selva', rarity: 'lendária', requirement: NITRO,
+    description: 'Cipós crescem pelo anel, folhas balançam e vaga-lumes piscam.',
+    ring: { colors: ['#14532d', '#15803d', '#65a30d', '#14532d'], anim: 'none', width: 0.06 },
+    glow: 'rgba(132,204,22,0.35)', back: 'foliage', ornament: 'vines' },
+  { id: 'frame-jaguar', kind: 'frame', name: 'Onça-Pintada', collection: 'selva', rarity: 'lendária', requirement: NITRO,
+    description: 'Orelhas atentas, cauda que balança e anel de rosetas.',
+    ring: { colors: ['#b45309', '#1c1917', '#f59e0b', '#1c1917', '#d97706', '#1c1917', '#fbbf24', '#1c1917', '#b45309'], anim: 'none', width: 0.08 },
+    glow: 'rgba(245,158,11,0.45)', ornament: 'jaguar' },
+  { id: 'frame-spirit-fox', kind: 'frame', name: 'Raposa Espiritual', collection: 'anime', rarity: 'lendária', requirement: NITRO,
+    description: 'Três caudas de luz atrás do avatar e chamas-fantasma em órbita.',
+    ring: { colors: ['#fb923c', '#fde68a', '#f472b6', '#fb923c'], anim: 'spin', width: 0.06 },
+    glow: 'rgba(251,146,60,0.5)', back: 'fox-tails', ornament: 'fox', particles: { glyph: '🔥', mode: 'orbit', count: 3 } },
+  { id: 'frame-lurking-eyes', kind: 'frame', name: 'Olhos na Escuridão', collection: 'sombras', rarity: 'lendária', requirement: NITRO,
+    description: 'Fumaça escura, olhos que piscam e um tentáculo que espia.',
+    ring: { colors: ['#020617', '#1e293b', '#3f6212', '#020617'], anim: 'spin', width: 0.08 },
+    glow: 'rgba(163,230,53,0.35)', back: 'smoke', ornament: 'lurking' },
+  { id: 'frame-great-wave', kind: 'frame', name: 'Onda de Kanagawa', collection: 'oceano', rarity: 'lendária', requirement: NITRO,
+    description: 'Onda em xilogravura com garras de espuma quebrando no avatar.',
+    ring: { colors: ['#1e3a5f', '#3b6e8f', '#9ec5d6', '#f7f3e8', '#1e3a5f'], anim: 'none', width: 0.07 },
+    ornament: 'wave' },
+  { id: 'frame-storm-cloud', kind: 'frame', name: 'Nuvem de Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO,
+    description: 'Nuvem carregada, chuva caindo e relâmpagos.',
+    ring: { colors: ['#334155', '#64748b', '#93c5fd', '#334155'], anim: 'pulse', width: 0.06 },
+    glow: 'rgba(147,197,253,0.4)', back: 'storm-cloud', ornament: 'storm' },
 
   // ---- Patentes (todos os níveis; animadas só 4 e 5) ----
   { id: 'frame-tier-0', kind: 'frame', name: 'Observador', collection: 'patentes', rarity: 'comum', requirement: { type: 'level', min: 0 },
@@ -279,7 +338,7 @@ const INTROS: IntroItem[] = [
     description: 'A fita se desfaz e revela o perfil.', durationMs: 1100,
     reveal: { kind: 'split', colors: ['#b91c1c', '#15803d'] }, particles: { glyph: '✦', mode: 'burst', count: 18, colors: ['#facc15', '#ffffff'] } },
   { id: 'intro-hell-portal', kind: 'intro', name: 'Portal Infernal', collection: 'infernal', rarity: 'lendária', requirement: NITRO,
-    description: 'Uma fenda de fogo se abre a partir do avatar.', durationMs: 1200,
+    description: 'Rachaduras incandescentes, erupção e um portal de fogo que se abre.', durationMs: 2000, scene: 'portal',
     reveal: { kind: 'iris', colors: ['#1c0a00', '#7f1d1d', '#f97316'] }, particles: { glyph: '🔥', mode: 'burst', count: 14 } },
   { id: 'intro-imperial-decree', kind: 'intro', name: 'Decreto Imperial', collection: 'imperial', rarity: 'épica', requirement: NITRO,
     description: 'O estandarte se recolhe deixando poeira dourada.', durationMs: 1200,
@@ -290,17 +349,27 @@ const INTROS: IntroItem[] = [
   { id: 'intro-eclipse', kind: 'intro', name: 'Eclipse', collection: 'celestial', rarity: 'épica', requirement: NITRO,
     description: 'A escuridão se fecha numa coroa de luz.', durationMs: 1200,
     reveal: { kind: 'circle', colors: ['#020617', '#0f172a'] }, fx: 'flash' },
-  { id: 'intro-speedlines', kind: 'intro', name: 'Linhas de Ação', collection: 'anime', rarity: 'rara', requirement: NITRO,
-    description: 'Speedlines e flash, estilo corte de anime.', durationMs: 900, fx: 'speedlines' },
+  { id: 'intro-speedlines', kind: 'intro', name: 'Corte de Anime', collection: 'anime', rarity: 'épica', requirement: NITRO,
+    description: 'Linhas de ação, quadro de impacto e carimbo 見参.', durationMs: 1700, scene: 'anime-cut', fx: 'speedlines' },
   { id: 'intro-fairy-tale', kind: 'intro', name: 'Conto de Fadas', collection: 'princess', rarity: 'épica', requirement: NITRO,
     description: 'Um rastro de brilho em espiral.', durationMs: 1200,
     reveal: { kind: 'iris', colors: ['#fdf2f8', '#fbcfe8', '#e9d5ff'] }, particles: { glyph: '✧', mode: 'burst', count: 22, colors: ['#f472b6', '#c084fc', '#fde68a'] } },
   { id: 'intro-glitch-boot', kind: 'intro', name: 'Boot Glitch', collection: 'cyber', rarity: 'épica', requirement: NITRO,
     description: 'A tela inicializa com scanlines e glitch RGB.', durationMs: 1000,
     reveal: { kind: 'curtain', colors: ['#020617', '#0e7490'] }, fx: 'glitch' },
-  { id: 'intro-hyperspace', kind: 'intro', name: 'Hiperespaço', collection: 'cosmico', rarity: 'lendária', requirement: NITRO,
-    description: 'Estrelas esticam em linhas e o perfil chega.', durationMs: 1200,
+  { id: 'intro-hyperspace', kind: 'intro', name: 'Salto Hiperespacial', collection: 'cosmico', rarity: 'lendária', requirement: NITRO,
+    description: 'Estrelas esticam em linhas, túnel de luz e chegada.', durationMs: 1900, scene: 'hyperspace',
     reveal: { kind: 'iris', colors: ['#000000', '#1e1b4b'] }, particles: { glyph: '', mode: 'streak', count: 40, colors: ['#ffffff', '#c4b5fd', '#93c5fd'] } },
+
+  // ---- Novas cenas ----
+  { id: 'intro-lurking-monster', kind: 'intro', name: 'Monstro à Espreita', collection: 'sombras', rarity: 'lendária', requirement: NITRO,
+    description: 'Olhos no escuro, a criatura se aproxima e dá o bote.', durationMs: 2300, scene: 'monster' },
+  { id: 'intro-jaguar-claw', kind: 'intro', name: 'Garra de Onça', collection: 'selva', rarity: 'lendária', requirement: NITRO,
+    description: 'Olhos âmbar, três arranhões e a tela rasgada.', durationMs: 1900, scene: 'jaguar' },
+  { id: 'intro-storm', kind: 'intro', name: 'Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO,
+    description: 'Chuva pesada, relâmpagos e a tempestade se abre.', durationMs: 2200, scene: 'storm' },
+  { id: 'intro-ukiyo-tsunami', kind: 'intro', name: 'Tsunami Ukiyo-e', collection: 'oceano', rarity: 'lendária', requirement: NITRO,
+    description: 'Onda gigante em xilogravura japonesa varre a tela.', durationMs: 2400, scene: 'tsunami' },
 
   // ---- Patentes 4 e 5 ----
   { id: 'intro-tier-4', kind: 'intro', name: 'Ascensão Safira', collection: 'patentes', rarity: 'épica', requirement: { type: 'level', min: 4 },

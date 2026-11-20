@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { observeFrame } from './inViewBudget';
+import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
 import {
   Cpu,
   Crown,
@@ -112,9 +113,15 @@ function FrameShell({
   return (
     <span ref={ref} className={`nx-frame ${mode} ${className}`} style={style}>
       {frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
+      {frame.back && <BackArt kind={frame.back} />}
       <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />
       {children}
-      {frame.ornament && <FrameOrnamentSvg kind={frame.ornament} animated={animatedOrnament} />}
+      {frame.ornament &&
+        (FRONT_ART_KINDS.includes(frame.ornament) ? (
+          <FrontArt kind={frame.ornament} />
+        ) : (
+          <FrameOrnamentSvg kind={frame.ornament} animated={animatedOrnament} />
+        ))}
       {frame.particles && (
         <span aria-hidden className={`nx-deco nx-particles nx-p--${frame.particles.mode} nx-anim`}>
           {Array.from({ length: frame.particles.count }, (_, i) => {

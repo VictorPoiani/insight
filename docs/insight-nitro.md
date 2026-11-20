@@ -11,6 +11,8 @@
 > - **Ninguém além do admin** acessa a galeria, os detalhes ou aplica itens; cosméticos só aparecem para quem tem acesso.
 > - O gate de **Preview** da §1 fica como opção para quando houver testadores externos; não está ativo.
 >
+> **Entregue em 20/11 (2ª rodada):** motor de **cenas** para aberturas (`components/nitro/intro/`) com **Monstro à Espreita**, **Garra de Onça**, **Tempestade** e **Tsunami Ukiyo-e**; Portal Infernal, Corte de Anime e Salto Hiperespacial refeitos como cenas; as demais aberturas ganharam 3 planos de profundidade, vinheta e brilho. Molduras novas com arte em camadas (`components/nitro/frameArt.tsx`): **Gorro do Noel**, **Floresta Viva**, **Onça-Pintada**, **Raposa Espiritual**, **Olhos na Escuridão**, **Onda de Kanagawa** e **Nuvem de Tempestade**; Coroa de Chamas ganhou chamas atrás do avatar e Halo Aurora uma auréola. Novas coleções: Selva & Natureza, Sombras & Monstros, Oceano.
+>
 > **Já entregue da v2:** asterisco e logo unificados (`components/brand/`), **Rainbow** com toggle (§3.3), molduras animando "na tela" com orçamento de 4 em vez de hover, remoção de `filter` animado, atalho "Editar moldura" visível no toque, item do Nitro no menu mobile.
 
 ---

@@ -63,6 +63,29 @@
   overflow: visible;
 }
 
+.nx-orn.nx-back {
+  z-index: 0;
+}
+
+/* ---------- Arte das molduras v2 (frameArt.tsx) ---------- */
+.nx-a { transform-box: fill-box; }
+
+.nx-flame { transform-origin: 50% 100%; animation: nx-flame 0.9s ease-in-out infinite alternate; }
+.nx-fan { transform-origin: 100% 60%; animation: nx-fan 3.2s ease-in-out infinite; }
+.nx-smoke { transform-box: view-box; transform-origin: 50% 50%; animation: nx-spin 22s linear infinite; }
+.nx-swing { transform-origin: 0% 30%; animation: nx-swing 2.6s ease-in-out infinite; }
+.nx-grow { stroke-dasharray: 100; animation: nx-grow 7s ease-in-out infinite; }
+.nx-leaf { transform-origin: 0% 50%; animation: nx-leaf 2.8s ease-in-out infinite; }
+.nx-firefly { animation: nx-firefly 2.4s ease-in-out infinite; }
+.nx-twitch { transform-origin: 50% 100%; animation: nx-twitch 5.5s ease-in-out infinite; }
+.nx-tail { transform-origin: 0% 100%; animation: nx-tail 3s ease-in-out infinite; }
+.nx-eye { transform-origin: 50% 50%; opacity: 0; animation: nx-eye 4.6s ease-in-out infinite; }
+.nx-tentacle { transform-origin: 0% 100%; animation: nx-tentacle 6s ease-in-out infinite; }
+.nx-bob { animation: nx-bob 3.4s ease-in-out infinite; }
+.nx-spray { animation: nx-spray 1.8s ease-out infinite; }
+.nx-rain { animation: nx-rain 0.7s linear infinite; }
+.nx-bolt { opacity: 0; animation: nx-bolt 4.2s linear infinite; }
+
 .nx-ring--spin { animation: nx-spin 7s linear infinite; }
 .nx-ring--shimmer { animation: nx-spin 14s linear infinite, nx-bright 3s ease-in-out infinite; }
 .nx-ring--pulse { animation: nx-bright 2.4s ease-in-out infinite; }
@@ -117,14 +140,15 @@
 .nx-frame .nx-svg-spin,
 .nx-frame .nx-dash,
 .nx-frame .nx-blink,
-.nx-frame .nx-pulse-svg {
+.nx-frame .nx-pulse-svg,
+.nx-frame .nx-a {
   animation-play-state: paused;
 }
 
 /* live = sempre (perfil); nx-on = na tela, dentro do orçamento (toque);
    hover = desktop */
-.nx-frame:is(.nx-live, .nx-on) :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg),
-.nx-frame.nx-auto:hover :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg) {
+.nx-frame:is(.nx-live, .nx-on) :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg, .nx-a),
+.nx-frame.nx-auto:hover :is(.nx-anim, .nx-svg-spin, .nx-dash, .nx-blink, .nx-pulse-svg, .nx-a) {
   animation-play-state: running;
 }
 
@@ -137,7 +161,7 @@
   contain: layout;
 }
 
-.nx-frame.nx-static .nx-anim {
+.nx-frame.nx-static :is(.nx-anim, .nx-a) {
   animation: none !important;
 }
 
@@ -353,6 +377,11 @@
   will-change: transform, opacity;
 }
 
+/* Planos de profundidade do motor genérico */
+.nx-ip:is(.nx-ip--fall, .nx-ip--burst, .nx-ip--cross, .nx-ip--streak) {
+  animation-duration: calc(var(--nx-dur) * var(--zf, 1)) !important;
+}
+
 .nx-ip--fall {
   left: var(--x);
   top: -6%;
@@ -385,6 +414,7 @@
 /* --------------------------------------------------- MOVIMENTO REDUZIDO */
 
 @media (prefers-reduced-motion: reduce) {
+  .nx-frame .nx-a,
   .nx-frame .nx-anim,
   .nx-title,
   .nx-tag--shimmer::after,
@@ -402,6 +432,7 @@
   }
 }
 
+html[data-reduce-motion='true'] .nx-frame .nx-a,
 html[data-reduce-motion='true'] .nx-frame .nx-anim,
 html[data-reduce-motion='true'] .nx-title,
 html[data-reduce-motion='true'] .nx-tag--shimmer::after,
@@ -422,6 +453,34 @@ html[data-reduce-motion='true'] .nx-intro {
 /* -------------------------------------------------------------- KEYFRAMES */
 
 @keyframes nx-spin { to { transform: rotate(360deg); } }
+@keyframes nx-flame { 0% { transform: scale(0.92, 0.82); opacity: 0.75; } 100% { transform: scale(1.05, 1.12); opacity: 1; } }
+@keyframes nx-fan { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(9deg); } }
+@keyframes nx-swing { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(12deg); } }
+@keyframes nx-grow { 0% { stroke-dashoffset: 100; } 40%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 100; } }
+@keyframes nx-leaf { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(14deg); } }
+@keyframes nx-firefly {
+  0%, 100% { opacity: 0.1; transform: translate(0, 0) scale(0.6); }
+  50% { opacity: 1; transform: translate(1.5px, -2px) scale(1.2); }
+}
+@keyframes nx-twitch { 0%, 86%, 100% { transform: rotate(0deg); } 89% { transform: rotate(-14deg); } 92% { transform: rotate(6deg); } 95% { transform: rotate(-6deg); } }
+@keyframes nx-tail { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(12deg); } }
+@keyframes nx-eye {
+  0%, 8% { opacity: 0; transform: scaleY(0.2); }
+  14%, 30% { opacity: 1; transform: scaleY(1); }
+  33% { opacity: 1; transform: scaleY(0.1); }
+  36%, 44% { opacity: 1; transform: scaleY(1); }
+  52%, 100% { opacity: 0; transform: scaleY(0.2); }
+}
+@keyframes nx-tentacle {
+  0%, 40% { transform: translate(-6px, 10px) rotate(-18deg); opacity: 0; }
+  55%, 75% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  68% { transform: translate(0, -1px) rotate(6deg); }
+  90%, 100% { transform: translate(-6px, 10px) rotate(-18deg); opacity: 0; }
+}
+@keyframes nx-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes nx-spray { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(3px, -5px) scale(1.2); } }
+@keyframes nx-rain { from { transform: translateY(0); } to { transform: translateY(18px); } }
+@keyframes nx-bolt { 0%, 70%, 74%, 78%, 100% { opacity: 0; } 71%, 73% { opacity: 1; } 76%, 77% { opacity: 0.85; } }
 @keyframes nx-bright { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
 @keyframes nx-flicker {
   0%, 100% { opacity: 1; }
@@ -512,12 +571,12 @@ html[data-reduce-motion='true'] .nx-intro {
 }
 @keyframes nx-ifall {
   0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
-  10% { opacity: 1; }
+  10% { opacity: var(--zo, 1); }
   100% { opacity: 0.2; transform: translate(var(--dx), 112vh) rotate(220deg); }
 }
 @keyframes nx-iburst {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
-  12% { opacity: 1; }
+  12% { opacity: var(--zo, 1); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.1) rotate(var(--a)); }
 }
 @keyframes nx-icross {

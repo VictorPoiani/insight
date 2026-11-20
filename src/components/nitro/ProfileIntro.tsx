@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { IntroItem, NitroCosmetics, getNitroItem } from '@/lib/nitro/catalog';
 import { prefersReducedMotion, useNitro, useProfileCosmetics } from './NitroProvider';
+import { IntroScene } from './intro/scenes';
 
 type CSSVars = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -40,7 +41,10 @@ export function IntroOverlay({ intro, onDone }: { intro: IntroItem; onDone: () =
         '--tx': `${Math.round(Math.cos(angle) * dist)}vmax`,
         '--ty': `${Math.round(Math.sin(angle) * dist)}vmax`,
         '--a': `${Math.round(rand(i + 3) * 360)}deg`,
-        '--s': `${Math.round(12 + rand(i + 6) * 18)}px`,
+        // 3 planos de profundidade: perto (grande, rápido), meio, longe (pequeno, lento, apagado)
+        '--s': `${Math.round((12 + rand(i + 6) * 18) * [1.35, 1, 0.6][i % 3])}px`,
+        '--zo': [1, 0.85, 0.5][i % 3],
+        '--zf': [0.8, 1, 1.25][i % 3],
         '--d': `${(rand(i + 8) * intro.durationMs * 0.35) / 1000}s`,
         '--c': colors[i % colors.length],
       };
@@ -66,7 +70,9 @@ export function IntroOverlay({ intro, onDone }: { intro: IntroItem; onDone: () =
       aria-hidden
       data-intro={intro.id}
     >
-      {intro.reveal?.kind === 'split' ? (
+      {intro.scene ? (
+        <IntroScene id={intro.scene} />
+      ) : intro.reveal?.kind === 'split' ? (
         <>
           <div className="nx-rv nx-rv-half nx-rv-half--l" />
           <div className="nx-rv nx-rv-half nx-rv-half--r" />
@@ -76,11 +82,13 @@ export function IntroOverlay({ intro, onDone }: { intro: IntroItem; onDone: () =
         <div className={`nx-rv nx-rv--${intro.reveal.kind}`} />
       ) : null}
 
-      {intro.fx === 'speedlines' && <div className="nx-fx nx-fx--speedlines" />}
-      {intro.fx === 'glitch' && <div className="nx-fx nx-fx--glitch" />}
-      {intro.fx === 'flash' && <div className="nx-fx nx-fx--flash" />}
+      {!intro.scene && <div className="nx-vignette" />}
+      {!intro.scene && <div className="nx-sweep" />}
+      {!intro.scene && intro.fx === 'speedlines' && <div className="nx-fx nx-fx--speedlines" />}
+      {!intro.scene && intro.fx === 'glitch' && <div className="nx-fx nx-fx--glitch" />}
+      {!intro.scene && intro.fx === 'flash' && <div className="nx-fx nx-fx--flash" />}
 
-      {intro.particles &&
+      {!intro.scene && intro.particles &&
         particles.map((p) => (
           <span key={p.key} className={`nx-ip nx-ip--${intro.particles!.mode}`} style={p.style}>
             {intro.particles!.mode === 'streak' ? null : intro.particles!.glyph}

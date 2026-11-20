@@ -675,9 +675,11 @@ export function PostComposer({
 
   useEffect(() => {
     async function fetchProfileTopics() {
+      // só os tópicos do próprio autor
       const { data } = await supabase
         .from('custom_topics')
         .select('*')
+        .eq('profile_id', authorId)
         .order('created_at', { ascending: true });
 
       const baseTopics: AvailableTopicOption[] = DEFAULT_TABS.filter(
@@ -715,7 +717,7 @@ export function PostComposer({
     }
 
     fetchProfileTopics();
-  }, [supabase]);
+  }, [supabase, authorId]);
 
   useEffect(() => {
     if (!editingPost) {

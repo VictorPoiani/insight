@@ -654,8 +654,10 @@ export function TopicTabsManager({
       },
     ];
 
+    const staff = viewer?.role === 'admin' || viewer?.role === 'moderator';
     const fullPayload = {
-      profile_id: resolvedProfileId,
+      // sempre o dono logado; só a equipe cria tópicos no perfil de outra pessoa
+      profile_id: staff ? resolvedProfileId : viewer?.id ?? resolvedProfileId,
       name: cleanName,
       tag: cleanTag,
       color,
@@ -668,16 +670,24 @@ export function TopicTabsManager({
       workspace_data: workspaceData,
     };
 
-    let { data, error } = await supabase
-      .from('custom_topics')
-      .insert(fullPayload)
-      .select()
-      .single();
+    // Mesmo nome interno já usado por você: tenta "-2", "-3"...
+    let { data, error } = await supabase.from('custom_topics').insert(fullPayload).select().single();
+    for (let n = 2; error?.code === '23505' && n <= 6; n++) {
+      const retry = await supabase
+        .from('custom_topics')
+        .insert({ ...fullPayload, tag: `${cleanTag}${n}` })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
-    if (error) {
+    // Banco antigo sem alguma coluna nova (42703): grava só o essencial, com o dono
+    if (error?.code === '42703') {
       const legacyRetry = await supabase
         .from('custom_topics')
         .insert({
+          profile_id: fullPayload.profile_id,
           name: cleanName,
           tag: cleanTag,
           color,
@@ -686,7 +696,6 @@ export function TopicTabsManager({
         })
         .select()
         .single();
-
       data = legacyRetry.data;
       error = legacyRetry.error;
     }

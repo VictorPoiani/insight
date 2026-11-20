@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, Lock, Play, Sparkles, Zap } from 'lucide-react';
 import {
   IntroItem,
@@ -22,6 +22,7 @@ import {
   CosmeticName,
   CosmeticTag,
   FramePreview,
+  NitroBadge,
   TagPill,
   TitleText,
 } from '@/components/nitro/Cosmetics';
@@ -93,36 +94,6 @@ const RARITY_CLASS: Record<string, string> = {
   lendária: 'text-amber-400',
 };
 
-function LockedScreen() {
-  return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6 gap-4">
-      <div className="relative">
-        <div className="absolute inset-0 rounded-full bg-accent/25 blur-2xl" />
-        <div className="relative w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center">
-          <Lock className="w-7 h-7 text-accent" />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <h1 className="text-2xl font-extrabold text-primary">
-          Insight <span className="text-accent">Nitro</span>
-        </h1>
-        <p className="text-sm text-secondary max-w-sm">
-          Molduras animadas, títulos especiais, tags e animações de abertura para o seu perfil.
-        </p>
-        <p className="text-xs text-secondary">
-          {PRICE_LABEL} · <span className="font-semibold">grátis e vitalício</span> para quem chega ao Nível 5 (Grão-Mestre).
-        </p>
-        <p className="text-xs text-muted">
-          {NITRO_PUBLIC ? 'Assinaturas abrindo em breve.' : 'Em breve · acesso restrito durante a beta fechada.'}
-        </p>
-      </div>
-      <Link href="/" className="text-xs font-semibold text-accent hover:underline">
-        Voltar para o início
-      </Link>
-    </div>
-  );
-}
-
 function slotOf(kind: NitroKind): keyof NitroCosmetics {
   return kind;
 }
@@ -130,6 +101,7 @@ function slotOf(kind: NitroKind): keyof NitroCosmetics {
 function NitroGallery() {
   const { ready, viewer, hasAccess, saveCosmetics } = useNitro();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [kind, setKind] = useState<NitroKind>(
     () => KIND_PARAM[searchParams.get('tab') || ''] || 'frame'
@@ -175,11 +147,14 @@ function NitroGallery() {
   );
 
   if (!ready) return <AsteriskLoader size="lg" fullHeight label="Carregando Nitro..." />;
-  if (!hasAccess || !viewer) return <LockedScreen />;
-
-  const level = viewer.contributor_level ?? 0;
-  const displayName = viewer.display_name || viewer.full_name || viewer.username;
-  const avatar = viewer.avatar_url || '/assets/net/default-perfil';
+  // Todos navegam e experimentam; só quem tem acesso salva (hoje: admin).
+  const previewOnly = !hasAccess;
+  const me = viewer
+    ? { id: viewer.id, username: viewer.username, cosmetics: viewer.cosmetics }
+    : { id: 'nitro-preview', username: 'voce', cosmetics: null };
+  const level = viewer?.contributor_level ?? 0;
+  const displayName = viewer?.display_name || viewer?.full_name || viewer?.username || 'Seu nome';
+  const avatar = viewer?.avatar_url || '/assets/net/default-perfil';
 
   function toggleItem(item: NitroItem) {
     const slot = slotOf(item.kind);
@@ -188,6 +163,10 @@ function NitroGallery() {
   }
 
   async function handleSave() {
+    if (previewOnly) {
+      router.push('/nitro/assinar');
+      return;
+    }
     setSaving(true);
     const res = await saveCosmetics(draft);
     setSaving(false);
@@ -208,28 +187,48 @@ function NitroGallery() {
           <p className="text-[11px] text-muted">Galeria de personalização de perfil</p>
         </div>
         <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-          <Lock className="w-3 h-3" /> {NITRO_PUBLIC ? PRICE_LABEL : 'Beta fechada · admin'}
+          <Lock className="w-3 h-3" /> {NITRO_PUBLIC ? PRICE_LABEL : hasAccess ? 'Beta fechada · admin' : 'Em breve'}
         </span>
+        <Link
+          href="/nitro/assinar"
+          className="nx-cta-mini inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-bold"
+        >
+          <Zap className="w-3.5 h-3.5" /> {hasAccess ? 'Planos' : 'Assinar'}
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-0 xl:gap-5">
         {/* Coluna da galeria */}
         <div className="min-w-0">
           <div className="px-4 sm:px-6 pt-5">
-            <NitroStatusCard />
+            {previewOnly ? (
+              <Link
+                href="/nitro/assinar"
+                className="nx-cta-banner block rounded-2xl p-4 text-white"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Em breve</p>
+                <p className="text-base font-extrabold">Seu perfil, em outro nível.</p>
+                <p className="text-xs opacity-90">
+                  Experimente qualquer item no provador. Nitro por {PRICE_LABEL} · grátis para sempre no Nível 5.
+                </p>
+              </Link>
+            ) : (
+              <NitroStatusCard />
+            )}
           </div>
 
           {/* Prévia (mobile e telas médias) */}
           <div className="xl:hidden px-4 sm:px-6 pt-5">
             <PreviewCard
               draft={draft}
-              viewer={viewer}
+              viewer={me}
               displayName={displayName}
               avatar={avatar}
               dirty={dirty}
               saving={saving}
               status={status}
               onSave={handleSave}
+              locked={previewOnly}
               onTestIntro={() => {
                 const it = NITRO_ITEMS.find((i) => i.id === draft.intro && i.kind === 'intro') as IntroItem | undefined;
                 if (it) setTestingIntro(it);
@@ -307,6 +306,7 @@ function NitroGallery() {
                 avatar={avatar}
                 displayName={displayName}
                 onToggle={() => toggleItem(item)}
+                locked={previewOnly}
                 onTest={item.kind === 'intro' ? () => setTestingIntro(item as IntroItem) : undefined}
               />
             ))}
@@ -349,13 +349,14 @@ function NitroGallery() {
           <div className="sticky top-20 space-y-4">
             <PreviewCard
               draft={draft}
-              viewer={viewer}
+              viewer={me}
               displayName={displayName}
               avatar={avatar}
               dirty={dirty}
               saving={saving}
               status={status}
               onSave={handleSave}
+              locked={previewOnly}
               onTestIntro={() => {
                 const it = NITRO_ITEMS.find((i) => i.id === draft.intro && i.kind === 'intro') as IntroItem | undefined;
                 if (it) setTestingIntro(it);
@@ -383,6 +384,7 @@ function PreviewCard({
   status,
   onSave,
   onTestIntro,
+  locked = false,
 }: {
   draft: NitroCosmetics;
   viewer: { id: string; username: string };
@@ -393,6 +395,7 @@ function PreviewCard({
   status: string | null;
   onSave: () => void;
   onTestIntro: () => void;
+  locked?: boolean;
 }) {
   return (
     <div className="p-5 rounded-2xl bg-surface border border-border space-y-4">
@@ -408,6 +411,7 @@ function PreviewCard({
           </p>
           <p className="text-xs text-muted flex items-center justify-center gap-1.5 flex-wrap">
             <span>@{viewer.username}</span>
+            <NitroBadge />
             <CosmeticTag profile={viewer} preview={draft} />
           </p>
         </div>
@@ -425,13 +429,24 @@ function PreviewCard({
         <button
           type="button"
           onClick={onSave}
-          disabled={!dirty || saving}
+          disabled={!locked && (!dirty || saving)}
           className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full bg-accent hover:bg-accent-hover text-white text-xs font-bold disabled:opacity-40"
         >
-          <Check className="w-3.5 h-3.5" /> {saving ? 'Salvando...' : 'Salvar'}
+          {locked ? (
+            <>
+              <Zap className="w-3.5 h-3.5" /> Assinar Nitro
+            </>
+          ) : (
+            <>
+              <Check className="w-3.5 h-3.5" /> {saving ? 'Salvando...' : 'Salvar'}
+            </>
+          )}
         </button>
       </div>
-      {dirty && !saving && <p className="text-[11px] text-amber-400 text-center">Alterações não salvas</p>}
+      {locked && (
+        <p className="text-[11px] text-muted text-center">Você está no provador: experimente à vontade, nada é salvo.</p>
+      )}
+      {!locked && dirty && !saving && <p className="text-[11px] text-amber-400 text-center">Alterações não salvas</p>}
       {status && <p className="text-[11px] text-center text-secondary">{status}</p>}
     </div>
   );
@@ -444,6 +459,7 @@ function ItemCard({
   displayName,
   onToggle,
   onTest,
+  locked = false,
 }: {
   item: NitroItem;
   equipped: boolean;
@@ -451,8 +467,10 @@ function ItemCard({
   displayName: string;
   onToggle: () => void;
   onTest?: () => void;
+  locked?: boolean;
 }) {
   const coll = getCollection(item.collection);
+  const category = item.kind === 'tag' && item.category ? item.category : coll.name;
 
   return (
     <div
@@ -479,7 +497,7 @@ function ItemCard({
             <TitleText title={item}>{displayName}</TitleText>
           </span>
         )}
-        {item.kind === 'tag' && <TagPill tagId={item.id} className="scale-125" />}
+        {item.kind === 'tag' && <TagPill tagId={item.id} className="max-w-[92%]" />}
         {item.kind === 'intro' && (
           <span className="flex flex-col items-center gap-1.5 text-secondary">
             <Sparkles className="w-7 h-7" style={{ color: coll.colors[0] }} />
@@ -498,7 +516,7 @@ function ItemCard({
         <p className="text-[10px] text-muted leading-snug line-clamp-2">{item.description}</p>
         <div className="mt-auto pt-1 flex items-center justify-between gap-1 text-[10px]">
           <span className="text-secondary truncate">
-            {coll.name} · <span className={RARITY_CLASS[item.rarity]}>{item.rarity}</span>
+            {category} · <span className={RARITY_CLASS[item.rarity]}>{item.rarity}</span>
           </span>
           <span className="shrink-0 px-1.5 py-0.5 rounded bg-elevated border border-border text-muted">
             {describeRequirement(item.requirement)}
@@ -521,7 +539,7 @@ function ItemCard({
               equipped ? 'bg-elevated border border-border text-secondary hover:text-danger' : 'bg-accent text-white hover:bg-accent-hover'
             }`}
           >
-            {equipped ? 'Remover' : 'Equipar'}
+            {equipped ? 'Remover' : locked ? 'Experimentar' : 'Equipar'}
           </button>
         </div>
       </div>

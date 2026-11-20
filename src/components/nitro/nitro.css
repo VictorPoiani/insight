@@ -343,6 +343,121 @@ html[data-reduce-motion='true'] .nx-fx-still { visibility: visible !important; }
   animation: nx-tagshine 3.5s ease-in-out infinite;
 }
 
+
+/* --------------------------------------------------------- SELO NITRO */
+.nx-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 3px rgba(192, 132, 252, 0.55));
+}
+.nx-badge-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.75) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: nx-badge-shine 3.8s ease-in-out infinite;
+}
+@keyframes nx-badge-shine {
+  0%, 70% { transform: translateX(-120%); }
+  90%, 100% { transform: translateX(120%); }
+}
+
+/* --------------------------------------------------------- TAGS ILUSTRADAS */
+.nx-tag--art {
+  height: 20px;
+  padding: 0 8px 0 4px;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.nx-tag-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+.nx-tag-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.25));
+}
+.nx-tag-label {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.nx-tag-scene * { transform-box: fill-box; }
+.nx-tag-scene .ta-scroll { transform-box: view-box; animation: ta-scroll 9s linear infinite; }
+.nx-tag-scene .ta-scroll-rev { transform-box: view-box; animation: ta-scroll 5s linear infinite reverse; }
+.nx-tag-scene .ta-draw { stroke-dasharray: 100; animation: ta-draw 3.6s ease-in-out infinite; }
+.nx-tag-scene .ta-pulse { transform-origin: center; animation: ta-pulse 1.8s ease-in-out infinite; }
+.nx-tag-scene .ta-fall { animation: ta-fall 2.2s linear infinite; }
+.nx-tag-scene .ta-sweep { transform-box: view-box; animation: ta-sweep 5.5s linear infinite; }
+.nx-tag-scene .ta-bob { transform-origin: center; animation: ta-bob 2s ease-in-out infinite; }
+.nx-tag-scene .ta-blink { animation: ta-blink 1.6s steps(2, jump-none) infinite; }
+.nx-tag-scene .ta-flicker { transform-origin: 50% 100%; animation: ta-flicker 0.9s ease-in-out infinite alternate; }
+.nx-tag-scene .ta-glitch { animation: ta-glitch 2.4s steps(1, end) infinite; }
+.nx-tag-scene .ta-spin { transform-box: view-box; animation: ta-spin 6s linear infinite; }
+.nx-tag-scene .ta-spin-rev { transform-box: view-box; animation: ta-spin 8s linear infinite reverse; }
+.nx-tag-scene .ta-rise { transform-origin: center; animation: ta-rise 2.8s ease-out infinite; }
+.nx-tag-scene .ta-twinkle { transform-box: view-box; animation: ta-twinkle 1.8s ease-in-out infinite; }
+.nx-tag-scene .ta-grow { transform-box: view-box; animation: ta-grow 2.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite; }
+.nx-tag-scene .ta-comet { transform-box: view-box; animation: ta-comet 3.6s ease-in infinite; }
+.nx-tag-scene .ta-drift { transform-box: view-box; animation: ta-drift 7s ease-in-out infinite alternate; }
+.nx-tag-scene .ta-glow { animation: ta-glow 2s ease-in-out infinite; }
+.nx-tag-scene .ta-wave { transform-box: view-box; animation: ta-wave 1.2s ease-in-out infinite alternate; }
+.nx-tag-scene .ta-swing { transform-box: view-box; animation: ta-swing 3s ease-in-out infinite alternate; }
+.nx-tag-scene .ta-swing-rev { transform-box: view-box; animation: ta-swing 3.4s ease-in-out infinite alternate-reverse; }
+
+@keyframes ta-scroll { from { transform: translateX(0); } to { transform: translateX(-120px); } }
+@keyframes ta-draw { 0% { stroke-dashoffset: 100; } 55%, 80% { stroke-dashoffset: 0; opacity: 0.75; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes ta-pulse { 0%, 100% { transform: scale(0.85); opacity: 0.35; } 50% { transform: scale(1.12); opacity: 0.85; } }
+@keyframes ta-fall { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(26px) rotate(260deg); opacity: 0.8; } }
+@keyframes ta-sweep { 0% { transform: translateX(0); } 100% { transform: translateX(150px); } }
+@keyframes ta-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@keyframes ta-blink { 0% { opacity: 1; } 100% { opacity: 0.15; } }
+@keyframes ta-flicker { 0% { transform: scaleY(0.75); opacity: 0.6; } 100% { transform: scaleY(1.1); opacity: 0.95; } }
+@keyframes ta-glitch { 0%, 70%, 100% { transform: translateX(0); opacity: 0.2; } 72% { transform: translateX(-3px); opacity: 0.6; } 76% { transform: translateX(4px); opacity: 0.4; } 80% { transform: translateX(0); opacity: 0.2; } }
+@keyframes ta-spin { to { transform: rotate(360deg); } }
+@keyframes ta-rise { 0% { transform: translateY(4px) scale(0.6); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-14px) scale(1.1); opacity: 0; } }
+@keyframes ta-twinkle { 0%, 100% { transform: scale(0.4); opacity: 0.3; } 50% { transform: scale(1.2); opacity: 1; } }
+@keyframes ta-grow { 0% { transform: scaleY(0.2); } 60%, 100% { transform: scaleY(1); } }
+@keyframes ta-comet { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 70%, 100% { transform: translate(150px, 0); opacity: 0; } }
+@keyframes ta-drift { from { transform: translateX(-6px); } to { transform: translateX(8px); } }
+@keyframes ta-glow { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.45; } }
+@keyframes ta-wave { from { transform: scaleY(0.4); } to { transform: scaleY(1.3); } }
+@keyframes ta-swing { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-tag-scene *, .nx-badge-shine { animation: none !important; }
+}
+html[data-reduce-motion='true'] .nx-tag-scene *,
+html[data-reduce-motion='true'] .nx-badge-shine { animation: none !important; }
+
+/* ------------------------------------------------------------ CTAs na galeria */
+.nx-cta-mini {
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  box-shadow: 0 6px 18px -6px rgba(168, 85, 247, 0.7);
+}
+
+.nx-cta-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, #4338ca, #9333ea 45%, #db2777);
+  box-shadow: 0 16px 40px -18px rgba(147, 51, 234, 0.8);
+}
+
 /* --------------------------------------------------------------- ABERTURA */
 
 .nx-intro {

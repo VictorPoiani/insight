@@ -96,3 +96,7 @@ html[data-reduce-motion='true'] .insight-logo .il-text,
 html[data-reduce-motion='true'] .insight-logo .il-star {
   animation: none !important;
 }
+
+/* Vitrine do Rainbow (página do Nitro): força o espectro dentro do bloco */
+.ia-force-rainbow .insight-asterisk .ia-rainbow { display: block; }
+.ia-force-rainbow .insight-asterisk .ia-base { visibility: hidden; }

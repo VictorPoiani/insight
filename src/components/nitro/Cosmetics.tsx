@@ -27,8 +27,10 @@ import {
   getNitroItem,
 } from '@/lib/nitro/catalog';
 import { useNitro, useProfileCosmetics } from './NitroProvider';
+import { displaysNitro, type NitroEntitlementInput } from '@/lib/nitro/entitlement';
+import { TAG_ART } from './tagArt';
 
-type CosmeticProfile = { id: string; cosmetics?: NitroCosmetics | null };
+type CosmeticProfile = { id: string; cosmetics?: NitroCosmetics | null } & NitroEntitlementInput;
 
 type CSSVars = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -468,13 +470,57 @@ export function CosmeticTag({
   const saved = useProfileCosmetics(profile);
   const cosmetics = preview !== undefined ? preview : saved;
   const tag = getNitroItem(cosmetics?.tag, 'tag');
-  if (!tag) return null;
-  return <TagPill tagId={tag.id} className={className} />;
+  const badge = displaysNitro(profile) === true;
+  if (!tag && !badge) return null;
+  if (!tag) return <NitroBadge className={className} />;
+  if (!badge) return <TagPill tagId={tag.id} className={className} />;
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`}>
+      <NitroBadge />
+      <TagPill tagId={tag.id} />
+    </span>
+  );
+}
+
+/** Selo do Insight Nitro (ao lado do nome/patente). Ícone próprio, não lucide. */
+export function NitroBadge({ className = '', size = 15 }: { className?: string; size?: number }) {
+  return (
+    <span className={`nx-badge ${className}`} title="Insight Nitro" aria-label="Membro Insight Nitro" role="img">
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+        <defs>
+          <linearGradient id="nxBadgeG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#7dd3fc" />
+            <stop offset="0.5" stopColor="#c084fc" />
+            <stop offset="1" stopColor="#f472b6" />
+          </linearGradient>
+        </defs>
+        <path d="M12 1.6 21 6.8v10.4L12 22.4 3 17.2V6.8Z" fill="url(#nxBadgeG)" stroke="#1e1b4b" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M12 1.6 21 6.8 12 12 3 6.8Z" fill="#ffffff" fillOpacity="0.28" />
+        <path d="M13.4 5.2 8.6 12.6h3l-1 6.2 4.8-7.4h-3Z" fill="#ffffff" stroke="#1e1b4b" strokeWidth="0.9" strokeLinejoin="round" />
+      </svg>
+      <span aria-hidden className="nx-badge-shine" />
+    </span>
+  );
 }
 
 export function TagPill({ tagId, className = '' }: { tagId: string; className?: string }) {
   const tag = getNitroItem(tagId, 'tag');
   if (!tag) return null;
+  const art = TAG_ART[tag.id];
+  if (art) {
+    const style: CSSVars = { '--nx-tbg': tag.bg, '--nx-tfg': tag.fg, '--nx-tb': tag.border };
+    return (
+      <span className={`nx-tag nx-tag--art ${className}`} style={style} title={tag.name}>
+        <svg className="nx-tag-scene" viewBox="0 0 120 20" preserveAspectRatio="xMidYMid slice" aria-hidden>
+          {art.scene}
+        </svg>
+        <svg className="nx-tag-icon" viewBox="0 0 16 16" aria-hidden>
+          {art.icon}
+        </svg>
+        <span className="nx-tag-label">{tag.label}</span>
+      </span>
+    );
+  }
   const Icon = TAG_ICONS[tag.icon];
   const style: CSSVars = { '--nx-tbg': tag.bg, '--nx-tfg': tag.fg, '--nx-tb': tag.border };
   return (

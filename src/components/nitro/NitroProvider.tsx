@@ -14,6 +14,8 @@ import { NitroCosmetics } from '@/lib/nitro/catalog';
 import {
   NITRO_KILL_SWITCH,
   NitroEntitlement,
+  NitroEntitlementInput,
+  displaysNitro,
   resolveNitroEntitlement,
 } from '@/lib/nitro/entitlement';
 import './nitro.css';
@@ -175,16 +177,17 @@ export function useNitro() {
 }
 
 /**
- * Cosméticos a exibir para um perfil, ou null.
- * Beta fechada: só quem tem acesso (admin) enxerga cosméticos.
+ * Cosméticos a exibir para um perfil, ou null. Todo mundo vê os cosméticos de
+ * quem tem Nitro (vitrine); só quem tem acesso pode equipar.
  */
 export function useProfileCosmetics(
-  profile: Pick<Profile, 'id'> & { cosmetics?: NitroCosmetics | null } | null | undefined
+  profile: (Pick<Profile, 'id'> & { cosmetics?: NitroCosmetics | null } & NitroEntitlementInput) | null | undefined
 ): NitroCosmetics | null {
-  const { hasAccess, overrides } = useNitro();
-  if (!hasAccess || !profile) return null;
-  if (profile.id in overrides) return overrides[profile.id];
-  return profile.cosmetics || null;
+  const { overrides } = useNitro();
+  if (!profile || NITRO_KILL_SWITCH) return null;
+  const cosmetics = profile.id in overrides ? overrides[profile.id] : profile.cosmetics || null;
+  if (!cosmetics) return null;
+  return displaysNitro(profile) === false ? null : cosmetics;
 }
 
 /** Aparelho com poucos núcleos/memória ou modo de economia de dados. */

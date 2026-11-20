@@ -122,3 +122,18 @@ mais rápido, por exemplo com a biblioteca `mediabunny` para demux/mux), com o
 ffmpeg.wasm como reserva para navegadores sem WebCodecs. A outra opção é
 transcodificar no servidor (Cloudflare Stream ou um worker com FFmpeg nativo depois
 do upload). Enquanto isso, o plano acima evita travar a aba e respeita a cota.
+
+## Vitrine pública, selo e cobrança (beta)
+
+- Todos navegam em `/nitro` no modo **provador** (experimentam qualquer item na prévia,
+  nada é salvo) e veem a página de planos `/nitro/assinar`. Só admin salva/usa.
+- Cosméticos e o **selo Nitro** de quem tem Nitro aparecem para todos (posts, respostas,
+  perfil, notificações). Hoje isso é só o admin.
+- **Cobrança**: `POST /api/nitro/checkout` cria a assinatura mensal (Mercado Pago
+  preapproval, `external_reference = nitro:<profile_id>`), mas só com
+  `NITRO_BILLING_ENABLED=true` no servidor; sem isso responde 503 "em breve".
+- **Webhook** (`/api/webhooks/mercadopago`): tópicos `subscription_preapproval` e
+  `subscription_authorized_payment` sincronizam `nitro_status`/`nitro_expires_at`
+  (próxima cobrança + 3 dias). Pagamentos recorrentes do Nitro **não** viram doação.
+  No painel do Mercado Pago, habilite esses tópicos no webhook.
+- Tags ilustradas: arte em `src/components/nitro/tagArt.tsx` (ícone e cenário próprios).

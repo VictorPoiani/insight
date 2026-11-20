@@ -40,6 +40,49 @@ function verifyMercadoPagoSignature(
     return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
+/** Prazo de tolerância após a data da próxima cobrança. */
+const NITRO_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Sincroniza uma assinatura do Insight Nitro (preapproval) com o perfil.
+ * Fonte da verdade: a API do Mercado Pago (nunca o corpo do webhook).
+ */
+async function syncNitroPreapproval(preapprovalId: string, accessToken: string) {
+    const res = await fetch(
+        `https://api.mercadopago.com/preapproval/${encodeURIComponent(preapprovalId)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' }
+    );
+    if (!res.ok) return { synced: false, reason: 'preapproval_not_found' };
+    const pre = await res.json();
+
+    const ref = String(pre.external_reference || '');
+    if (!ref.startsWith('nitro:')) return { synced: false, reason: 'not_nitro' };
+    const profileId = ref.slice('nitro:'.length);
+
+    const statusMap: Record<string, string> = {
+        authorized: 'active',
+        paused: 'past_due',
+        cancelled: 'canceled',
+    };
+    const nitroStatus = statusMap[pre.status];
+    if (!nitroStatus) return { synced: false, reason: `status_${pre.status}` };
+
+    const update: Record<string, unknown> = {
+        nitro_status: nitroStatus,
+        nitro_subscription_id: String(pre.id),
+    };
+    if (nitroStatus === 'active' && pre.next_payment_date) {
+        update.nitro_expires_at = new Date(
+            new Date(pre.next_payment_date).getTime() + NITRO_GRACE_MS
+        ).toISOString();
+    }
+    // cancelada/pausada: mantém nitro_expires_at — vale até o fim do período pago
+
+    const supabaseAdmin = createAdminClient();
+    await supabaseAdmin.from('profiles').update(update).eq('id', profileId);
+    return { synced: true, status: nitroStatus };
+}
+
 export async function POST(request: Request) {
     try {
         const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
@@ -64,6 +107,25 @@ export async function POST(request: Request) {
             url.searchParams.get('id') ||
             ''
         );
+
+        // Assinatura do Insight Nitro (preapproval) e cobranças recorrentes dela
+        if (paymentId && (topic === 'subscription_preapproval' || topic === 'preapproval' || topic === 'subscription_authorized_payment')) {
+            if (webhookSecret && !verifyMercadoPagoSignature(request, paymentId, webhookSecret)) {
+                return NextResponse.json({ error: 'Assinatura do webhook inválida' }, { status: 401 });
+            }
+            let preapprovalId = paymentId;
+            if (topic === 'subscription_authorized_payment') {
+                const ap = await fetch(
+                    `https://api.mercadopago.com/authorized_payments/${encodeURIComponent(paymentId)}`,
+                    { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' }
+                );
+                if (!ap.ok) return NextResponse.json({ received: true, ignored: true });
+                preapprovalId = String((await ap.json()).preapproval_id || '');
+                if (!preapprovalId) return NextResponse.json({ received: true, ignored: true });
+            }
+            const result = await syncNitroPreapproval(preapprovalId, accessToken);
+            return NextResponse.json({ received: true, nitro: result });
+        }
 
         // Ignora eventos que não sejam de pagamento (mas devolve 200 pro MP não reenviar)
         if (!paymentId || (topic && topic !== 'payment')) {
@@ -99,6 +161,14 @@ export async function POST(request: Request) {
         const payment = await mpRes.json();
         const mpStatus: string = payment.status; // 'approved' | 'pending' | 'rejected' | 'cancelled'
         const paidAmount = Number(payment.transaction_amount) || 0;
+
+        // Mensalidade do Nitro NÃO é doação: não gera pontos nem patente.
+        if (
+            payment.operation_type === 'recurring_payment' ||
+            String(payment.external_reference || '').startsWith('nitro:')
+        ) {
+            return NextResponse.json({ received: true, nitroPayment: true });
+        }
 
         if (mpStatus !== 'approved' || paidAmount <= 0) {
             return NextResponse.json({ received: true, status: mpStatus });

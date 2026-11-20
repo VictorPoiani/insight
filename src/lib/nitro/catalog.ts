@@ -22,6 +22,10 @@ export type NitroCollectionId =
   | 'sombras'
   | 'oceano'
   | 'bichos'
+  | 'memes'
+  | 'kpop'
+  | 'telas'
+  | 'musica'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -127,6 +131,8 @@ export interface TagItem extends BaseItem {
   border: string;
   shimmer?: boolean;
   mono?: boolean;
+  /** Subcategoria exibida no card (ex.: "Memes BR"). */
+  category?: string;
 }
 
 export interface IntroItem extends BaseItem {
@@ -180,6 +186,10 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'oceano', name: 'Oceano', description: 'Ondas em xilogravura e marés.', colors: ['#1e3a5f', '#f7f3e8'] },
   { id: 'bichos', name: 'Bichinhos', description: 'Orelhas, patinhas e amigos ilustrados em volta da foto.', colors: ['#f9b8c6', '#f6a04d'] },
   { id: 'patentes', name: 'Patentes', description: 'Conquistadas pelos níveis de contribuinte.', colors: ['#4285F4', '#d4a72c'] },
+  { id: 'memes', name: 'Memes BR & Internet', description: 'Clássicos da internet brasileira e mundial.', colors: ['#2563eb', '#facc15'] },
+  { id: 'kpop', name: 'K-Pop & Cultura Pop', description: 'Lightsticks, comebacks e finais de MV.', colors: ['#c084fc', '#f472b6'] },
+  { id: 'telas', name: 'Filmes, Séries & Sci-Fi', description: 'Multiversos, cometas e aventuras.', colors: ['#fb923c', '#6366f1'] },
+  { id: 'musica', name: 'Música', description: 'Rock, pop, indie e clássicos.', colors: ['#ea580c', '#34d399'] },
 ];
 
 const NITRO: NitroRequirement = { type: 'nitro' };
@@ -247,6 +257,55 @@ const TAGS: TagItem[] = [
     description: 'Conectado à rede.', icon: 'cpu', bg: '#020617', fg: '#22d3ee', border: '#22d3ee', mono: true },
   { id: 'tag-cosmic-voyager', kind: 'tag', name: 'Viajante Cósmico', label: 'Viajante Cósmico', collection: 'cosmico', rarity: 'rara', requirement: NITRO,
     description: 'Já esteve além da heliopausa.', icon: 'orbit', bg: 'linear-gradient(90deg,#4c1d95,#be185d)', fg: '#fdf4ff', border: 'rgba(244,114,182,0.5)' },
+  // ---- tags ilustradas (arte em components/nitro/tagArt.tsx)
+  { id: 'tag-caneta-azul', kind: 'tag', name: 'Caneta Azul', label: 'Caneta Azul', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
+    description: 'Tá marcado com a minha caneta', icon: 'sparkles', bg: '#dbeafe', fg: '#1e3a8a', border: '#3b82f6' },
+  { id: 'tag-bora-bill', kind: 'tag', name: 'Bora Bill', label: 'Bora Bill', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
+    description: 'Não pode faltar o encerramento', icon: 'sparkles', bg: '#450a0a', fg: '#fef3c7', border: '#facc15' },
+  { id: 'tag-receba', kind: 'tag', name: 'Receba!', label: 'Receba!', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
+    description: 'Apenas o melhor do mundo', icon: 'sparkles', bg: 'linear-gradient(90deg,#facc15,#f59e0b)', fg: '#422006', border: '#a16207' },
+  { id: 'tag-ai-dentu', kind: 'tag', name: 'Aí Dentu', label: 'Aí Dentu', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
+    description: 'Quando o plot twist vem forte', icon: 'sparkles', bg: '#7dd3fc', fg: '#082f49', border: '#0369a1' },
+  { id: 'tag-pave-pacume', kind: 'tag', name: 'É Pavê ou Pacumê?', label: 'É Pavê ou Pacumê?', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
+    description: 'Piada clássica de respeito', icon: 'sparkles', bg: '#fef3c7', fg: '#78350f', border: '#d97706' },
+  { id: 'tag-complicado', kind: 'tag', name: 'Complicado Isso Aí', label: 'Complicado Isso Aí', collection: 'memes', category: 'Internet', rarity: 'rara', requirement: NITRO,
+    description: 'Situação crítica no servidor', icon: 'sparkles', bg: '#111827', fg: '#fecaca', border: '#ef4444' },
+  { id: 'tag-this-is-fine', kind: 'tag', name: 'This Is Fine', label: 'This Is Fine', collection: 'memes', category: 'Internet', rarity: 'épica', requirement: NITRO,
+    description: 'Tudo sob controle (não está)', icon: 'sparkles', bg: 'linear-gradient(90deg,#c2410c,#9a3412)', fg: '#fef3c7', border: '#fb923c' },
+  { id: 'tag-404', kind: 'tag', name: '404 Noção Not Found', label: '404 Noção Not Found', collection: 'memes', category: 'Internet', rarity: 'rara', requirement: NITRO,
+    description: 'Procurei mas não achei', icon: 'sparkles', bg: '#0f172a', fg: '#a5f3fc', border: '#22d3ee' },
+  { id: 'tag-plot-twist', kind: 'tag', name: 'Plot Twist', label: 'Plot Twist', collection: 'memes', category: 'Internet', rarity: 'comum', requirement: NITRO,
+    description: 'Ninguém viu chegando', icon: 'sparkles', bg: 'linear-gradient(90deg,#6d28d9,#a21caf)', fg: '#fdf4ff', border: '#c084fc' },
+  { id: 'tag-bias-wrecked', kind: 'tag', name: 'Bias Wrecked', label: 'Bias Wrecked', collection: 'kpop', category: 'K-Pop', rarity: 'rara', requirement: NITRO,
+    description: 'Mudou de ideia no meio do MV', icon: 'sparkles', bg: '#fce7f3', fg: '#9d174d', border: '#f472b6' },
+  { id: 'tag-ending-fairy', kind: 'tag', name: 'Ending Fairy', label: 'Ending Fairy', collection: 'kpop', category: 'K-Pop', rarity: 'épica', requirement: NITRO,
+    description: 'Foco total nos últimos segundos', icon: 'sparkles', bg: 'linear-gradient(90deg,#312e81,#6b21a8)', fg: '#fdf4ff', border: '#f0abfc' },
+  { id: 'tag-lightstick', kind: 'tag', name: 'Lightstick Acesa', label: 'Lightstick Acesa', collection: 'kpop', category: 'K-Pop', rarity: 'comum', requirement: NITRO,
+    description: 'Pronto pro show / comeback', icon: 'sparkles', bg: '#2e1065', fg: '#f5d0fe', border: '#a855f7' },
+  { id: 'tag-all-kill', kind: 'tag', name: 'All-Kill', label: 'All-Kill', collection: 'kpop', category: 'K-Pop', rarity: 'lendária', requirement: NITRO,
+    description: 'Dominando tudo de ponta a ponta', icon: 'sparkles', bg: 'linear-gradient(90deg,#0a0a0a,#292524)', fg: '#fde68a', border: '#facc15' },
+  { id: 'tag-full-combo', kind: 'tag', name: 'Full Combo', label: 'Full Combo', collection: 'kpop', category: 'Cultura Pop', rarity: 'épica', requirement: NITRO,
+    description: 'Sem errar uma nota sequer', icon: 'sparkles', bg: '#0c4a6e', fg: '#e0f2fe', border: '#38bdf8' },
+  { id: 'tag-inevitavel', kind: 'tag', name: 'Eu Sou Inevitável', label: 'Eu Sou Inevitável', collection: 'telas', category: 'Filmes', rarity: 'épica', requirement: NITRO,
+    description: 'Já era esperado', icon: 'sparkles', bg: 'linear-gradient(90deg,#3b0764,#581c87)', fg: '#fde68a', border: '#ca8a04' },
+  { id: 'tag-multiverso', kind: 'tag', name: 'Multiverso da Loucura', label: 'Multiverso da Loucura', collection: 'telas', category: 'Filmes', rarity: 'rara', requirement: NITRO,
+    description: 'Cada aba é uma realidade', icon: 'sparkles', bg: '#1e1b4b', fg: '#fdba74', border: '#fb923c' },
+  { id: 'tag-nao-olhe', kind: 'tag', name: 'Não Olhe Para Cima', label: 'Não Olhe Para Cima', collection: 'telas', category: 'Filmes', rarity: 'comum', requirement: NITRO,
+    description: 'Ignorando o aviso óbvio', icon: 'sparkles', bg: '#020617', fg: '#e2e8f0', border: '#475569' },
+  { id: 'tag-hora-aventura', kind: 'tag', name: 'Hora da Aventura', label: 'Hora da Aventura', collection: 'telas', category: 'Animação', rarity: 'rara', requirement: NITRO,
+    description: 'Bora resolver na marra', icon: 'sparkles', bg: '#7dd3fc', fg: '#052e16', border: '#16a34a' },
+  { id: 'tag-modo-furtivo', kind: 'tag', name: 'Modo Furtivo', label: 'Modo Furtivo', collection: 'telas', category: 'Sci-Fi', rarity: 'comum', requirement: NITRO,
+    description: 'Passando sem deixar rastro', icon: 'sparkles', bg: '#18181b', fg: '#d4d4d8', border: '#52525b' },
+  { id: 'tag-stairway', kind: 'tag', name: 'Stairway to Heaven', label: 'Stairway to Heaven', collection: 'musica', category: 'Música', rarity: 'lendária', requirement: NITRO,
+    description: 'Subindo degrau por degrau', icon: 'sparkles', bg: 'linear-gradient(90deg,#bae6fd,#fef3c7)', fg: '#1e3a8a', border: '#facc15' },
+  { id: 'tag-bohemian', kind: 'tag', name: 'Bohemian Rhapsody', label: 'Bohemian Rhapsody', collection: 'musica', category: 'Música', rarity: 'épica', requirement: NITRO,
+    description: 'Mistura de tudo num só lugar', icon: 'sparkles', bg: '#111111', fg: '#ffffff', border: '#a855f7' },
+  { id: 'tag-solo-guitarra', kind: 'tag', name: 'Solo de Guitarra', label: 'Solo de Guitarra', collection: 'musica', category: 'Música', rarity: 'rara', requirement: NITRO,
+    description: 'Momento de brilhar sem pressa', icon: 'sparkles', bg: '#7c2d12', fg: '#fed7aa', border: '#ea580c' },
+  { id: 'tag-replay', kind: 'tag', name: 'Replay Infinito', label: 'Replay Infinito', collection: 'musica', category: 'Música', rarity: 'comum', requirement: NITRO,
+    description: 'Não cansa de ouvir', icon: 'sparkles', bg: '#064e3b', fg: '#d1fae5', border: '#34d399' },
+  { id: 'tag-backstage', kind: 'tag', name: 'Backstage Pass', label: 'Backstage Pass', collection: 'musica', category: 'Música', rarity: 'épica', requirement: NITRO,
+    description: 'Acesso de bastidores', icon: 'sparkles', bg: '#18181b', fg: '#fef08a', border: '#facc15' },
 ];
 
 // ============================================================================

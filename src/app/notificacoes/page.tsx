@@ -1,5 +1,7 @@
 'use client';
 
+import { NitroBadge } from '@/components/nitro/Cosmetics';
+import { displaysNitro } from '@/lib/nitro/entitlement';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -584,7 +586,8 @@ export default function NotificationsPage() {
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs sm:text-sm text-primary leading-snug">
-                      <span className="font-extrabold">{actorName}</span>{' '}
+                      <span className="font-extrabold">{actorName}</span>
+                      {notif.actor && displaysNitro(notif.actor) === true && <NitroBadge className="mx-0.5" size={13} />}{' '}
                       <ShieldCheck className="w-3.5 h-3.5 text-[#00ccff] inline-block align-text-bottom mr-1" />
                       <span className="text-secondary">{meta.actionText}</span>
                     </p>

@@ -1300,7 +1300,7 @@ export function ProfileHeader({
                 </>
               )}
             </div>
-            {hasNitroAccess && isOwnProfile && (
+            {isOwnProfile && (
               <Link
                 href="/nitro?tab=frame"
                 title="Editar moldura"
@@ -1507,9 +1507,9 @@ export function ProfileHeader({
             )}
 
             {/* Insight Nitro: personalizar o próprio perfil (beta fechada) */}
-            {hasNitroAccess && isOwnProfile && (
+            {isOwnProfile && (
               <Link
-                href="/nitro?tab=frame"
+                href={hasNitroAccess ? '/nitro?tab=frame' : '/nitro'}
                 title="Personalizar perfil · Insight Nitro"
                 className="px-3.5 py-1.5 rounded-full font-bold text-xs bg-elevated border border-border hover:border-accent text-primary flex items-center gap-1.5 transition-colors shrink-0"
               >

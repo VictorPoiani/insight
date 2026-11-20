@@ -97,3 +97,17 @@ export function describeNitroSource(e: NitroEntitlement): string {
       return `R$ ${NITRO_PRICE_BRL.toFixed(2).replace('.', ',')}/mês`;
   }
 }
+
+/**
+ * O selo/cosméticos de um perfil QUALQUER devem aparecer para quem o vê?
+ * Beta fechada: só admin exibe. Lançado: quem tem direito.
+ * `null` = o objeto não trouxe as colunas necessárias (confie nos cosméticos salvos,
+ * que só são gravados pela RPC com checagem de acesso).
+ */
+export function displaysNitro(p: NitroEntitlementInput | null | undefined): boolean | null {
+  if (!p || NITRO_KILL_SWITCH) return false;
+  if (p.role === undefined && p.contributor_level === undefined && p.nitro_status === undefined) return null;
+  if (p.role === 'admin') return true;
+  if (!NITRO_PUBLIC) return false;
+  return resolveNitroEntitlement(p).entitled;
+}

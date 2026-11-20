@@ -48,6 +48,8 @@ export interface Profile {
   nitro_status?: 'none' | 'active' | 'past_due' | 'canceled' | 'expired' | null;
   nitro_expires_at?: string | null;
   has_lifetime_nitro?: boolean | null;
+  /** E-mail confirmado pelo link enviado pelo app. */
+  email_verified_at?: string | null;
   /** Insight Nitro: itens equipados (snapshot gravado via RPC set_my_cosmetics). */
   cosmetics?: NitroCosmetics | null;
 }
@@ -309,6 +311,19 @@ export interface Reply {
   /** Resposta a que esta resposta responde (null = resposta direta ao post). */
   parent_reply_id?: string | null;
   likes_count?: number | null;
+  /** Corpo em blocos (texto, citação, código, lista, imagem, Spotify). */
+  blocks?: ReplyBlock[] | null;
+}
+
+export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify';
+
+export interface ReplyBlock {
+  id: string;
+  type: ReplyBlockType;
+  text?: string;
+  url?: string;
+  trackId?: string;
+  bytes?: number;
 }
 
 export interface NotificationItem {

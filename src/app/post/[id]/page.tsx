@@ -1,5 +1,6 @@
 'use client';
 
+import { loginHref } from '@/lib/account/loginRedirect';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Post, Profile, Reply } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
-import { ReplyComposer } from '@/components/replies/ReplyComposer';
+import { ReplyComposer, ReplySubmitPayload } from '@/components/replies/ReplyComposer';
 import { ReplyCarousel } from '@/components/replies/ReplyCarousel';
 import { ReplyThread, AuthorProfiles } from '@/components/replies/ReplyThread';
 import { ReplyNode, ReplySort, buildReplyTree } from '@/components/replies/utils';
@@ -187,7 +188,7 @@ export default function PostDiscussionPage() {
 
   function requireLogin(): Profile | null {
     if (!loggedUser) {
-      router.push('/login');
+      router.push(loginHref());
       return null;
     }
     return loggedUser;
@@ -205,11 +206,7 @@ export default function PostDiscussionPage() {
     });
   }
 
-  async function submitReply(
-    parent: ReplyNode | null,
-    text: string,
-    trackId: string | null
-  ): Promise<boolean> {
+  async function submitReply(parent: ReplyNode | null, { blocks, content }: ReplySubmitPayload): Promise<boolean> {
     const me = requireLogin();
     if (!me || !post) return false;
 
@@ -219,8 +216,11 @@ export default function PostDiscussionPage() {
       author_name: me.display_name || me.full_name || me.username,
       author_handle: me.username,
       avatar_url: me.avatar_url || '/assets/net/default-perfil',
-      content: text,
-      spotify_track_id: trackId,
+      content,
+      blocks,
+      // compatibilidade: primeira faixa/imagem também nas colunas antigas
+      spotify_track_id: blocks.find((b) => b.type === 'spotify')?.trackId || null,
+      image_url: blocks.find((b) => b.type === 'image')?.url || null,
     };
     if (parent) payload.parent_reply_id = parent.id;
 
@@ -237,7 +237,7 @@ export default function PostDiscussionPage() {
     // O dono do post já é notificado pelo trigger notify_on_reply do banco.
     // Aqui notificamos só o autor da resposta respondida (se for outra pessoa).
     if (parent?.profile_id && parent.profile_id !== author?.id) {
-      notify(parent.profile_id, me, text);
+      notify(parent.profile_id, me, content);
     }
 
     if (!parent) {
@@ -412,7 +412,7 @@ export default function PostDiscussionPage() {
         onReplyClick={() => {
           mainComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           mainComposerRef.current?.focus({ preventScroll: true });
-          if (!loggedUser) router.push('/login');
+          if (!loggedUser) router.push(loginHref());
         }}
         onDelete={() => router.push('/')}
       />
@@ -435,7 +435,8 @@ export default function PostDiscussionPage() {
           textareaRef={mainComposerRef}
           replyingTo={author.username}
           placeholder="Publique sua resposta..."
-          onSubmit={(text, trackId) => submitReply(null, text, trackId)}
+          draftScope={`reply:${post.id}:root`}
+          onSubmit={(payload) => submitReply(null, payload)}
         />
       </div>
 
@@ -476,14 +477,14 @@ export default function PostDiscussionPage() {
           activeComposerId={activeComposerId}
           setActiveComposerId={(id) => {
             if (id && !loggedUser) {
-              router.push('/login');
+              router.push(loginHref());
               return;
             }
             setActiveComposerId(id);
           }}
           canDelete={canDelete}
           onToggleLike={toggleLike}
-          onSubmitReply={(parent, text, trackId) => submitReply(parent, text, trackId)}
+          onSubmitReply={(parent, payload) => submitReply(parent, payload)}
           onDelete={deleteReply}
           onCopyLink={copyReplyLink}
         />

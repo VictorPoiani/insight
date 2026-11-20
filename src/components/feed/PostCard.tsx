@@ -1,5 +1,7 @@
 'use client';
 
+import { loginHref } from '@/lib/account/loginRedirect';
+import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
@@ -298,7 +300,7 @@ export function PostCard({
     allowMultiple?: boolean
   ) {
     if (!loggedUserProfile) {
-      window.location.href = '/login';
+      window.location.href = loginHref();
       return;
     }
     if (votingBlockId === blockId) return;
@@ -371,7 +373,7 @@ export function PostCard({
 
   async function handleLike() {
     if (!loggedUserProfile) {
-      window.location.href = '/login';
+      window.location.href = loginHref();
       return;
     }
 
@@ -396,7 +398,7 @@ export function PostCard({
 
   async function handleRepost() {
     if (!loggedUserProfile) {
-      window.location.href = '/login';
+      window.location.href = loginHref();
       return;
     }
 
@@ -434,7 +436,7 @@ export function PostCard({
 
   async function handleReportPost() {
     if (!loggedUserProfile) {
-      window.location.href = '/login';
+      window.location.href = loginHref();
       return;
     }
 
@@ -551,6 +553,7 @@ export function PostCard({
               <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
                 <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
               </span>
+              {author.email_verified_at && <VerifiedBadge size={14} />}
               <span className="text-xs text-muted truncate">
                 @{author.username || 'insight'}
               </span>

@@ -1,5 +1,6 @@
 'use client';
 
+import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Profile } from '@/types/database';
@@ -1562,6 +1563,7 @@ export function ProfileHeader({
             <span>
               <CosmeticName profile={profile}>{displayName}</CosmeticName>
             </span>
+            {(profile as { email_verified_at?: string | null }).email_verified_at && <VerifiedBadge size={20} className="ml-1.5 align-[-3px]" />}
             {nickname && (
               <>
                 , <span style={{ color: nicknameColor }}>{nickname}</span>

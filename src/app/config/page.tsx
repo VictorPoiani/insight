@@ -1,5 +1,7 @@
 'use client';
 
+import { PasswordStrength, validateNewPassword } from '@/components/account/PasswordStrength';
+import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -214,6 +216,9 @@ export default function ConfigPage() {
     text: string;
   } | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [sendingVerify, setSendingVerify] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -518,42 +523,68 @@ export default function ConfigPage() {
     e.preventDefault();
     setPasswordMsg(null);
 
-    if (newPassword.length < 6) {
-      setPasswordMsg({
-        type: 'error',
-        text: 'A nova senha deve ter no mínimo 6 caracteres.',
-      });
+    const problem = validateNewPassword(newPassword, confirmPassword);
+    if (problem) {
+      setPasswordMsg({ type: 'error', text: problem });
       return;
     }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordMsg({
-        type: 'error',
-        text: 'A confirmação de senha não coincide.',
-      });
+    if (!currentPassword) {
+      setPasswordMsg({ type: 'error', text: 'Digite sua senha atual.' });
       return;
     }
 
     setUpdatingPassword(true);
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.email) {
+      setUpdatingPassword(false);
+      setPasswordMsg({ type: 'error', text: 'Sessão expirada. Entre de novo.' });
+      return;
+    }
+
+    // confirma a senha atual antes de trocar
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
     });
+    if (reauthError) {
+      setUpdatingPassword(false);
+      setPasswordMsg({ type: 'error', text: 'A senha atual está incorreta.' });
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) await supabase.auth.signOut({ scope: 'others' }).catch(() => {});
     setUpdatingPassword(false);
 
     if (error) {
       setPasswordMsg({
         type: 'error',
-        text: 'Erro ao atualizar senha: ' + error.message,
+        text: error.message.toLowerCase().includes('different')
+          ? 'A nova senha precisa ser diferente da atual.'
+          : 'Não foi possível atualizar a senha. Tente novamente.',
       });
       return;
     }
 
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setPasswordMsg({
       type: 'success',
-      text: 'Senha atualizada com sucesso!',
+      text: 'Senha atualizada! Encerramos a sessão nos outros aparelhos.',
     });
+  }
+
+  async function handleSendVerification() {
+    setVerifyMsg(null);
+    setSendingVerify(true);
+    const res = await fetch('/api/account/verify-email', { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    setSendingVerify(false);
+    if (d.alreadyVerified) setVerifyMsg('Seu e-mail já está verificado.');
+    else setVerifyMsg(res.ok ? 'Link enviado! Confira sua caixa de entrada (e o spam).' : d.error || 'Não foi possível enviar.');
   }
 
   async function handleExportUserData() {
@@ -600,14 +631,17 @@ export default function ConfigPage() {
       `ATENÇÃO: Para excluir permanentemente seu perfil (@${myProfile.username}) e todas as suas publicações, digite EXCLUIR MINHA CONTA:`
     );
     if (confirmation !== 'EXCLUIR MINHA CONTA') return;
+    const pw = prompt('Por segurança, digite sua senha atual:');
+    if (!pw) return;
 
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', myProfile.id);
-
-    if (error) {
-      alert('Erro ao excluir perfil: ' + error.message);
+    const res = await fetch('/api/account/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw, confirmation }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(d.error || 'Erro ao excluir a conta.');
       return;
     }
 
@@ -1318,6 +1352,42 @@ export default function ConfigPage() {
                 </div>
               </form>
 
+              {/* Verificação de e-mail */}
+              <div className="px-6 py-6 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-3 max-w-xl">
+                  <div>
+                    <h2 className="text-base font-extrabold text-primary flex items-center gap-2">
+                      Verificação da conta
+                      {myProfile.email_verified_at ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <VerifiedBadge size={12} /> Verificada
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          Pendente
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      {myProfile.email_verified_at
+                        ? `E-mail confirmado em ${new Date(myProfile.email_verified_at).toLocaleDateString('pt-BR')}. Seu perfil exibe o selo de verificado.`
+                        : 'Confirme seu e-mail para ganhar o selo de verificado e poder recuperar a conta.'}
+                    </p>
+                  </div>
+                  {!myProfile.email_verified_at && (
+                    <button
+                      type="button"
+                      onClick={handleSendVerification}
+                      disabled={sendingVerify}
+                      className="px-4 py-2 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-50 shrink-0"
+                    >
+                      {sendingVerify ? 'Enviando...' : 'Enviar link de verificação'}
+                    </button>
+                  )}
+                </div>
+                {verifyMsg && <p className="text-xs text-secondary">{verifyMsg}</p>}
+              </div>
+
               {/* Alterar Senha */}
               <form
                 onSubmit={handleChangePassword}
@@ -1329,7 +1399,7 @@ export default function ConfigPage() {
                       Alterar senha
                     </h2>
                     <p className="text-xs text-muted">
-                      Defina uma nova senha de acesso (mínimo de 6 caracteres)
+                      Confirme a senha atual e escolha uma nova (mínimo de 8 caracteres)
                     </p>
                   </div>
 
@@ -1368,7 +1438,17 @@ export default function ConfigPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    minLength={6}
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Senha atual"
+                    className="sm:col-span-2 bg-surface border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Nova senha"
@@ -1377,13 +1457,23 @@ export default function ConfigPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    minLength={6}
+                    minLength={8}
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirme a nova senha"
                     className="bg-surface border border-border rounded-xl px-3.5 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent"
                   />
+                  <div className="sm:col-span-2">
+                    <PasswordStrength value={newPassword} />
+                  </div>
                 </div>
+                <p className="text-[11px] text-muted max-w-xl">
+                  Esqueceu a senha atual?{' '}
+                  <a href="/login?recuperar=1" className="text-accent font-semibold hover:underline">
+                    Receber link de redefinição
+                  </a>
+                </p>
 
                 <div>
                   <button

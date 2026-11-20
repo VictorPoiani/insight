@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { createServerSupabase } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import { setVapidDetails, sendNotification } from 'web-push';
@@ -111,6 +113,18 @@ function chunkArray<T>(list: T[], size: number): T[][] {
 
 // Diagnóstico ao vivo: abra http://localhost:3000/api/newsletter no navegador
 export async function GET() {
+  // Diagnóstico só para admin (expunha provedores e erros de SMTP a qualquer um)
+  const supa = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supa.auth.getUser();
+  const { data: me } = user
+    ? await supa.from('profiles').select('role').or(`user_id.eq.${user.id},id.eq.${user.id}`).maybeSingle()
+    : { data: null };
+  if (me?.role !== 'admin') {
+    return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
+  }
+
   const brevoTransporter = createBrevoTransporter();
   const gmailTransporter = createGmailTransporter();
   const resendKey = process.env.RESEND_API_KEY?.trim();
@@ -570,6 +584,36 @@ export async function POST(request: Request) {
     const body = (await request.json()) as NewsletterPayload;
     const supabase = getSupabaseClient();
     const siteUrl = resolveSiteUrl();
+
+    // Disparos em massa: só admin. Boas-vindas: só para quem está inscrito, 1x por dia.
+    const authed = await createServerSupabase();
+    const {
+      data: { user: caller },
+    } = await authed.auth.getUser();
+    const { data: callerProfile } = caller
+      ? await authed.from('profiles').select('role').or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle()
+      : { data: null };
+    const callerIsAdmin = callerProfile?.role === 'admin';
+
+    if ((body.action === 'official_update' || body.action === 'new_post') && !callerIsAdmin) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
+    }
+
+    if (body.action === 'welcome') {
+      const email = String(body.email || '').trim().toLowerCase();
+      const { data: sub } = await supabase.from('subscribers').select('email').eq('email', email).maybeSingle();
+      if (!sub) return NextResponse.json({ ok: true, skipped: true });
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex');
+      const { count } = await supabase
+        .from('account_email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('email_hash', emailHash)
+        .eq('kind', 'welcome')
+        .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if ((count ?? 0) > 0) return NextResponse.json({ ok: true, skipped: true });
+      await supabase.from('account_email_log').insert({ email_hash: emailHash, kind: 'welcome' });
+      body.email = email;
+    }
 
     const { data: profile } = await supabase
       .from('profiles')

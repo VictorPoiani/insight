@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
 import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
 import { CustomSpotifyPlayer } from '@/components/feed/CustomSpotifyPlayer';
@@ -365,6 +366,37 @@ export default function NotificacoesPage() {
   const [editingUpdate, setEditingUpdate] = useState<OfficialUpdateRecord | null>(
     null
   );
+
+  // Rascunho automático na nuvem (novo ou edição)
+  const updateDraft = useCloudDraft<PostBlock[]>(
+    isAdmin ? (editingUpdate ? `update:edit:${editingUpdate.id}` : 'update:new') : null,
+    isAdmin ? authorId : null,
+    (bs) => !bs.some((b) => (b.html || '').replace(/<[^>]*>|&nbsp;/g, '').trim() || b.imageUrl || b.videoUrl || b.fileUrl)
+  );
+  const restoredScope = useRef<string | null>(null);
+  const [updateDraftAt, setUpdateDraftAt] = useState<number | null>(null);
+  const currentDraftScope = editingUpdate ? `update:edit:${editingUpdate.id}` : 'update:new';
+
+  useEffect(() => {
+    if (!isAdmin || !updateDraft.ready || restoredScope.current === currentDraftScope) return;
+    restoredScope.current = currentDraftScope;
+    const saved = updateDraft.loaded;
+    const base = editingUpdate ? new Date(editingUpdate.created_at).getTime() : 0;
+    if (saved && saved.at > base) {
+      setBlocks(saved.v);
+      setUpdateDraftAt(saved.at);
+    } else {
+      setUpdateDraftAt(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, updateDraft.ready, currentDraftScope]);
+
+  useEffect(() => {
+    if (restoredScope.current !== currentDraftScope) return;
+    updateDraft.save(blocks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
+
   const [activeBlockId, setActiveBlockId] = useState<string>('');
   const [menuOpenForBlockId, setMenuOpenForBlockId] = useState<string | null>(null);
   const [cellConfigOpenForId, setCellConfigOpenForId] = useState<string | null>(null);
@@ -488,8 +520,9 @@ export default function NotificacoesPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAdmin(Boolean(session?.user));
+    } = supabase.auth.onAuthStateChange(() => {
+      // recarrega e reavalia o cargo (não basta estar logado para ser admin)
+      loadOfficialUpdates();
     });
 
     return () => {
@@ -849,6 +882,8 @@ export default function NotificacoesPage() {
         }).catch(() => {});
       }
 
+      void updateDraft.clear();
+      setUpdateDraftAt(null);
       setBlocks([createNewBlock('h1'), createNewBlock('paragraph')]);
       await loadOfficialUpdates();
     } catch (err: any) {
@@ -910,6 +945,27 @@ export default function NotificacoesPage() {
           onSubmit={handleSaveUpdate}
           className="p-5 rounded-2xl bg-surface border border-border space-y-4 shadow-sm"
         >
+          {updateDraftAt && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl border border-accent/40 bg-accent/10 text-xs">
+              <span className="text-primary">
+                Rascunho restaurado · {new Date(updateDraftAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void updateDraft.clear();
+                  setUpdateDraftAt(null);
+                  setBlocks(editingUpdate ? JSON.parse(JSON.stringify(editingUpdate.blocks)) : [createNewBlock('h1'), createNewBlock('paragraph')]);
+                }}
+                className="font-semibold text-secondary hover:text-danger"
+              >
+                Descartar rascunho
+              </button>
+            </div>
+          )}
+          {draftStatusLabel(updateDraft.status, updateDraft.savedAt) && (
+            <p className="text-[10px] text-muted font-mono">{draftStatusLabel(updateDraft.status, updateDraft.savedAt)}</p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
             <div className="flex items-center gap-2 text-xs font-bold text-accent">
               <Megaphone className="w-4 h-4" />

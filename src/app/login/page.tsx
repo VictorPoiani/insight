@@ -1,5 +1,6 @@
 'use client';
 
+import { safeNext } from '@/lib/account/loginRedirect';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -197,6 +198,33 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecover, setShowRecover] = useState(false);
+  const [recoverEmail, setRecoverEmail] = useState('');
+  const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('recuperar') === '1') setShowRecover(true);
+  }, []);
+
+  async function requestPasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setRecovering(true);
+    setRecoverMsg(null);
+    try {
+      const res = await fetch('/api/account/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: recoverEmail }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setRecoverMsg(d.message || d.error || 'Tente novamente em instantes.');
+    } catch {
+      setRecoverMsg('Falha de conexão. Tente novamente.');
+    } finally {
+      setRecovering(false);
+    }
+  }
 
   useEffect(() => {
     function syncThemeFromApp() {
@@ -302,8 +330,12 @@ export default function LoginPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres.');
+    if (password.length < 8) {
+      setError('A senha deve ter no mínimo 8 caracteres.');
+      return;
+    }
+    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      setError('Use letras e números na senha.');
       return;
     }
 
@@ -381,7 +413,10 @@ export default function LoginPage() {
           .limit(1);
 
         const prof = rows?.[0];
-        if (prof?.username) {
+        const next = safeNext(new URLSearchParams(window.location.search).get('next'));
+        if (next) {
+          window.location.href = next;
+        } else if (prof?.username) {
           window.location.href = `/u/${encodeURIComponent(prof.username)}`;
         } else {
           window.location.href = '/';
@@ -445,23 +480,31 @@ export default function LoginPage() {
           data: {
             full_name: fullName.trim(),
             username: cleanUsername,
+            // o banco valida e consome o convite na criação da conta
+            invite_code: IS_CLOSED_BETA ? cleanCode : undefined,
           },
         },
       });
 
       if (signUpError) {
+        const low = signUpError.message.toLowerCase();
+        if (low.includes('database error saving new user') || low.includes('invite_required')) {
+          throw new Error('Código de convite inválido, expirado ou já utilizado.');
+        }
+        if (low.includes('already registered') || low.includes('already been registered')) {
+          throw new Error('Este e-mail já está vinculado a uma conta.');
+        }
         if (
-          signUpError.message.toLowerCase().includes('duplicate') ||
-          signUpError.message.toLowerCase().includes('unique')
+          low.includes('duplicate') ||
+          low.includes('unique')
         ) {
           throw new Error('Este @username ou e-mail já está vinculado a uma conta.');
         }
         throw signUpError;
       }
 
-      if (IS_CLOSED_BETA && cleanCode) {
-        await supabase.rpc('redeem_invite_code', { p_code: cleanCode });
-      }
+      // envia o link de verificação de e-mail (sem bloquear a entrada)
+      await fetch('/api/account/verify-email', { method: 'POST' }).catch(() => {});
 
       window.location.href = `/u/${encodeURIComponent(cleanUsername)}`;
     } catch (err: any) {
@@ -937,8 +980,8 @@ export default function LoginPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    minLength={6}
-                    placeholder="Mínimo de 6 caracteres"
+                    minLength={mode === 'login' ? 6 : 8}
+                    placeholder={mode === 'login' ? 'Sua senha' : 'Mínimo de 8 caracteres, com letras e números'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`${inputClass} !pr-10`}
@@ -963,6 +1006,22 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {mode === 'login' && (
+                <div className="-mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRecover((v) => !v);
+                      setRecoverEmail(email.includes('@') ? email.trim() : '');
+                      setRecoverMsg(null);
+                    }}
+                    className={`text-[11px] font-semibold ${isDark ? 'text-[#3898ec]' : 'text-[#2563eb]'} hover:underline`}
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={
@@ -986,6 +1045,40 @@ export default function LoginPage() {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+
+            {showRecover && (
+              <form
+                onSubmit={requestPasswordReset}
+                className={`mt-4 p-3.5 rounded-xl border space-y-2.5 ${
+                  isDark ? 'border-zinc-800 bg-zinc-900/70' : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <p className={`text-xs font-bold ${isDark ? 'text-zinc-200' : 'text-slate-800'}`}>Redefinir senha</p>
+                <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  Enviaremos um link válido por 1 hora para o e-mail da sua conta.
+                </p>
+                <input
+                  type="email"
+                  required
+                  value={recoverEmail}
+                  onChange={(e) => setRecoverEmail(e.target.value)}
+                  placeholder="voce@email.com"
+                  className={inputClass.replace('pl-10', 'pl-3.5')}
+                />
+                <button
+                  type="submit"
+                  disabled={recovering}
+                  className="w-full py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 text-white font-bold text-xs"
+                >
+                  {recovering ? 'Enviando...' : 'Enviar link'}
+                </button>
+                {recoverMsg && (
+                  <p role="status" className={`text-[11px] ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    {recoverMsg}
+                  </p>
+                )}
+              </form>
+            )}
 
             <div
               className={`mt-6 pt-4 border-t text-center text-xs flex items-center justify-center gap-3 ${

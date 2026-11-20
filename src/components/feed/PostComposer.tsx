@@ -6,6 +6,7 @@ import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid
 import { uploadMediaToInsight, MediaQuotaError, type UploadR2Result } from '@/lib/mediaCompressor';
 import { formatBytes, getTierByLevel, getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { useNitro } from '@/components/nitro/NitroProvider';
+import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
@@ -595,6 +596,73 @@ export function PostComposer({
   const remainingBytes = Math.max(0, uploadLimit - usedBytes);
   const quotaPct = Math.min(100, (usedBytes / uploadLimit) * 100);
   const overQuota = usedBytes > uploadLimit;
+
+  // ---------------------------------------------------- rascunho automático (nuvem)
+  type PostDraft = {
+    blocks: PostBlock[];
+    tagsInput: string;
+    selectedTopicTags: string[];
+    visibility: PostVisibility;
+    isPinned: boolean;
+  };
+  const draftScope = editingPost
+    ? `post:edit:${editingPost.id}`
+    : `post:new${defaultTag ? `:${defaultTag}` : ''}`;
+  const draft = useCloudDraft<PostDraft>(isAdmin ? draftScope : null, authorId, (d) =>
+    !d.blocks.some(
+      (b) =>
+        (b.html && b.html.replace(/<[^>]*>|&nbsp;/g, '').trim()) ||
+        b.imageUrl ||
+        b.videoUrl ||
+        b.fileUrl ||
+        b.spotifyTrackId ||
+        b.type === 'chart' ||
+        b.type === 'poll' ||
+        b.type === 'table' ||
+        (b.mindMapNodes && b.mindMapNodes.length > 0) ||
+        (b.roadmapSteps && b.roadmapSteps.length > 0)
+    )
+  );
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  const initialSnapshot = useRef<PostDraft | null>(null);
+  const restoredOnce = useRef(false);
+
+  useEffect(() => {
+    if (!draft.ready || restoredOnce.current) return;
+    restoredOnce.current = true;
+    initialSnapshot.current = { blocks, tagsInput, selectedTopicTags, visibility, isPinned };
+    const saved = draft.loaded;
+    // na edição, só restaura se o rascunho é mais novo que o post salvo
+    const postTime = editingPost ? new Date(editingPost.updated_at || editingPost.created_at).getTime() : 0;
+    if (saved && saved.at > postTime) {
+      setBlocks(saved.v.blocks);
+      setTagsInput(saved.v.tagsInput);
+      setSelectedTopicTags(saved.v.selectedTopicTags);
+      setVisibility(saved.v.visibility);
+      setIsPinned(saved.v.isPinned);
+      setDraftRestoredAt(saved.at);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.ready]);
+
+  useEffect(() => {
+    if (!restoredOnce.current) return;
+    draft.save({ blocks, tagsInput, selectedTopicTags, visibility, isPinned });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks, tagsInput, selectedTopicTags, visibility, isPinned]);
+
+  function discardDraft() {
+    const init = initialSnapshot.current;
+    void draft.clear();
+    setDraftRestoredAt(null);
+    if (init) {
+      setBlocks(init.blocks.length ? init.blocks : [createNewBlock('paragraph')]);
+      setTagsInput(init.tagsInput);
+      setSelectedTopicTags(init.selectedTopicTags);
+      setVisibility(init.visibility);
+      setIsPinned(init.isPinned);
+    }
+  }
 
   const [giphyQuery, setGiphyQuery] = useState<string>('');
   const [giphyMediaType, setGiphyMediaType] = useState<'gifs' | 'stickers'>('gifs');
@@ -1437,6 +1505,7 @@ export function PostComposer({
       setIsSubmitting(false);
 
       if (!error && updatedData) {
+        void draft.clear();
         onPostUpdated?.({ ...(updatedData as Post), visibility });
       } else {
         alert(
@@ -1498,6 +1567,8 @@ export function PostComposer({
         }).catch(() => {});
       }
 
+      void draft.clear();
+      setDraftRestoredAt(null);
       setBlocks([createNewBlock('paragraph')]);
       setTagsInput('');
       setSelectedTopicTags(defaultTag ? [defaultTag.toLowerCase()] : []);
@@ -3639,6 +3710,24 @@ export function PostComposer({
           })}
         </div>
       </div>
+
+      {/* RASCUNHO AUTOMÁTICO */}
+      {draftRestoredAt && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl border border-accent/40 bg-accent/10 text-xs">
+          <span className="text-primary">
+            Rascunho restaurado ·{' '}
+            {new Date(draftRestoredAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <button type="button" onClick={discardDraft} className="font-semibold text-secondary hover:text-danger">
+            Descartar rascunho
+          </button>
+        </div>
+      )}
+      {draftStatusLabel(draft.status, draft.savedAt) && (
+        <p className="text-[10px] text-muted font-mono" aria-live="polite">
+          {draftStatusLabel(draft.status, draft.savedAt)}
+        </p>
+      )}
 
       {/* COTA DE ANEXOS DO POST (peso comprimido no R2) */}
       {usedBytes > 0 && (

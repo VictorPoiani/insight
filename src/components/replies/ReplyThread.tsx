@@ -4,7 +4,8 @@ import { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
 import { Heart, MessageCircle, Trash2, ChevronDown, Link2 } from 'lucide-react';
 import { Profile } from '@/types/database';
-import { ReplyComposer } from './ReplyComposer';
+import { ReplyComposer, ReplySubmitPayload } from './ReplyComposer';
+import { ReplyBlocks } from './ReplyBlocks';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { ReplyNode, formatRelativeTime, getReplyAuthorHref } from './utils';
 
@@ -25,7 +26,7 @@ interface ThreadContextValue {
   setActiveComposerId: (id: string | null) => void;
   canDelete: (node: ReplyNode) => boolean;
   onToggleLike: (replyId: string) => void;
-  onSubmitReply: (parent: ReplyNode, text: string, trackId: string | null) => Promise<boolean>;
+  onSubmitReply: (parent: ReplyNode, payload: ReplySubmitPayload) => Promise<boolean>;
   onDelete: (node: ReplyNode) => void;
   onCopyLink: (replyId: string) => void;
 }
@@ -149,13 +150,17 @@ function ReplyItem({
           )}
 
           {/* Conteúdo */}
-          {node.content && (
-            <p className="mt-1 text-sm text-primary whitespace-pre-line leading-relaxed break-words">
-              {node.content}
-            </p>
+          {Array.isArray(node.blocks) && node.blocks.length > 0 ? (
+            <ReplyBlocks blocks={node.blocks} />
+          ) : (
+            node.content && (
+              <p className="mt-1 text-sm text-primary whitespace-pre-line leading-relaxed break-words">
+                {node.content}
+              </p>
+            )
           )}
 
-          {node.spotify_track_id && (
+          {node.spotify_track_id && !(Array.isArray(node.blocks) && node.blocks.length > 0) && (
             <iframe
               src={`https://open.spotify.com/embed/track/${node.spotify_track_id}?utm_source=generator&theme=0`}
               width="100%"
@@ -229,8 +234,9 @@ function ReplyItem({
                 replyingTo={node.author_handle}
                 placeholder="Escreva sua resposta..."
                 onCancel={() => setActiveComposerId(null)}
-                onSubmit={async (text, trackId) => {
-                  const ok = await onSubmitReply(node, text, trackId);
+                draftScope={`reply:${node.post_id}:${node.id}`}
+                onSubmit={async (payload) => {
+                  const ok = await onSubmitReply(node, payload);
                   if (ok) {
                     setActiveComposerId(null);
                     setCollapsed(false);

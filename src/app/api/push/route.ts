@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { setVapidDetails, sendNotification } from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
@@ -157,6 +158,18 @@ export async function POST(req: NextRequest) {
 
     // 3. DISPARAR NOTIFICAÇÃO PARA TODOS OS SEGUIDORES INSCRITOS
     if (action === 'broadcast') {
+      // Envio para todos os aparelhos: só admin
+      const authed = await createServerSupabase();
+      const {
+        data: { user: caller },
+      } = await authed.auth.getUser();
+      const { data: me } = caller
+        ? await authed.from('profiles').select('role').or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle()
+        : { data: null };
+      if (me?.role !== 'admin') {
+        return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
+      }
+
       const {
         title = 'Novo Insight publicado — Victor Poiani',
         message = 'Confira a nova publicação no Insight*.',

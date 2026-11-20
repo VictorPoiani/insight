@@ -59,8 +59,10 @@ export function NitroSettingsPanel({ value, onChange, level, showEquipped, disab
   const { prefs, setPrefs } = useNitro();
   const set = (patch: Partial<NitroCosmetics>) => onChange({ ...value, ...patch });
 
-  const equipped: { key: 'frame' | 'title' | 'tag' | 'intro'; name: string | null }[] = [
+  const equipped: { key: 'frame' | 'title' | 'tag' | 'intro' | 'font' | 'theme'; name: string | null }[] = [
+    { key: 'theme', name: getNitroItem(value.theme, 'theme')?.name ?? null },
     { key: 'frame', name: getNitroItem(value.frame, 'frame')?.name ?? null },
+    { key: 'font', name: getNitroItem(value.font, 'font')?.name ?? null },
     { key: 'title', name: getNitroItem(value.title, 'title')?.name ?? null },
     { key: 'tag', name: getNitroItem(value.tag, 'tag')?.name ?? null },
     { key: 'intro', name: getNitroItem(value.intro, 'intro')?.name ?? null },

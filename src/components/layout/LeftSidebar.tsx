@@ -85,7 +85,7 @@ export function LeftSidebar() {
       if (saved) {
         const prefs = JSON.parse(saved);
         const root = document.documentElement;
-        if (prefs.theme) {
+        if (prefs.theme && !root.hasAttribute('data-nitro-theme')) {
           root.setAttribute('data-theme', prefs.theme);
         }
         if (prefs.highContrast) {

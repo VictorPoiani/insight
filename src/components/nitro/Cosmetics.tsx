@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import {
   FrameItem,
+  FontItem,
   FrameOrnament,
   NitroCosmetics,
   TagIcon,
@@ -406,8 +407,29 @@ export function CosmeticName({ profile, children, preview, className = '' }: Cos
   const saved = useProfileCosmetics(profile);
   const cosmetics = preview !== undefined ? preview : saved;
   const title = getNitroItem(cosmetics?.title, 'title');
-  if (!title) return <>{children}</>;
-  return <TitleText title={title} className={className}>{children}</TitleText>;
+  const font = getNitroItem(cosmetics?.font, 'font');
+  const inner = title ? <TitleText title={title} className={className}>{children}</TitleText> : <>{children}</>;
+  if (!font) return inner;
+  return (
+    <NameFont font={font} withTitle={Boolean(title)}>
+      {inner}
+    </NameFont>
+  );
+}
+
+/** Aplica um Estilo de Nome (fonte + efeito). */
+export function NameFont({
+  font,
+  withTitle = false,
+  children,
+}: {
+  font: FontItem;
+  withTitle?: boolean;
+  children: ReactNode;
+}) {
+  // o dourado "chrome" pinta o texto; com Título ativo, as cores são do título
+  const effect = font.effect && !(withTitle && font.effect === 'chrome') ? `nfx-${font.effect}` : '';
+  return <span className={`nx-namefont nf-${font.font} ${effect}`}>{children}</span>;
 }
 
 export function TitleText({

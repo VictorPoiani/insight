@@ -275,7 +275,8 @@ export default function ConfigPage() {
 
   function applyPreferencesToDOM(nextPrefs: UserPreferences) {
     const root = document.documentElement;
-    root.setAttribute('data-theme', nextPrefs.theme);
+    // com Tema Nitro ativo, o modo claro/escuro vem do tema
+    if (!root.hasAttribute('data-nitro-theme')) root.setAttribute('data-theme', nextPrefs.theme);
 
     if (nextPrefs.highContrast) {
       root.setAttribute('data-contrast', 'high');

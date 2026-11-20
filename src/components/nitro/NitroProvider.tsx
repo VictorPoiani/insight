@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
-import { NitroCosmetics } from '@/lib/nitro/catalog';
+import { NitroCosmetics, getNitroItem } from '@/lib/nitro/catalog';
 import {
   NITRO_KILL_SWITCH,
   NitroEntitlement,
@@ -19,6 +19,7 @@ import {
   resolveNitroEntitlement,
 } from '@/lib/nitro/entitlement';
 import './nitro.css';
+import './themes.css';
 
 /**
  * Interruptor geral: NEXT_PUBLIC_INSIGHT_NITRO=off desliga o Nitro inteiro
@@ -47,6 +48,9 @@ interface NitroContextValue {
   /** Cosméticos salvos nesta sessão, por perfil (atualização instantânea na UI). */
   overrides: Record<string, NitroCosmetics | null>;
   saveCosmetics: (next: NitroCosmetics) => Promise<{ ok: boolean; error?: string }>;
+  /** Tema mostrado temporariamente (provador); null = volta ao tema salvo. */
+  previewTheme: string | null;
+  setPreviewTheme: (id: string | null) => void;
 }
 
 const NitroContext = createContext<NitroContextValue>({
@@ -58,7 +62,12 @@ const NitroContext = createContext<NitroContextValue>({
   setPrefs: () => {},
   overrides: {},
   saveCosmetics: async () => ({ ok: false, error: 'Nitro indisponível' }),
+  previewTheme: null,
+  setPreviewTheme: () => {},
 });
+
+/** Guardado no aparelho para aplicar o tema antes da hidratação (sem piscar). */
+export const NITRO_THEME_KEY = 'insight-nitro-theme';
 
 export function NitroProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
@@ -66,6 +75,7 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
   const [viewer, setViewer] = useState<Profile | null>(null);
   const [prefs, setPrefsState] = useState<NitroViewerPrefs>(DEFAULT_PREFS);
   const [overrides, setOverrides] = useState<Record<string, NitroCosmetics | null>>({});
+  const [previewTheme, setPreviewTheme] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -140,6 +150,44 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
     else root.removeAttribute('data-nitro-rainbow');
   }, [rainbowOn]);
 
+  // Tema de app: só o dono vê (é aplicado no aparelho de quem usa, nunca no perfil)
+  const ownTheme = hasAccess ? ownCosmetics?.theme ?? null : null;
+  const appliedTheme = getNitroItem(previewTheme ?? ownTheme, 'theme');
+  useEffect(() => {
+    if (!ready) return;
+    const root = document.documentElement;
+    if (!root.dataset.baseTheme) root.dataset.baseTheme = root.getAttribute('data-theme') || 'dark';
+    let prefs: { theme?: string; accentColor?: string } = {};
+    try {
+      prefs = JSON.parse(localStorage.getItem('insight-preferences') || '{}');
+    } catch {
+      prefs = {};
+    }
+    if (appliedTheme) {
+      root.setAttribute('data-nitro-theme', appliedTheme.id);
+      root.setAttribute('data-theme', appliedTheme.mode);
+      // a cor de destaque personalizada (inline) cede lugar à do tema
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-hover');
+    } else {
+      root.removeAttribute('data-nitro-theme');
+      delete root.dataset.ntMode;
+      // volta ao tema e à cor escolhidos nas configurações
+      root.setAttribute('data-theme', prefs.theme || root.dataset.baseTheme || 'dark');
+      if (prefs.accentColor) {
+        root.style.setProperty('--accent', prefs.accentColor);
+        root.style.setProperty('--accent-hover', prefs.accentColor);
+      }
+    }
+    try {
+      const own = getNitroItem(ownTheme, 'theme');
+      if (own) localStorage.setItem(NITRO_THEME_KEY, JSON.stringify({ id: own.id, mode: own.mode }));
+      else localStorage.removeItem(NITRO_THEME_KEY);
+    } catch {
+      // armazenamento indisponível
+    }
+  }, [ready, appliedTheme, ownTheme]);
+
   const saveCosmetics = useCallback(
     async (next: NitroCosmetics) => {
       if (!viewer || !hasAccess) return { ok: false, error: 'Acesso restrito.' };
@@ -153,6 +201,8 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
         introEnabled: next.introEnabled ?? true,
         levelAnimation: next.levelAnimation ?? true,
         rainbow: next.rainbow ?? true,
+        font: next.font ?? null,
+        theme: next.theme ?? null,
       };
       const { data, error } = await supabase.rpc('set_my_cosmetics', { p_cosmetics: payload });
       if (error) return { ok: false, error: error.message };
@@ -165,8 +215,8 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics }),
-    [ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics]
+    () => ({ ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme, setPreviewTheme }),
+    [ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme]
   );
 
   return <NitroContext.Provider value={value}>{children}</NitroContext.Provider>;

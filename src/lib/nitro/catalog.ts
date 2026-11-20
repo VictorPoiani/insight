@@ -7,7 +7,7 @@ import type { CritterId } from '@/components/nitro/critters';
  * Especificação completa: docs/insight-nitro.md
  */
 
-export type NitroKind = 'title' | 'tag' | 'frame' | 'intro';
+export type NitroKind = 'title' | 'tag' | 'frame' | 'intro' | 'font' | 'theme';
 
 export type NitroCollectionId =
   | 'natal'
@@ -26,6 +26,8 @@ export type NitroCollectionId =
   | 'kpop'
   | 'telas'
   | 'musica'
+  | 'temas'
+  | 'tipografia'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -166,7 +168,23 @@ export type IntroSceneId =
   | 'fairy'
   | 'glitch-boot';
 
-export type NitroItem = FrameItem | TitleItem | TagItem | IntroItem;
+/** Estilo de exibição do nome (fonte + efeito). Combina com o Título. */
+export interface FontItem extends BaseItem {
+  kind: 'font';
+  /** id curto: vira as classes nf-<font> e nfx-<effect> (nitro.css). */
+  font: string;
+  effect?: 'block' | 'neon' | 'outline' | 'chrome' | 'drip' | 'street' | 'glow';
+}
+
+/** Tema de aplicativo: muda as cores do Insight só para quem usa. */
+export interface ThemeItem extends BaseItem {
+  kind: 'theme';
+  mode: 'dark' | 'light';
+  /** 3 cores para a miniatura do card. */
+  swatch: [string, string, string];
+}
+
+export type NitroItem = FrameItem | TitleItem | TagItem | IntroItem | FontItem | ThemeItem;
 
 // ============================================================================
 // COLEÇÕES
@@ -190,6 +208,8 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'kpop', name: 'K-Pop & Cultura Pop', description: 'Lightsticks, comebacks e finais de MV.', colors: ['#c084fc', '#f472b6'] },
   { id: 'telas', name: 'Filmes, Séries & Sci-Fi', description: 'Multiversos, cometas e aventuras.', colors: ['#fb923c', '#6366f1'] },
   { id: 'musica', name: 'Música', description: 'Rock, pop, indie e clássicos.', colors: ['#ea580c', '#34d399'] },
+  { id: 'temas', name: 'Temas de App', description: 'Seu Insight com outras cores — só você vê.', colors: ['#f472b6', '#38bdf8'] },
+  { id: 'tipografia', name: 'Estilos de Nome', description: 'Fontes e efeitos para o seu nome.', colors: ['#facc15', '#22c55e'] },
 ];
 
 const NITRO: NitroRequirement = { type: 'nitro' };
@@ -481,7 +501,78 @@ const INTROS: IntroItem[] = [
 // ÍNDICES E HELPERS
 // ============================================================================
 
-export const NITRO_ITEMS: NitroItem[] = [...TITLES, ...TAGS, ...FRAMES, ...INTROS];
+
+// ============================================================================
+// ESTILOS DE NOME (12)
+// ============================================================================
+
+const FONTS: FontItem[] = [
+  { id: 'font-blocos', kind: 'font', name: 'Bloco Pixel', collection: 'tipografia', rarity: 'épica', requirement: NITRO,
+    description: 'Pixels quadrados com sombra dura, no clima dos jogos de blocos.', font: 'blocos', effect: 'block' },
+  { id: 'font-arcade', kind: 'font', name: 'Arcade 8-bit', collection: 'tipografia', rarity: 'rara', requirement: NITRO,
+    description: 'Letreiro de fliperama dos anos 80.', font: 'arcade', effect: 'block' },
+  { id: 'font-orbital', kind: 'font', name: 'Orbital', collection: 'tipografia', rarity: 'rara', requirement: NITRO,
+    description: 'Painel de nave com brilho neon.', font: 'orbit', effect: 'glow' },
+  { id: 'font-cursiva', kind: 'font', name: 'Cursiva', collection: 'tipografia', rarity: 'comum', requirement: NITRO,
+    description: 'Assinatura caprichada.', font: 'cursiva' },
+  { id: 'font-imperial', kind: 'font', name: 'Imperial', collection: 'tipografia', rarity: 'lendária', requirement: NITRO,
+    description: 'Letras romanas em ouro escovado.', font: 'imperial', effect: 'chrome' },
+  { id: 'font-terror', kind: 'font', name: 'Terror', collection: 'tipografia', rarity: 'épica', requirement: NITRO,
+    description: 'Escorrendo como pôster de filme B.', font: 'terror', effect: 'drip' },
+  { id: 'font-rua', kind: 'font', name: 'Rua', collection: 'tipografia', rarity: 'rara', requirement: NITRO,
+    description: 'Grafite em bloco com sombra 3D.', font: 'rua', effect: 'street' },
+  { id: 'font-neon', kind: 'font', name: 'Neon Retrô', collection: 'tipografia', rarity: 'épica', requirement: NITRO,
+    description: 'Tubos de neon de letreiro antigo.', font: 'neon', effect: 'neon' },
+  { id: 'font-gibi', kind: 'font', name: 'Gibi', collection: 'tipografia', rarity: 'comum', requirement: NITRO,
+    description: 'Balão de história em quadrinhos.', font: 'gibi', effect: 'outline' },
+  { id: 'font-glitch', kind: 'font', name: 'Glitch', collection: 'tipografia', rarity: 'rara', requirement: NITRO,
+    description: 'Sinal corrompido com aberração RGB.', font: 'glitch' },
+  { id: 'font-gotica', kind: 'font', name: 'Gótica', collection: 'tipografia', rarity: 'épica', requirement: NITRO,
+    description: 'Fraktur medieval de manuscrito.', font: 'gotica' },
+  { id: 'font-manuscrito', kind: 'font', name: 'Manuscrito', collection: 'tipografia', rarity: 'comum', requirement: NITRO,
+    description: 'Escrito à mão no caderno.', font: 'manuscrito' },
+];
+
+// ============================================================================
+// TEMAS DE APP (16) — cores em components/nitro/themes.css
+// ============================================================================
+
+const THEMES: ThemeItem[] = [
+  { id: 'theme-kwai', kind: 'theme', name: 'Laranja Elétrico', collection: 'temas', rarity: 'épica', requirement: NITRO,
+    description: 'Laranja e rosa vibrantes, na vibe dos apps de vídeo curto.', mode: 'dark', swatch: ['#ff7a1a', '#ee0979', '#1a0b07'] },
+  { id: 'theme-infernal', kind: 'theme', name: 'Infernal', collection: 'temas', rarity: 'lendária', requirement: NITRO,
+    description: 'Brasas sobre preto vulcânico.', mode: 'dark', swatch: ['#ef4444', '#7f1d1d', '#140303'] },
+  { id: 'theme-blocos', kind: 'theme', name: 'Mundo de Blocos', collection: 'temas', rarity: 'épica', requirement: NITRO,
+    description: 'Grama, terra e pixels — clima de sandbox.', mode: 'dark', swatch: ['#5fbf3a', '#6b4423', '#2a1c0f'] },
+  { id: 'theme-cafe', kind: 'theme', name: 'Café Expresso', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Marrom torrado com creme.', mode: 'dark', swatch: ['#c8915b', '#4a2f1f', '#1c120c'] },
+  { id: 'theme-latte', kind: 'theme', name: 'Café com Leite', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Bege suave e aconchegante.', mode: 'light', swatch: ['#a0673d', '#e9d5c1', '#fbf6f0'] },
+  { id: 'theme-espacial', kind: 'theme', name: 'Espacial', collection: 'temas', rarity: 'lendária', requirement: NITRO,
+    description: 'Nebulosa roxa e campo de estrelas.', mode: 'dark', swatch: ['#8b5cf6', '#1e1b4b', '#050816'] },
+  { id: 'theme-soft-blue', kind: 'theme', name: 'Soft Blue Clean', collection: 'temas', rarity: 'comum', requirement: NITRO,
+    description: 'Branco limpo com azul suave.', mode: 'light', swatch: ['#3b82f6', '#dbeafe', '#f8fbff'] },
+  { id: 'theme-algodao', kind: 'theme', name: 'Algodão Doce', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Rosa e pêssego, doce e claro.', mode: 'light', swatch: ['#ec4899', '#fde2e4', '#fff1e6'] },
+  { id: 'theme-menta', kind: 'theme', name: 'Menta Gelada', collection: 'temas', rarity: 'comum', requirement: NITRO,
+    description: 'Verde-água e azul gelo.', mode: 'light', swatch: ['#14b8a6', '#ccfbf1', '#eef6ff'] },
+  { id: 'theme-lavanda', kind: 'theme', name: 'Lavanda', collection: 'temas', rarity: 'comum', requirement: NITRO,
+    description: 'Lilás claro e sereno.', mode: 'light', swatch: ['#8b5cf6', '#ede9fe', '#f8f7ff'] },
+  { id: 'theme-aurora', kind: 'theme', name: 'Aurora Boreal', collection: 'temas', rarity: 'épica', requirement: NITRO,
+    description: 'Faixas verdes e violetas no céu polar.', mode: 'dark', swatch: ['#2dd4bf', '#7c3aed', '#04111f'] },
+  { id: 'theme-synthwave', kind: 'theme', name: 'Synthwave', collection: 'temas', rarity: 'épica', requirement: NITRO,
+    description: 'Magenta, ciano e horizonte retrô.', mode: 'dark', swatch: ['#f472b6', '#22d3ee', '#12001f'] },
+  { id: 'theme-crepusculo', kind: 'theme', name: 'Crepúsculo', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Pôr do sol roxo e laranja.', mode: 'dark', swatch: ['#fb923c', '#9333ea', '#1a0b24'] },
+  { id: 'theme-floresta', kind: 'theme', name: 'Floresta Noturna', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Verde musgo sob a lua.', mode: 'dark', swatch: ['#4ade80', '#14532d', '#06140d'] },
+  { id: 'theme-oceano', kind: 'theme', name: 'Mar Profundo', collection: 'temas', rarity: 'rara', requirement: NITRO,
+    description: 'Azul abissal com brilho ciano.', mode: 'dark', swatch: ['#38bdf8', '#03346e', '#021526'] },
+  { id: 'theme-terminal', kind: 'theme', name: 'Terminal', collection: 'temas', rarity: 'comum', requirement: NITRO,
+    description: 'Preto e verde fósforo.', mode: 'dark', swatch: ['#22c55e', '#052e16', '#000000'] },
+];
+
+export const NITRO_ITEMS: NitroItem[] = [...TITLES, ...TAGS, ...FRAMES, ...INTROS, ...FONTS, ...THEMES];
 
 const BY_ID = new Map<string, NitroItem>(NITRO_ITEMS.map((i) => [i.id, i]));
 
@@ -509,6 +600,8 @@ export const KIND_LABELS: Record<NitroKind, { singular: string; plural: string }
   title: { singular: 'Título', plural: 'Títulos' },
   tag: { singular: 'Tag', plural: 'Tags' },
   intro: { singular: 'Abertura', plural: 'Aberturas' },
+  font: { singular: 'Estilo de nome', plural: 'Estilos de nome' },
+  theme: { singular: 'Tema do app', plural: 'Temas' },
 };
 
 /** Snapshot salvo em profiles.cosmetics. */
@@ -518,6 +611,10 @@ export interface NitroCosmetics {
   tag?: string | null;
   frame?: string | null;
   intro?: string | null;
+  /** Estilo de nome (fonte). */
+  font?: string | null;
+  /** Tema de aplicativo (só quem usa vê). */
+  theme?: string | null;
   frameEnabled?: boolean;
   frameAnimated?: boolean;
   introEnabled?: boolean;

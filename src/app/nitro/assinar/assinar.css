@@ -330,7 +330,7 @@
 .na-grid {
   margin-top: 22px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 @container (min-width: 600px) {
@@ -339,6 +339,7 @@
 }
 
 .na-reveal {
+  min-width: 0;
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -346,6 +347,7 @@
 .na-reveal.is-in { opacity: 1; transform: none; }
 
 .na-perk {
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -423,6 +425,7 @@
 
 .na-marquee {
   width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -469,7 +472,7 @@
 .na-plans {
   margin-top: 22px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 @container (min-width: 720px) {
@@ -539,3 +542,39 @@ html[data-reduce-motion='true'] .na-page *::after { animation: none !important; 
 html[data-reduce-motion='true'] .na-reveal { opacity: 1; transform: none; }
 
 .na-nowrap { white-space: nowrap; }
+
+/* ------------------------------------------------------------ temas e estilos de nome */
+.na-perk--wide .na-perk-stage:has(.na-theme-row) { height: 190px; }
+.na-theme-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+}
+.na-theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 26%;
+  opacity: 0.75;
+  animation: na-fade 0.5s ease;
+}
+.na-theme-card.is-main { width: 40%; opacity: 1; }
+.na-theme-name { font-size: 11px; font-weight: 700; color: var(--na-muted); }
+.na-theme-card.is-main .na-theme-name { color: var(--na-ink); }
+@container (max-width: 520px) {
+  .na-theme-card:not(.is-main) { display: none; }
+  .na-theme-card.is-main { width: 78%; }
+}
+.na-font-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 26px;
+  color: var(--na-ink);
+}
+.na-font-demo small { font-size: 11px; font-weight: 700; color: var(--na-muted); font-family: inherit; }

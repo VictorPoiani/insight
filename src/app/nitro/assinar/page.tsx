@@ -4,14 +4,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import {
+  FontItem,
   FrameItem,
   IntroItem,
   NITRO_ITEMS,
   TagItem,
+  ThemeItem,
   TitleItem,
 } from '@/lib/nitro/catalog';
+import { ThemeMiniature } from '@/components/nitro/ThemeMiniature';
 import { useNitro } from '@/components/nitro/NitroProvider';
-import { FramePreview, NitroBadge, TagPill, TitleText } from '@/components/nitro/Cosmetics';
+import { FramePreview, NameFont, NitroBadge, TagPill, TitleText } from '@/components/nitro/Cosmetics';
 import { IntroOverlay } from '@/components/nitro/ProfileIntro';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { NITRO_PRICE_BRL, describeNitroSource } from '@/lib/nitro/entitlement';
@@ -24,6 +27,8 @@ const FRAMES = NITRO_ITEMS.filter((i): i is FrameItem => i.kind === 'frame' && n
 const TITLES = NITRO_ITEMS.filter((i): i is TitleItem => i.kind === 'title' && nitroOnly(i));
 const TAGS = NITRO_ITEMS.filter((i): i is TagItem => i.kind === 'tag' && nitroOnly(i));
 const INTROS = NITRO_ITEMS.filter((i): i is IntroItem => i.kind === 'intro' && nitroOnly(i));
+const THEMES = NITRO_ITEMS.filter((i): i is ThemeItem => i.kind === 'theme');
+const FONTS = NITRO_ITEMS.filter((i): i is FontItem => i.kind === 'font');
 
 /** Troca o índice a cada `ms` (pausado com movimento reduzido). */
 function useCycle(length: number, ms: number) {
@@ -44,6 +49,11 @@ function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setShown(true);
+      return;
+    }
+    // threshold 0: blocos largos/altos (ou maiores que a tela) também aparecem
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) {
@@ -51,10 +61,15 @@ function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; 
           io.disconnect();
         }
       },
-      { threshold: 0.15 }
+      { threshold: 0, rootMargin: '0px 0px -8% 0px' }
     );
     io.observe(el);
-    return () => io.disconnect();
+    // garantia: nada fica invisível se o observador não disparar
+    const t = setTimeout(() => setShown(true), 2500);
+    return () => {
+      io.disconnect();
+      clearTimeout(t);
+    };
   }, []);
   return (
     <div ref={ref} className={`na-reveal ${shown ? 'is-in' : ''} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
@@ -103,6 +118,8 @@ export default function NitroCheckoutPage() {
   const frameI = useCycle(FRAMES.length, 2200);
   const titleI = useCycle(TITLES.length, 1800);
   const introI = useCycle(INTROS.length, 2600);
+  const themeI = useCycle(THEMES.length, 2400);
+  const fontI = useCycle(FONTS.length, 1700);
   const avatar = viewer?.avatar_url || AVATAR;
   const name = viewer?.display_name || viewer?.full_name || viewer?.username || 'Seu nome';
 
@@ -159,8 +176,8 @@ export default function NitroCheckoutPage() {
               <span className="na-h1-grad na-nowrap">Seja inesquecível.</span>
             </h1>
             <p className="na-lead">
-              Molduras animadas, aberturas de perfil cinematográficas, títulos que brilham, tags ilustradas e o
-              Insight* inteiro em Rainbow. Tudo isso por menos que um café.
+              Molduras animadas, aberturas de perfil cinematográficas, temas para o app inteiro, estilos de nome,
+              tags ilustradas e o Insight* em Rainbow. Tudo isso por menos que um café.
             </p>
 
             <div className="na-price">
@@ -254,6 +271,46 @@ export default function NitroCheckoutPage() {
                       );
                     })}
                   </div>
+                }
+              />
+            </Reveal>
+
+            <Reveal delay={40} className="na-span-2">
+              <Perk
+                wide
+                title="Temas de app"
+                stat={`${THEMES.length} temas`}
+                text="Mude as cores do Insight inteiro: Laranja Elétrico, Infernal, Mundo de Blocos, Café, Espacial, Soft Blue Clean e mais. Só você vê."
+                preview={
+                  <div className="na-theme-row">
+                    {[0, 1, 2].map((k) => {
+                      const t = THEMES[(themeI + k) % THEMES.length];
+                      return (
+                        <div key={`${k}-${t.id}`} className={`na-theme-card ${k === 1 ? 'is-main' : ''}`}>
+                          <ThemeMiniature themeId={t.id} name={name} large={k === 1} />
+                          <span className="na-theme-name">{t.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                }
+              />
+            </Reveal>
+
+            <Reveal delay={60}>
+              <Perk
+                title="Estilos de nome"
+                stat={`${FONTS.length} estilos`}
+                text="Fonte em blocos de pixel, arcade 8-bit, neon retrô, gótica, gibi… e combina com o seu Título."
+                preview={
+                  <span className="na-font-demo">
+                    {FONTS[fontI] && (
+                      <NameFont key={FONTS[fontI].id} font={FONTS[fontI]}>
+                        {name}
+                      </NameFont>
+                    )}
+                    <small>{FONTS[fontI]?.name}</small>
+                  </span>
                 }
               />
             </Reveal>
@@ -381,6 +438,7 @@ export default function NitroCheckoutPage() {
               </p>
               <ul>
                 <li>Galeria completa de cosméticos</li>
+                <li>{THEMES.length} temas de app e {FONTS.length} estilos de nome</li>
                 <li>Selo Nitro e Rainbow</li>
                 <li>Grupo VIP no WhatsApp</li>
                 <li>Mais IA (em breve)</li>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 // @ts-ignore
 import './globals.css';
+import { NAME_FONT_VARIABLES } from '@/components/nitro/nameFonts';
 import { AppShell } from '../components/layout/AppShell';
 import { ReleaseNotesModal } from '@/components/layout/ReleaseNotesModal';
 
@@ -18,13 +19,24 @@ export const viewport: Viewport = {
 const themeInitScript = `
   (function() {
     try {
+      var nt = localStorage.getItem('insight-nitro-theme');
+      if (nt) {
+        var t = JSON.parse(nt);
+        if (t && /^theme-[a-z-]+$/.test(t.id)) {
+          document.documentElement.setAttribute('data-nitro-theme', t.id);
+          document.documentElement.dataset.ntMode = t.mode === 'light' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', document.documentElement.dataset.ntMode);
+        }
+      }
+    } catch (e) {}
+    try {
       var saved = localStorage.getItem('insight-preferences');
       if (saved) {
         var prefs = JSON.parse(saved);
         var root = document.documentElement;
 
         if (prefs.theme) {
-          root.setAttribute('data-theme', prefs.theme);
+          root.setAttribute('data-theme', root.dataset.ntMode || prefs.theme);
         }
         if (prefs.highContrast) {
           root.setAttribute('data-contrast', 'high');
@@ -38,7 +50,7 @@ const themeInitScript = `
             : prefs.fontSize;
           root.style.fontSize = effectiveSize + 'px';
         }
-        if (prefs.accentColor) {
+        if (prefs.accentColor && !localStorage.getItem('insight-nitro-theme')) {
           root.style.setProperty('--accent', prefs.accentColor);
           root.style.setProperty('--accent-hover', prefs.accentColor);
         }
@@ -69,7 +81,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" data-theme="dark" suppressHydrationWarning>
+    <html lang="pt-BR" data-theme="dark" className={NAME_FONT_VARIABLES} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

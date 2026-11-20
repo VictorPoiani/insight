@@ -22,6 +22,7 @@ import {
   CosmeticName,
   CosmeticTag,
   FramePreview,
+  NameFont,
   NitroBadge,
   TagPill,
   TitleText,
@@ -29,6 +30,7 @@ import {
 import { IntroOverlay } from '@/components/nitro/ProfileIntro';
 import { NitroSettingsPanel } from '@/components/nitro/NitroSettingsPanel';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
+import { ThemeMiniature } from '@/components/nitro/ThemeMiniature';
 import { createClient } from '@/lib/supabase/client';
 import { NITRO_PRICE_BRL, NITRO_PUBLIC, describeNitroSource } from '@/lib/nitro/entitlement';
 
@@ -76,7 +78,7 @@ function NitroStatusCard() {
   );
 }
 
-const KIND_ORDER: NitroKind[] = ['frame', 'title', 'tag', 'intro'];
+const KIND_ORDER: NitroKind[] = ['frame', 'theme', 'title', 'font', 'tag', 'intro'];
 const KIND_PARAM: Record<string, NitroKind> = {
   frame: 'frame',
   moldura: 'frame',
@@ -85,6 +87,12 @@ const KIND_PARAM: Record<string, NitroKind> = {
   tag: 'tag',
   intro: 'intro',
   abertura: 'intro',
+  theme: 'theme',
+  tema: 'theme',
+  temas: 'theme',
+  font: 'font',
+  fonte: 'font',
+  nome: 'font',
 };
 
 const RARITY_CLASS: Record<string, string> = {
@@ -99,7 +107,7 @@ function slotOf(kind: NitroKind): keyof NitroCosmetics {
 }
 
 function NitroGallery() {
-  const { ready, viewer, hasAccess, saveCosmetics } = useNitro();
+  const { ready, viewer, hasAccess, saveCosmetics, setPreviewTheme } = useNitro();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -114,15 +122,24 @@ function NitroGallery() {
 
   const savedCosmetics = viewer?.cosmetics || {};
 
+  const [draftReady, setDraftReady] = useState(false);
   useEffect(() => {
+    if (!ready) return;
     if (viewer) setDraft(viewer.cosmetics || {});
+    setDraftReady(true);
     // Inicializa o rascunho quando o perfil carrega
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewer?.id]);
+  }, [ready, viewer?.id]);
+
+  // Provador: o tema escolhido aparece no app inteiro enquanto você está aqui
+  useEffect(() => {
+    if (draftReady) setPreviewTheme(draft.theme ?? 'none');
+  }, [draftReady, draft.theme, setPreviewTheme]);
+  useEffect(() => () => setPreviewTheme(null), [setPreviewTheme]);
 
   const dirty = useMemo(() => {
     const keys: (keyof NitroCosmetics)[] = [
-      'frame', 'title', 'tag', 'intro', 'frameEnabled', 'frameAnimated', 'introEnabled', 'levelAnimation', 'rainbow',
+      'frame', 'title', 'tag', 'intro', 'font', 'theme', 'frameEnabled', 'frameAnimated', 'introEnabled', 'levelAnimation', 'rainbow',
     ];
     const norm = (v: unknown, k: keyof NitroCosmetics) =>
       v === undefined || v === null ? (k.endsWith('Enabled') || k.endsWith('Animated') || k === 'levelAnimation' || k === 'rainbow' ? true : null) : v;
@@ -274,13 +291,13 @@ function NitroGallery() {
 
           {/* Categorias */}
           <div className="px-4 sm:px-6 pt-3 border-b border-border">
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {KIND_ORDER.map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setKind(k)}
-                  className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
                     kind === k ? 'border-accent text-primary' : 'border-transparent text-muted hover:text-primary'
                   }`}
                 >
@@ -498,6 +515,12 @@ function ItemCard({
           </span>
         )}
         {item.kind === 'tag' && <TagPill tagId={item.id} className="max-w-[92%]" />}
+        {item.kind === 'font' && (
+          <span className="px-2 text-lg text-primary max-w-full text-center leading-snug line-clamp-2 break-words">
+            <NameFont font={item}>{displayName}</NameFont>
+          </span>
+        )}
+        {item.kind === 'theme' && <ThemeMiniature themeId={item.id} name={displayName} />}
         {item.kind === 'intro' && (
           <span className="flex flex-col items-center gap-1.5 text-secondary">
             <Sparkles className="w-7 h-7" style={{ color: coll.colors[0] }} />

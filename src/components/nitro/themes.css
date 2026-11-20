@@ -1,0 +1,304 @@
+/* ==========================================================================
+   Temas de App do Insight Nitro — só quem aplicou vê (data-nitro-theme no <html>).
+   [data-nt-scope] aplica o mesmo tema dentro de uma miniatura (galeria/planos).
+   ========================================================================== */
+
+html[data-nitro-theme="theme-kwai"],
+[data-nt-scope="theme-kwai"] {
+  color-scheme: dark;
+  --background: rgba(22,8,5,.70);
+  --surface: rgba(44,16,10,.80);
+  --elevated: rgba(66,24,14,.88);
+  --border: rgba(255,140,70,.24);
+  --primary: #fff4ec;
+  --secondary: #fbc8a8;
+  --muted: #c98d6b;
+  --accent: #ff7a1a;
+  --accent-hover: #ff8f3d;
+  --accent-soft: color-mix(in srgb, #ff7a1a 18%, transparent);
+  --danger: #ff4d4d;
+  --nt-bg: radial-gradient(120% 70% at 0% 0%, #ff6a00 0%, transparent 55%), radial-gradient(90% 60% at 100% 10%, #ee0979 0%, transparent 55%), linear-gradient(180deg,#2a0d06 0%,#120604 70%);
+}
+
+html[data-nitro-theme="theme-infernal"],
+[data-nt-scope="theme-infernal"] {
+  color-scheme: dark;
+  --background: rgba(18,4,4,.72);
+  --surface: rgba(36,8,8,.82);
+  --elevated: rgba(54,12,12,.88);
+  --border: rgba(239,68,68,.25);
+  --primary: #fde8e8;
+  --secondary: #f2b8b8;
+  --muted: #b77a7a;
+  --accent: #ef4444;
+  --accent-hover: #f87171;
+  --accent-soft: color-mix(in srgb, #ef4444 18%, transparent);
+  --danger: #fb923c;
+  --nt-bg: radial-gradient(circle at 20% 90%, rgba(251,146,60,.55) 0 2px, transparent 3px) 0 0/90px 70px, radial-gradient(circle at 70% 40%, rgba(239,68,68,.5) 0 1.5px, transparent 2.5px) 0 0/130px 110px, radial-gradient(120% 60% at 50% 120%, #b91c1c 0%, #450a0a 45%, transparent 75%), linear-gradient(180deg,#1c0404,#0a0101);
+}
+
+html[data-nitro-theme="theme-blocos"],
+[data-nt-scope="theme-blocos"] {
+  color-scheme: dark;
+  --background: rgba(30,20,10,.74);
+  --surface: rgba(58,38,20,.86);
+  --elevated: rgba(78,52,28,.92);
+  --border: #8b5a2b;
+  --primary: #f6efd9;
+  --secondary: #d8c9a3;
+  --muted: #a8956c;
+  --accent: #5fbf3a;
+  --accent-hover: #74d14f;
+  --accent-soft: color-mix(in srgb, #5fbf3a 18%, transparent);
+  --danger: #e5533d;
+  --nt-bg: linear-gradient(180deg, #5fbf3a 0 10px, #3f8f25 10px 16px, transparent 16px), repeating-conic-gradient(#5b3a1e 0 25%, #6b4423 0 50%) 0 0/24px 24px, #4a2f17;
+}
+
+html[data-nitro-theme="theme-cafe"],
+[data-nt-scope="theme-cafe"] {
+  color-scheme: dark;
+  --background: rgba(22,14,10,.74);
+  --surface: rgba(40,26,18,.84);
+  --elevated: rgba(58,38,26,.9);
+  --border: rgba(200,145,91,.24);
+  --primary: #f3e6d8;
+  --secondary: #d6bfa6;
+  --muted: #a88b70;
+  --accent: #c8915b;
+  --accent-hover: #d9a26c;
+  --accent-soft: color-mix(in srgb, #c8915b 18%, transparent);
+  --danger: #e0664c;
+  --nt-bg: radial-gradient(80% 50% at 80% 0%, rgba(200,145,91,.35), transparent 60%), linear-gradient(180deg,#2b1d14,#140c07);
+}
+
+html[data-nitro-theme="theme-latte"],
+[data-nt-scope="theme-latte"] {
+  color-scheme: light;
+  --background: rgba(251,246,240,.72);
+  --surface: rgba(255,252,248,.86);
+  --elevated: rgba(240,226,210,.9);
+  --border: #e3cdb6;
+  --primary: #3b2a20;
+  --secondary: #6f5646;
+  --muted: #9b8170;
+  --accent: #a0673d;
+  --accent-hover: #8a5530;
+  --accent-soft: color-mix(in srgb, #a0673d 18%, transparent);
+  --danger: #c2410c;
+  --nt-bg: radial-gradient(90% 60% at 10% 0%, #f6e3cf, transparent 60%), linear-gradient(180deg,#f5ebe0,#e9d5c1);
+}
+
+html[data-nitro-theme="theme-espacial"],
+[data-nt-scope="theme-espacial"] {
+  color-scheme: dark;
+  --background: rgba(5,8,22,.70);
+  --surface: rgba(14,16,40,.80);
+  --elevated: rgba(24,24,58,.88);
+  --border: rgba(139,92,246,.26);
+  --primary: #eef0ff;
+  --secondary: #b9bfe6;
+  --muted: #7e86b8;
+  --accent: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --accent-soft: color-mix(in srgb, #8b5cf6 18%, transparent);
+  --danger: #f472b6;
+  --nt-bg: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px) 0 0/97px 97px, radial-gradient(circle, rgba(196,181,253,.8) 0 1px, transparent 1.5px) 40px 60px/151px 151px, radial-gradient(60% 45% at 85% 15%, rgba(139,92,246,.45), transparent 70%), radial-gradient(50% 40% at 10% 85%, rgba(236,72,153,.28), transparent 70%), linear-gradient(180deg,#050816,#0b0b2b);
+}
+
+html[data-nitro-theme="theme-soft-blue"],
+[data-nt-scope="theme-soft-blue"] {
+  color-scheme: light;
+  --background: rgba(248,251,255,.72);
+  --surface: rgba(255,255,255,.88);
+  --elevated: rgba(232,240,255,.94);
+  --border: #d6e4ff;
+  --primary: #0f172a;
+  --secondary: #475569;
+  --muted: #7c8aa5;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: color-mix(in srgb, #3b82f6 18%, transparent);
+  --danger: #dc2626;
+  --nt-bg: radial-gradient(70% 50% at 100% 0%, #dbeafe, transparent 65%), linear-gradient(180deg,#f8fbff,#e8f0ff);
+}
+
+html[data-nitro-theme="theme-algodao"],
+[data-nt-scope="theme-algodao"] {
+  color-scheme: light;
+  --background: rgba(255,247,247,.72);
+  --surface: rgba(255,255,255,.86);
+  --elevated: rgba(253,232,236,.92);
+  --border: #f9cfd8;
+  --primary: #4a1d2f;
+  --secondary: #7a4a5c;
+  --muted: #a87a8b;
+  --accent: #ec4899;
+  --accent-hover: #db2777;
+  --accent-soft: color-mix(in srgb, #ec4899 18%, transparent);
+  --danger: #dc2626;
+  --nt-bg: radial-gradient(80% 60% at 0% 0%, #fbcfe8, transparent 60%), radial-gradient(70% 55% at 100% 100%, #fed7aa, transparent 60%), linear-gradient(135deg,#fde2e4,#fff1e6);
+}
+
+html[data-nitro-theme="theme-menta"],
+[data-nt-scope="theme-menta"] {
+  color-scheme: light;
+  --background: rgba(244,252,250,.72);
+  --surface: rgba(255,255,255,.86);
+  --elevated: rgba(220,246,240,.92);
+  --border: #bfeee2;
+  --primary: #0f2f2a;
+  --secondary: #3d625b;
+  --muted: #6f8f88;
+  --accent: #14b8a6;
+  --accent-hover: #0d9488;
+  --accent-soft: color-mix(in srgb, #14b8a6 18%, transparent);
+  --danger: #dc2626;
+  --nt-bg: radial-gradient(80% 60% at 0% 0%, #ccfbf1, transparent 60%), radial-gradient(70% 55% at 100% 100%, #dbeafe, transparent 60%), linear-gradient(135deg,#d8f5ec,#e6f0ff);
+}
+
+html[data-nitro-theme="theme-lavanda"],
+[data-nt-scope="theme-lavanda"] {
+  color-scheme: light;
+  --background: rgba(250,248,255,.72);
+  --surface: rgba(255,255,255,.86);
+  --elevated: rgba(237,233,254,.92);
+  --border: #ddd6fe;
+  --primary: #2e1065;
+  --secondary: #5b4b8a;
+  --muted: #8b7fb3;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  --accent-soft: color-mix(in srgb, #8b5cf6 18%, transparent);
+  --danger: #dc2626;
+  --nt-bg: radial-gradient(80% 60% at 100% 0%, #e9d5ff, transparent 60%), linear-gradient(160deg,#f3e8ff,#e0e7ff);
+}
+
+html[data-nitro-theme="theme-aurora"],
+[data-nt-scope="theme-aurora"] {
+  color-scheme: dark;
+  --background: rgba(4,17,31,.70);
+  --surface: rgba(8,30,48,.80);
+  --elevated: rgba(12,42,64,.88);
+  --border: rgba(45,212,191,.24);
+  --primary: #e6fffb;
+  --secondary: #a7d8d2;
+  --muted: #6f9c99;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-soft: color-mix(in srgb, #2dd4bf 18%, transparent);
+  --danger: #f472b6;
+  --nt-bg: radial-gradient(90% 35% at 30% 0%, rgba(45,212,191,.55), transparent 70%), radial-gradient(70% 30% at 80% 8%, rgba(124,58,237,.5), transparent 70%), radial-gradient(60% 25% at 55% 18%, rgba(74,222,128,.35), transparent 70%), linear-gradient(180deg,#04111f,#020a14);
+}
+
+html[data-nitro-theme="theme-synthwave"],
+[data-nt-scope="theme-synthwave"] {
+  color-scheme: dark;
+  --background: rgba(18,0,31,.68);
+  --surface: rgba(32,4,52,.80);
+  --elevated: rgba(46,8,72,.88);
+  --border: rgba(244,114,182,.28);
+  --primary: #fde7ff;
+  --secondary: #e6b3f2;
+  --muted: #a77bbd;
+  --accent: #f472b6;
+  --accent-hover: #f9a8d4;
+  --accent-soft: color-mix(in srgb, #f472b6 18%, transparent);
+  --danger: #22d3ee;
+  --nt-bg: linear-gradient(transparent 0 calc(100% - 1px), rgba(34,211,238,.35) calc(100% - 1px)) 0 0/100% 40px, linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(244,114,182,.25) calc(100% - 1px)) 0 0/60px 100%, radial-gradient(60% 40% at 50% 100%, rgba(251,146,60,.55), transparent 70%), linear-gradient(180deg,#12001f,#2a0040);
+}
+
+html[data-nitro-theme="theme-crepusculo"],
+[data-nt-scope="theme-crepusculo"] {
+  color-scheme: dark;
+  --background: rgba(26,11,36,.70);
+  --surface: rgba(42,16,54,.80);
+  --elevated: rgba(60,22,72,.88);
+  --border: rgba(251,146,60,.25);
+  --primary: #fff1e6;
+  --secondary: #e8c3b9;
+  --muted: #b08a95;
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
+  --accent-soft: color-mix(in srgb, #fb923c 18%, transparent);
+  --danger: #f43f5e;
+  --nt-bg: radial-gradient(120% 60% at 50% 110%, #fb923c 0%, #db2777 35%, transparent 70%), linear-gradient(180deg,#1a0b24,#3b0d3f);
+}
+
+html[data-nitro-theme="theme-floresta"],
+[data-nt-scope="theme-floresta"] {
+  color-scheme: dark;
+  --background: rgba(6,20,13,.72);
+  --surface: rgba(12,34,22,.82);
+  --elevated: rgba(18,48,30,.88);
+  --border: rgba(74,222,128,.22);
+  --primary: #e9fbef;
+  --secondary: #acd4b8;
+  --muted: #749a80;
+  --accent: #4ade80;
+  --accent-hover: #86efac;
+  --accent-soft: color-mix(in srgb, #4ade80 18%, transparent);
+  --danger: #f87171;
+  --nt-bg: radial-gradient(40% 25% at 85% 10%, rgba(254,249,195,.25), transparent 70%), radial-gradient(100% 60% at 50% 120%, #14532d, transparent 70%), linear-gradient(180deg,#06140d,#03100a);
+}
+
+html[data-nitro-theme="theme-oceano"],
+[data-nt-scope="theme-oceano"] {
+  color-scheme: dark;
+  --background: rgba(2,21,38,.70);
+  --surface: rgba(4,34,60,.80);
+  --elevated: rgba(6,48,84,.88);
+  --border: rgba(56,189,248,.25);
+  --primary: #e0f4ff;
+  --secondary: #a6cbe3;
+  --muted: #6f93ab;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-soft: color-mix(in srgb, #38bdf8 18%, transparent);
+  --danger: #fb7185;
+  --nt-bg: radial-gradient(80% 40% at 50% 0%, rgba(56,189,248,.35), transparent 70%), linear-gradient(180deg,#03346e,#021526 60%,#010b16);
+}
+
+html[data-nitro-theme="theme-terminal"],
+[data-nt-scope="theme-terminal"] {
+  color-scheme: dark;
+  --background: rgba(0,0,0,.78);
+  --surface: rgba(4,12,6,.86);
+  --elevated: rgba(8,22,12,.92);
+  --border: rgba(34,197,94,.3);
+  --primary: #d1fadf;
+  --secondary: #86d6a2;
+  --muted: #4f9a6a;
+  --accent: #22c55e;
+  --accent-hover: #4ade80;
+  --accent-soft: color-mix(in srgb, #22c55e 18%, transparent);
+  --danger: #f87171;
+  --nt-bg: repeating-linear-gradient(0deg, rgba(34,197,94,.06) 0 1px, transparent 1px 3px), radial-gradient(70% 50% at 50% 0%, rgba(34,197,94,.18), transparent 70%), #000;
+}
+
+
+/* fundo ilustrado atrás de todo o app */
+html[data-nitro-theme] {
+  background: var(--nt-bg) !important;
+  background-attachment: fixed !important;
+}
+html[data-nitro-theme] body {
+  background: transparent !important;
+}
+@media (max-width: 768px) {
+  /* attachment: fixed é caro no celular; um véu fixo faz o mesmo papel */
+  html[data-nitro-theme] { background-attachment: scroll !important; }
+  html[data-nitro-theme] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--nt-bg);
+    pointer-events: none;
+  }
+}
+
+/* miniatura do tema (galeria/planos) */
+[data-nt-scope] {
+  background: var(--nt-bg);
+  color: var(--primary);
+}

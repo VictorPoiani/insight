@@ -840,3 +840,34 @@ html[data-reduce-motion='true'] .nx-intro {
   30% { opacity: 1; }
   100% { opacity: 0; transform: rotate(var(--a)) translateX(55vmax) scaleX(1); }
 }
+
+/* --------------------------------------------------------- ESTILOS DE NOME */
+.nx-namefont { display: inline-block; line-height: 1.15; }
+.nf-blocos { font-family: var(--nf-blocos), ui-monospace, monospace; font-weight: 600; letter-spacing: 0.02em; }
+.nf-arcade { font-family: var(--nf-arcade), ui-monospace, monospace; font-size: 0.72em; letter-spacing: 0.04em; line-height: 1.5; }
+.nf-orbit { font-family: var(--nf-orbit), sans-serif; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.9em; }
+.nf-cursiva { font-family: var(--nf-cursiva), cursive; font-weight: 400; font-size: 1.05em; }
+.nf-imperial { font-family: var(--nf-imperial), serif; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.92em; }
+.nf-terror { font-family: var(--nf-terror), cursive; font-weight: 400; letter-spacing: 0.04em; font-size: 1.1em; }
+.nf-rua { font-family: var(--nf-rua), sans-serif; font-weight: 400; font-size: 0.86em; }
+.nf-neon { font-family: var(--nf-neon), sans-serif; font-weight: 400; font-size: 0.95em; }
+.nf-gibi { font-family: var(--nf-gibi), cursive; font-weight: 400; letter-spacing: 0.05em; font-size: 1.12em; }
+.nf-glitch { font-family: var(--nf-glitch), sans-serif; font-weight: 400; font-size: 1.02em; }
+.nf-gotica { font-family: var(--nf-gotica), serif; font-weight: 400; font-size: 1.1em; }
+.nf-manuscrito { font-family: var(--nf-manuscrito), cursive; font-weight: 700; font-size: 1.22em; }
+
+/* efeitos (combinam com a cor do Título, se houver) */
+.nfx-block { text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.45); }
+.nfx-street { text-shadow: 1px 1px 0 var(--accent), 2px 2px 0 var(--accent), 3px 3px 0 rgba(0, 0, 0, 0.35); }
+.nfx-neon { text-shadow: 0 0 4px var(--accent), 0 0 10px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 60%, transparent); }
+.nfx-glow { text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.nfx-outline { -webkit-text-stroke: 1px rgba(0, 0, 0, 0.75); paint-order: stroke fill; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5); }
+.nfx-drip { text-shadow: 0 2px 0 #7f1d1d, 0 4px 6px rgba(127, 29, 29, 0.6); }
+.nfx-chrome {
+  background: linear-gradient(180deg, #fff7d6 0%, #facc15 45%, #a16207 55%, #fde68a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* com Título ativo, as cores vêm do título */
+.nx-title-wrap .nx-namefont .nx-title { font: inherit; letter-spacing: inherit; }

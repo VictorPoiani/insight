@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { siteUrl } from '@/lib/account/mailer';
+import { createAdminClient } from '@/lib/supabase/admin';
 import crypto from 'crypto';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
@@ -32,6 +34,7 @@ interface NewsletterPayload {
   postTitle?: string;
   postContent?: string;
   postTags?: string[];
+  postId?: string;
   postBlocks?: PostBlock[];
   isPinned?: boolean;
 }
@@ -48,17 +51,9 @@ function getSupabaseClient() {
 }
 
 function resolveSiteUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
-  }
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return 'http://localhost:3000';
+  return siteUrl();
 }
+
 
 function createBrevoTransporter() {
   const user = process.env.BREVO_SMTP_USER?.trim();
@@ -172,10 +167,30 @@ export async function GET() {
   });
 }
 
+/** Escapa texto vindo de usuários antes de entrar no HTML do e-mail. */
+function esc(v?: string | null): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** HTML rico dos blocos: só formatação básica, sem atributos (sem links/scripts/estilos). */
+function safeHtml(v?: string | null): string {
+  const text = String(v ?? '').replace(/&nbsp;/g, ' ');
+  const allowed = /^(b|strong|i|em|u|s|strike|br|code|mark)$/i;
+  return esc(text.replace(/<\/?([a-z0-9]+)[^>]*>/gi, (tag, name: string) =>
+    allowed.test(name) ? `\u0000${tag.startsWith('</') ? '/' : ''}${name.toLowerCase()}\u0001` : ''
+  ))
+    .replace(/\u0000(\/?)([a-z]+)\u0001/g, (_m, slash: string, name: string) => (name === 'br' ? '<br/>' : `<${slash}${name}>`));
+}
+
 function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): string {
   if (!Array.isArray(blocks) || blocks.length === 0) {
     return `<p style="margin: 0; font-size: 15px; line-height: 1.7; color: #e4e4e7; white-space: pre-line;">${
-      fallbackText || ''
+      esc(fallbackText)
     }</p>`;
   }
 
@@ -186,45 +201,43 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
       }
       if (b.type === 'h1') {
         return `<h2 style="margin: 18px 0 8px 0; font-size: 22px; font-weight: 800; color: #ffffff;">${
-          b.html || ''
+          safeHtml(b.html)
         }</h2>`;
       }
       if (b.type === 'h2') {
         return `<h3 style="margin: 16px 0 6px 0; font-size: 18px; font-weight: 700; color: #f4f4f5;">${
-          b.html || ''
+          safeHtml(b.html)
         }</h3>`;
       }
       if (b.type === 'quote') {
         return `<blockquote style="margin: 14px 0; padding: 8px 16px; border-left: 4px solid #2563eb; color: #a1a1aa; font-style: italic; font-size: 15px;">${
-          b.html || ''
+          safeHtml(b.html)
         }</blockquote>`;
       }
       if (b.type === 'callout') {
         return `
           <div style="margin: 14px 0; padding: 14px 16px; background-color: #18181b; border: 1px solid rgba(37, 99, 235, 0.4); border-radius: 12px; color: #f4f4f5; font-size: 14px;">
-            <span>${b.html || ''}</span>
+            <span>${safeHtml(b.html)}</span>
           </div>
         `;
       }
       if (b.type === 'code') {
         return `<pre style="margin: 14px 0; padding: 14px; background-color: #18181b; border: 1px solid #27272a; border-radius: 10px; font-family: monospace; font-size: 12px; color: #38bdf8; overflow-x: auto; white-space: pre-wrap;">${
-          b.html || ''
+          safeHtml(b.html)
         }</pre>`;
       }
       if (b.type === 'bullet') {
         return `<p style="margin: 6px 0; font-size: 15px; color: #e4e4e7;"><span style="color: #2563eb; font-weight: bold; margin-right: 8px;">•</span>${
-          b.html || ''
+          safeHtml(b.html)
         }</p>`;
       }
-      if (b.type === 'image' && b.imageUrl) {
+      if (b.type === 'image' && b.imageUrl && /^https:\/\//.test(b.imageUrl)) {
         return `
           <div style="margin: 18px 0; text-align: center;">
-            <img src="${b.imageUrl}" alt="${
-          b.imageCaption || 'Imagem do post'
-        }" style="max-width: 100%; border-radius: 12px; border: 1px solid #27272a; display: block; margin: 0 auto;" />
+            <img src="${esc(b.imageUrl)}" alt="${esc(b.imageCaption || 'Imagem do post')}" style="max-width: 100%; border-radius: 12px; border: 1px solid #27272a; display: block; margin: 0 auto;" />
             ${
               b.imageCaption
-                ? `<p style="margin: 6px 0 0 0; font-size: 12px; color: #71717a;">${b.imageCaption}</p>`
+                ? `<p style="margin: 6px 0 0 0; font-size: 12px; color: #71717a;">${esc(b.imageCaption)}</p>`
                 : ''
             }
           </div>
@@ -243,7 +256,7 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
                   }; font-weight: ${rIdx === 0 ? '700' : '400'}; background-color: ${
                     rIdx === 0 ? '#18181b' : '#09090b'
                   };">
-                    ${cell || ''}
+                    ${esc(cell)}
                   </td>`
                 )
                 .join('')}
@@ -257,9 +270,9 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
           .map(
             (s: any) => `
             <div style="margin-bottom: 10px; padding: 12px; background-color: #18181b; border: 1px solid #27272a; border-radius: 10px;">
-              <div style="font-family: monospace; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">${s.phase || ''}</div>
-              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 2px;">${s.title || ''}</div>
-              <div style="font-size: 13px; color: #a1a1aa; margin-top: 4px;">${s.description || ''}</div>
+              <div style="font-family: monospace; font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">${esc(s.phase)}</div>
+              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 2px;">${esc(s.title)}</div>
+              <div style="font-size: 13px; color: #a1a1aa; margin-top: 4px;">${esc(s.description)}</div>
             </div>`
           )
           .join('');
@@ -269,18 +282,18 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
         const optsHtml = (b.pollOptions || [])
           .map(
             (o) =>
-              `<div style="padding: 8px 12px; margin-top: 6px; background-color: #09090b; border: 1px solid #27272a; border-radius: 8px; font-size: 13px; color: #e4e4e7;">• ${o.text}</div>`
+              `<div style="padding: 8px 12px; margin-top: 6px; background-color: #09090b; border: 1px solid #27272a; border-radius: 8px; font-size: 13px; color: #e4e4e7;">• ${esc(o.text)}</div>`
           )
           .join('');
         return `
           <div style="margin: 16px 0; padding: 14px; background-color: #18181b; border: 1px solid #27272a; border-radius: 12px;">
-            <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">📊 Enquete: ${b.pollQuestion}</div>
+            <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">📊 Enquete: ${esc(b.pollQuestion)}</div>
             ${optsHtml}
           </div>
         `;
       }
       return `<p style="margin: 0 0 12px 0; font-size: 15px; line-height: 1.7; color: #e4e4e7;">${
-        b.html || ''
+        safeHtml(b.html)
       }</p>`;
     })
     .join('');
@@ -412,8 +425,11 @@ function buildMasterEmailTemplate({
 async function sendEmailDispatcher(
   rawRecipients: string[],
   subject: string,
-  html: string
+  html: string,
+  fromName = 'Insight*'
 ) {
+  // nome de exibição sem aspas/quebras (o endereço é sempre o do Insight)
+  const safeFrom = fromName.replace(/["\r\n<>]/g, '').slice(0, 70) || 'Insight*';
   const recipients = sanitizeEmailList(rawRecipients);
   if (recipients.length === 0) {
     return { ok: true, sent: 0, errors: [] };
@@ -432,7 +448,7 @@ async function sendEmailDispatcher(
     try {
       if (recipients.length === 1) {
         await brevoTransporter.sendMail({
-          from: `"Insight* — Victor Poiani" <${brevoSender}>`,
+          from: `"${safeFrom}" <${brevoSender}>`,
           to: recipients[0],
           subject,
           html,
@@ -441,7 +457,7 @@ async function sendEmailDispatcher(
         const batches = chunkArray(recipients, 45);
         for (const batch of batches) {
           await brevoTransporter.sendMail({
-            from: `"Insight* — Victor Poiani" <${brevoSender}>`,
+            from: `"${safeFrom}" <${brevoSender}>`,
             to: brevoSender,
             bcc: batch,
             subject,
@@ -466,7 +482,7 @@ async function sendEmailDispatcher(
     try {
       if (recipients.length === 1) {
         await gmailTransporter.sendMail({
-          from: `"Insight* — Victor Poiani" <${gmailUser}>`,
+          from: `"${safeFrom}" <${gmailUser}>`,
           to: recipients[0],
           subject,
           html,
@@ -475,7 +491,7 @@ async function sendEmailDispatcher(
         const batches = chunkArray(recipients, 45);
         for (const batch of batches) {
           await gmailTransporter.sendMail({
-            from: `"Insight* — Victor Poiani" <${gmailUser}>`,
+            from: `"${safeFrom}" <${gmailUser}>`,
             to: gmailUser,
             bcc: batch,
             subject,
@@ -512,7 +528,7 @@ async function sendEmailDispatcher(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: fromEmail,
+          from: `${safeFrom} <${(fromEmail.match(/<([^>]+)>/)?.[1] || fromEmail).trim()}>`,
           to: [recipient],
           subject,
           html,
@@ -595,7 +611,7 @@ export async function POST(request: Request) {
       : { data: null };
     const callerIsAdmin = callerProfile?.role === 'admin';
 
-    if ((body.action === 'official_update' || body.action === 'new_post') && !callerIsAdmin) {
+    if (body.action === 'official_update' && !callerIsAdmin) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
     }
 
@@ -618,6 +634,8 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('display_name, full_name, nickname, username, avatar_url')
+      .eq('role', 'admin')
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -763,18 +781,64 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'new_post') {
-      const { data: subs } = await supabase
-        .from('subscribers')
-        .select('email, notify_mode, interested_tags');
-
-      if (!subs || subs.length === 0) {
+      // O conteúdo vem do BANCO (não do navegador) e o remetente é o autor real.
+      const postId = String(body.postId || '');
+      if (!/^[0-9a-f-]{36}$/i.test(postId) || !caller) {
+        return NextResponse.json({ ok: false, error: 'Post inválido.' }, { status: 400 });
+      }
+      const admin = createAdminClient();
+      const { data: post } = await admin
+        .from('posts')
+        .select('id, profile_id, author_id, content, blocks, tags, is_pinned, visibility, is_draft')
+        .eq('id', postId)
+        .maybeSingle();
+      if (!post || post.visibility === 'private' || post.is_draft) {
         return NextResponse.json({ ok: true, sent: 0 });
       }
+      const ownerId = post.profile_id || post.author_id;
+      const { data: author } = await admin
+        .from('profiles')
+        .select('id, user_id, display_name, full_name, nickname, username, avatar_url')
+        .eq('id', ownerId)
+        .maybeSingle();
+      const callerOwnsPost = author && (author.user_id === caller.id || author.id === caller.id);
+      if (!author || (!callerOwnsPost && !callerIsAdmin)) {
+        return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
+      }
 
-      const postTagsLower = (body.postTags || []).map((t) => t.toLowerCase());
-      const isPinned = Boolean(body.isPinned);
+      // um disparo por post
+      const marker = crypto.createHash('sha256').update(`post:${post.id}`).digest('hex');
+      const { count: already } = await admin
+        .from('account_email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('email_hash', marker)
+        .eq('kind', 'post');
+      if ((already ?? 0) > 0) return NextResponse.json({ ok: true, sent: 0, duplicate: true });
+      await admin.from('account_email_log').insert({ email_hash: marker, kind: 'post' });
 
-      const matchedRecipients = subs
+      // seguidores do autor -> e-mails das contas
+      const { data: follows } = await admin.from('follows').select('follower_id').eq('following_id', author.id);
+      const followerIds = (follows || []).map((f) => f.follower_id);
+      if (followerIds.length === 0) return NextResponse.json({ ok: true, sent: 0 });
+      const { data: followerProfiles } = await admin
+        .from('profiles')
+        .select('id, user_id')
+        .in('id', followerIds);
+      const emails: string[] = [];
+      for (const fp of followerProfiles || []) {
+        const { data: u } = await admin.auth.admin.getUserById(fp.user_id || fp.id);
+        if (u?.user?.email) emails.push(u.user.email.toLowerCase());
+      }
+      if (emails.length === 0) return NextResponse.json({ ok: true, sent: 0 });
+
+      // consentimento: o seguidor precisa estar inscrito (e não em "só oficiais")
+      const postTagsLower = (post.tags || []).map((t: string) => t.toLowerCase());
+      const isPinned = Boolean(post.is_pinned);
+      const { data: subs } = await admin
+        .from('subscribers')
+        .select('email, notify_mode, interested_tags')
+        .in('email', emails);
+      const matchedRecipients = (subs || [])
         .filter((sub) => {
           if (!sub.notify_mode || sub.notify_mode === 'all') return true;
           if (sub.notify_mode === 'pinned') return isPinned;
@@ -787,32 +851,30 @@ export async function POST(request: Request) {
           return false;
         })
         .map((sub) => sub.email);
+      if (matchedRecipients.length === 0) return NextResponse.json({ ok: true, sent: 0 });
 
-      if (matchedRecipients.length === 0) {
-        return NextResponse.json({ ok: true, sent: 0 });
-      }
-
-      const richPostHtml = renderBlocksForEmail(body.postBlocks, body.postContent);
-
+      const postAuthorName = author.display_name || author.full_name || author.username;
+      const richPostHtml = renderBlocksForEmail(post.blocks as PostBlock[], post.content);
       const tagsPillsHtml =
         postTagsLower.length > 0
           ? `<div style="margin-top: 16px;">${postTagsLower
               .map(
-                (t) =>
-                  `<span style="display: inline-block; background-color: #18181b; border: 1px solid #27272a; color: #60a5fa; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; margin-right: 6px; margin-bottom: 6px;">#${t}</span>`
+                (t: string) =>
+                  `<span style="display: inline-block; background-color: #18181b; border: 1px solid #27272a; color: #60a5fa; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; margin-right: 6px; margin-bottom: 6px;">#${esc(t)}</span>`
               )
               .join('')}</div>`
           : '';
 
       const html = buildMasterEmailTemplate({
         badgeText: isPinned ? 'Insight Fixado' : 'Novo Insight',
-        headline: isPinned
-          ? 'Nova publicação em destaque no Insight*'
-          : 'Victor Poiani acabou de publicar um novo insight',
-        authorName,
-        authorNickname,
-        authorHandle,
-        authorAvatar,
+        headline: `${esc(postAuthorName)} publicou um novo insight`,
+        authorName: esc(postAuthorName),
+        authorNickname: esc(author.nickname || ''),
+        authorHandle: esc(author.username),
+        authorAvatar:
+          author.avatar_url && /^https:\/\//.test(author.avatar_url)
+            ? esc(author.avatar_url)
+            : `https://ui-avatars.com/api/?name=${encodeURIComponent(postAuthorName)}&background=2563eb&color=fff&bold=true`,
         mainHtmlContent: `
           <div style="background-color: #121215; border: 1px solid #27272a; border-radius: 16px; padding: 22px;">
             ${richPostHtml}
@@ -820,21 +882,18 @@ export async function POST(request: Request) {
           </div>
         `,
         ctaLabel: 'Ler e Responder na Thread',
-        ctaUrl: siteUrl,
+        ctaUrl: `${siteUrl}/post/${post.id}`,
         siteUrl,
       });
 
       const sendResult = await sendEmailDispatcher(
         matchedRecipients,
-        `${isPinned ? '[Destaque] ' : ''}Novo Insight de Victor Poiani`,
-        html
+        `${isPinned ? '[Destaque] ' : ''}Novo insight de ${postAuthorName}`.replace(/[\r\n]/g, ' '),
+        html,
+        `${postAuthorName} via Insight*`
       );
 
-      return NextResponse.json({
-        ok: sendResult.ok,
-        sent: sendResult.sent,
-        errors: sendResult.errors,
-      });
+      return NextResponse.json({ ok: sendResult.ok, sent: sendResult.sent, errors: sendResult.errors });
     }
 
     return NextResponse.json({ ok: false, error: 'Ação inválida' }, { status: 400 });

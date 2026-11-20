@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { setVapidDetails, sendNotification } from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
@@ -83,7 +85,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // vincula o aparelho ao perfil logado (posts notificam só seguidores)
+      const authedSub = await createServerSupabase();
+      const {
+        data: { user: subUser },
+      } = await authedSub.auth.getUser();
+      const { data: subProfile } = subUser
+        ? await authedSub.from('profiles').select('id').or(`user_id.eq.${subUser.id},id.eq.${subUser.id}`).maybeSingle()
+        : { data: null };
+
       const fullPayload = {
+        profile_id: subProfile?.id ?? null,
         endpoint,
         p256dh,
         auth,
@@ -156,7 +168,76 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 3. DISPARAR NOTIFICAÇÃO PARA TODOS OS SEGUIDORES INSCRITOS
+    // 3a. NOVO POST: só os aparelhos de quem SEGUE o autor
+    if (action === 'new_post') {
+      const postId = String(body.postId || '');
+      const authed = await createServerSupabase();
+      const {
+        data: { user: caller },
+      } = await authed.auth.getUser();
+      if (!caller || !/^[0-9a-f-]{36}$/i.test(postId)) {
+        return NextResponse.json({ error: 'Post inválido.' }, { status: 400 });
+      }
+      const admin = createAdminClient();
+      const { data: post } = await admin
+        .from('posts')
+        .select('id, profile_id, author_id, content, visibility, is_draft')
+        .eq('id', postId)
+        .maybeSingle();
+      if (!post || post.visibility === 'private' || post.is_draft) return NextResponse.json({ sent: 0 });
+      const { data: author } = await admin
+        .from('profiles')
+        .select('id, user_id, display_name, full_name, username')
+        .eq('id', post.profile_id || post.author_id)
+        .maybeSingle();
+      if (!author || (author.user_id !== caller.id && author.id !== caller.id)) {
+        return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
+      }
+      const marker = crypto.createHash('sha256').update(`push:${post.id}`).digest('hex');
+      const { count: already } = await admin
+        .from('account_email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('email_hash', marker)
+        .eq('kind', 'push-post');
+      if ((already ?? 0) > 0) return NextResponse.json({ sent: 0, duplicate: true });
+      await admin.from('account_email_log').insert({ email_hash: marker, kind: 'push-post' });
+
+      const { data: follows } = await admin.from('follows').select('follower_id').eq('following_id', author.id);
+      const followerIds = (follows || []).map((f) => f.follower_id);
+      if (followerIds.length === 0) return NextResponse.json({ sent: 0 });
+      const { data: subs } = await admin
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, notify_mode')
+        .in('profile_id', followerIds);
+
+      const name = author.display_name || author.full_name || author.username;
+      let sent = 0;
+      await Promise.allSettled(
+        (subs || [])
+          .filter((sub) => sub.notify_mode !== 'official_only')
+          .map(async (sub) => {
+            try {
+              await sendNotification(
+                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                JSON.stringify({
+                  title: `${name} publicou um novo insight`,
+                  body: String(post.content || '').slice(0, 160),
+                  url: `/post/${post.id}`,
+                  tag: `insight-post-${post.id}`,
+                })
+              );
+              sent++;
+            } catch (err: any) {
+              if (err?.statusCode === 404 || err?.statusCode === 410) {
+                await admin.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+              }
+            }
+          })
+      );
+      return NextResponse.json({ sent });
+    }
+
+    // 3b. DISPARO GERAL (atualizações oficiais / avisos): só admin
     if (action === 'broadcast') {
       // Envio para todos os aparelhos: só admin
       const authed = await createServerSupabase();

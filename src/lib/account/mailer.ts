@@ -56,11 +56,18 @@ export async function sendAccountEmail(to: string, subject: string, html: string
   return { ok: false as const, provider: null };
 }
 
+/**
+ * Endereço público do site para links de e-mail. Nunca vem de cabeçalhos da
+ * requisição (evita links envenenados). Em produção ignora valores locais.
+ */
 export function siteUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+  const onVercel = Boolean(process.env.VERCEL);
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, '');
+  const explicitOk = explicit && /^https?:\/\//.test(explicit) && !(onVercel && /localhost|127\.0\.0\.1|^http:/.test(explicit));
+  if (explicitOk) return explicit!;
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return 'http://localhost:3000';
+  return explicit || 'http://localhost:3000';
 }
 
 /** Layout simples dos e-mails de conta (escapa só o que vem de fora: o link é nosso). */

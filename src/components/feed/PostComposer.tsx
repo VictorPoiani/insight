@@ -1517,54 +1517,40 @@ export function PostComposer({
       return;
     }
 
-    let { error } = await supabase.from('posts').insert({
-      author_id: authorId,
-      profile_id: authorId,
-      ...basePayload,
-      visibility,
-    });
-
-    if (error && error.message?.includes('visibility')) {
-      const retry = await supabase.from('posts').insert({
+    let { data: createdPost, error } = await supabase
+      .from('posts')
+      .insert({
         author_id: authorId,
         profile_id: authorId,
         ...basePayload,
-      });
+        visibility,
+      })
+      .select('id')
+      .single();
+
+    if (error && error.message?.includes('visibility')) {
+      const retry = await supabase
+        .from('posts')
+        .insert({
+          author_id: authorId,
+          profile_id: authorId,
+          ...basePayload,
+        })
+        .select('id')
+        .single();
+      createdPost = retry.data;
       error = retry.error;
     }
 
     setIsSubmitting(false);
 
     if (!error) {
-      if (visibility === 'public') {
-        // 1. Disparo de Web Push Nativo Instantâneo (Passo 6)
-        fetch('/api/push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'broadcast',
-            title: isPinned
-              ? '📌 Novo Insight em Destaque — Victor Poiani'
-              : 'Novo Insight de Victor Poiani ⚡',
-            message: plainTextSummary || 'Confira a nova publicação no Insight*.',
-            url: '/',
-            tags: combinedTags,
-            isOfficialUpdate: false,
-          }),
-        }).catch(() => {});
-
-        // 2. Disparo de E-mail para assinantes da Newsletter
-        fetch('/api/newsletter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'new_post',
-            postContent: plainTextSummary || 'Nova publicação no Insight*',
-            postBlocks: validBlocks,
-            postTags: combinedTags,
-            isPinned,
-          }),
-        }).catch(() => {});
+      if (visibility === 'public' && createdPost?.id) {
+        // Avisa só quem segue o autor (o servidor carrega o post do banco e
+        // confere a autoria; o e-mail sai em nome do autor).
+        const notifyBody = JSON.stringify({ action: 'new_post', postId: createdPost.id });
+        fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
+        fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
       }
 
       void draft.clear();

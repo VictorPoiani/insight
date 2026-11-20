@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
+import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
+import { useNitro } from '@/components/nitro/NitroProvider';
 import {
   Bolt,
   BellPlus,
@@ -514,6 +516,8 @@ export function ProfileHeader({
 
   // Estados de Sessão e Follows
   const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
+  const { hasAccess: hasNitroAccess, viewer: nitroViewer } = useNitro();
+  const isOwnProfile = Boolean(nitroViewer && nitroViewer.id === profile.id);
   const [isFollowingProfile, setIsFollowingProfile] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followingCount, setFollowingCount] = useState(0);
@@ -1282,9 +1286,10 @@ export function ProfileHeader({
         {/* 2. Linha Única: Foto de Perfil + Patente + Status + Contadores + Botões */}
         <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5 pt-3">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <CosmeticAvatar profile={profile} size={128} live className="-mt-14 sm:-mt-16 group/frame">
             <div
               onClick={() => isAdmin && avatarInputRef.current?.click()}
-              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface -mt-14 sm:-mt-16 relative overflow-hidden shadow-lg group shrink-0 ${isAdmin ? 'cursor-pointer' : ''
+              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-background bg-surface relative overflow-hidden shadow-lg group shrink-0 ${isAdmin ? 'cursor-pointer' : ''
                 }`}
             >
               <img
@@ -1307,6 +1312,17 @@ export function ProfileHeader({
                 </>
               )}
             </div>
+            {hasNitroAccess && isOwnProfile && (
+              <Link
+                href="/nitro?tab=frame"
+                title="Editar moldura"
+                aria-label="Editar moldura"
+                className="absolute -bottom-1 -left-1 z-10 w-8 h-8 rounded-full bg-background border border-border text-accent flex items-center justify-center shadow-md opacity-0 group-hover/frame:opacity-100 focus:opacity-100 transition-opacity"
+              >
+                <Palette className="w-3.5 h-3.5" />
+              </Link>
+            )}
+            </CosmeticAvatar>
 
             {/* Pills ao lado da foto: Nível de Contribuinte + Status */}
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
@@ -1502,6 +1518,18 @@ export function ProfileHeader({
               </button>
             )}
 
+            {/* Insight Nitro: personalizar o próprio perfil (beta fechada) */}
+            {hasNitroAccess && isOwnProfile && (
+              <Link
+                href="/nitro?tab=frame"
+                title="Personalizar perfil · Insight Nitro"
+                className="px-3.5 py-1.5 rounded-full font-bold text-xs bg-elevated border border-border hover:border-accent text-primary flex items-center gap-1.5 transition-colors shrink-0"
+              >
+                <Palette className="w-3.5 h-3.5 text-accent" />
+                <span>Personalizar</span>
+              </Link>
+            )}
+
             {/* Botão Seguir / Acompanhar */}
             {loggedUserProfile?.id !== profile.id ? (
               <button
@@ -1543,7 +1571,9 @@ export function ProfileHeader({
         {/* 3. Nome, Alcunha Colorida e Metadados */}
         <div className="mt-4">
           <h1 className="text-xl sm:text-2xl font-extrabold text-primary">
-            <span>{displayName}</span>
+            <span>
+              <CosmeticName profile={profile}>{displayName}</CosmeticName>
+            </span>
             {nickname && (
               <>
                 , <span style={{ color: nicknameColor }}>{nickname}</span>
@@ -1552,7 +1582,10 @@ export function ProfileHeader({
           </h1>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-secondary mt-1.5">
-            <span>@{profile.username}</span>
+            <span className="inline-flex items-center gap-1.5">
+              @{profile.username}
+              <CosmeticTag profile={profile} />
+            </span>
             {location && (
               <span className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-muted" />

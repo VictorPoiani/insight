@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { NitroConfigTab } from '@/components/nitro/NitroConfigTab';
+import { Zap as NitroZap } from 'lucide-react';
 import {
   BookOpen,
   Eye,
@@ -50,7 +53,7 @@ interface UserPreferences {
 }
 
 type NotifyMode = 'all' | 'tags' | 'pinned' | 'official_only';
-type ConfigTabId = 'appearance' | 'account' | 'notifications' | 'staff';
+type ConfigTabId = 'appearance' | 'account' | 'notifications' | 'nitro' | 'staff';
 
 interface InviteCodeRow {
   id: string;
@@ -182,6 +185,7 @@ export default function ConfigPage() {
   const supabase = createClient();
 
   const [activeTab, setActiveTab] = useState<ConfigTabId>('appearance');
+  const { hasAccess: hasNitroAccess } = useNitro();
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [mounted, setMounted] = useState(false);
   const [focusSidebarsCollapsed, setFocusSidebarsCollapsed] = useState(false);
@@ -833,6 +837,24 @@ export default function ConfigPage() {
               <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
             )}
           </button>
+
+          {hasNitroAccess && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('nitro')}
+              className={`py-2.5 relative flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                activeTab === 'nitro'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
+              }`}
+            >
+              <NitroZap className="w-3.5 h-3.5 text-accent" />
+              <span>Perfil & Nitro</span>
+              {activeTab === 'nitro' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+              )}
+            </button>
+          )}
 
           {isStaff && (
             <button
@@ -1619,6 +1641,8 @@ export default function ConfigPage() {
       {/* ====================================================================
           ABA 4: PAINEL DA EQUIPE DEV (SEPARAÇÃO FLUIDA SEM CARDS)
           ==================================================================== */}
+      {activeTab === 'nitro' && hasNitroAccess && <NitroConfigTab />}
+
       {activeTab === 'staff' && isStaff && (
         <div className="divide-y divide-border">
           <div className="px-6 py-6 space-y-4">

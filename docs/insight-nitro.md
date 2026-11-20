@@ -1,6 +1,13 @@
 # Insight Nitro — Especificação técnica e de produto
 
-> Status: **proposta** · Lançamento: **somente Preview (Vercel)** · Stack: Next.js 15 (App Router), TypeScript, Tailwind, Supabase, Cloudflare R2
+> Status: **beta fechada em produção — acesso só para `role = 'admin'`** · Stack: Next.js 15 (App Router), TypeScript, Tailwind, Supabase, Cloudflare R2
+
+> **O que está no ar (20/11/2026)** — a estratégia de Preview da §1 foi substituída, a pedido, por uma beta fechada em produção:
+> - Gate por papel: só `profiles.role = 'admin'` acessa `/nitro`, a aba "Perfil & Nitro" e **enxerga** cosméticos. Demais usuários veem o item "Insight Nitro" com cadeado na barra lateral e uma tela "Em breve".
+> - Interruptor geral: `NEXT_PUBLIC_INSIGHT_NITRO=off` na Vercel desliga tudo (inclusive para admin).
+> - Banco: só `profiles.cosmetics` (snapshot) + trigger de proteção + RPC `set_my_cosmetics` (exige admin). Migração: `supabase/migrations/20261120000000_insight_nitro_admin_beta.sql`. As tabelas de catálogo/assinatura da §3 ficam para o lançamento.
+> - Catálogo: os 48 itens da §2 em `src/lib/nitro/catalog.ts`, renderizados 100% em CSS/SVG (`src/components/nitro/nitro.css`); assets na R2 (§3.5) ainda não são necessários.
+> - Propagação: perfil, posts, página de discussão (árvore, carrossel e composer) e barra lateral. Notificações e Explore ainda não.
 
 O Insight Nitro é uma galeria de personalização de perfil com assinatura mensal e coleções temáticas.
 O usuário equipa quatro tipos de item:

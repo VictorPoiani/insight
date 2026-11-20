@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart, MessageCircle, Trash2, ChevronDown, Link2 } from 'lucide-react';
 import { Profile } from '@/types/database';
 import { ReplyComposer } from './ReplyComposer';
+import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { ReplyNode, formatRelativeTime, getReplyAuthorHref } from './utils';
 
 /** A partir desta profundidade não indentamos mais (evita "escadinha" no mobile). */
@@ -12,8 +13,12 @@ const MAX_INDENT_DEPTH = 4;
 /** A partir desta profundidade, sub-respostas começam recolhidas. */
 const AUTO_COLLAPSE_DEPTH = 3;
 
+export type AuthorProfiles = Record<string, Pick<Profile, 'id' | 'cosmetics'>>;
+
 interface ThreadContextValue {
   loggedUser: Profile | null;
+  /** Perfis atuais dos autores (para molduras/títulos do Insight Nitro). */
+  authorProfiles: AuthorProfiles;
   likedIds: Set<string>;
   highlightedId: string | null;
   activeComposerId: string | null;
@@ -71,7 +76,9 @@ function ReplyItem({
     onSubmitReply,
     onDelete,
     onCopyLink,
+    authorProfiles,
   } = useThread();
+  const authorProfile = node.profile_id ? authorProfiles[node.profile_id] : null;
 
   const [collapsed, setCollapsed] = useState(depth >= AUTO_COLLAPSE_DEPTH);
   const liked = likedIds.has(node.id);
@@ -93,11 +100,13 @@ function ReplyItem({
         {/* Coluna do avatar + linha da thread (clicável para recolher) */}
         <div className="flex flex-col items-center shrink-0">
           <Link href={authorHref}>
-            <img
-              src={node.avatar_url || '/assets/net/default-perfil'}
-              alt={node.author_name || 'Autor'}
-              className={`${depth === 0 ? 'w-9 h-9' : 'w-7 h-7'} rounded-full object-cover border border-border bg-elevated hover:border-accent transition-colors`}
-            />
+            <CosmeticAvatar profile={authorProfile} size={depth === 0 ? 36 : 28}>
+              <img
+                src={node.avatar_url || '/assets/net/default-perfil'}
+                alt={node.author_name || 'Autor'}
+                className={`${depth === 0 ? 'w-9 h-9' : 'w-7 h-7'} rounded-full object-cover border border-border bg-elevated hover:border-accent transition-colors`}
+              />
+            </CosmeticAvatar>
           </Link>
           {hasChildren && !collapsed && (
             <button
@@ -119,9 +128,10 @@ function ReplyItem({
               href={authorHref}
               className="font-bold text-primary hover:text-accent truncate transition-colors"
             >
-              {node.author_name || 'Membro'}
+              <CosmeticName profile={authorProfile}>{node.author_name || 'Membro'}</CosmeticName>
             </Link>
             <span className="text-muted truncate">@{node.author_handle || 'membro'}</span>
+            <CosmeticTag profile={authorProfile} className="shrink-0" />
             <span className="text-muted">·</span>
             <time
               dateTime={node.created_at}

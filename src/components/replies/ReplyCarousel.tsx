@@ -3,19 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Heart, MessageCircle, Music, Flame } from 'lucide-react';
 import { ReplyNode, formatRelativeTime } from './utils';
+import { CosmeticAvatar, CosmeticName } from '@/components/nitro/Cosmetics';
+import type { AuthorProfiles } from './ReplyThread';
 
 interface ReplyCarouselProps {
   replies: ReplyNode[];
   likedIds: Set<string>;
   onSelect: (replyId: string) => void;
   onToggleLike: (replyId: string) => void;
+  authorProfiles?: AuthorProfiles;
 }
 
 /**
  * Carrossel horizontal com as respostas em destaque (mais curtidas / com mais
  * conversa). Clicar num card leva até a resposta dentro da discussão.
  */
-export function ReplyCarousel({ replies, likedIds, onSelect, onToggleLike }: ReplyCarouselProps) {
+export function ReplyCarousel({ replies, likedIds, onSelect, onToggleLike, authorProfiles = {} }: ReplyCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -92,14 +95,18 @@ export function ReplyCarousel({ replies, likedIds, onSelect, onToggleLike }: Rep
               className="snap-start shrink-0 w-[78%] sm:w-[260px] p-3.5 rounded-2xl bg-surface border border-border hover:border-accent/60 cursor-pointer transition-colors flex flex-col gap-2.5"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <img
-                  src={reply.avatar_url || '/assets/net/default-perfil'}
-                  alt={reply.author_name || 'Autor'}
-                  className="w-7 h-7 rounded-full object-cover border border-border shrink-0"
-                />
+                <CosmeticAvatar profile={reply.profile_id ? authorProfiles[reply.profile_id] : null} size={28}>
+                  <img
+                    src={reply.avatar_url || '/assets/net/default-perfil'}
+                    alt={reply.author_name || 'Autor'}
+                    className="w-7 h-7 rounded-full object-cover border border-border shrink-0"
+                  />
+                </CosmeticAvatar>
                 <div className="min-w-0 leading-tight">
                   <p className="text-xs font-bold text-primary truncate">
-                    {reply.author_name || 'Membro'}
+                    <CosmeticName profile={reply.profile_id ? authorProfiles[reply.profile_id] : null}>
+                      {reply.author_name || 'Membro'}
+                    </CosmeticName>
                   </p>
                   <p className="text-[11px] text-muted truncate">
                     @{reply.author_handle || 'membro'} · {formatRelativeTime(reply.created_at)}

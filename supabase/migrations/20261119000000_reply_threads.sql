@@ -82,34 +82,9 @@ $$;
 
 grant execute on function public.toggle_reply_like(uuid) to authenticated;
 
--- 4) Contador de respostas no post (mostrado no feed)
-alter table public.posts
-  add column if not exists replies_count integer not null default 0;
-
-create or replace function public.sync_post_replies_count()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_post_id uuid;
-begin
-  v_post_id := coalesce(new.post_id, old.post_id);
-  update public.posts
-  set replies_count = (select count(*) from public.replies where post_id = v_post_id)
-  where id = v_post_id;
-  return null;
-end;
-$$;
-
-drop trigger if exists replies_count_sync on public.replies;
-create trigger replies_count_sync
-  after insert or delete on public.replies
-  for each row execute function public.sync_post_replies_count();
+-- Obs.: posts.replies_count e a notificação ao dono do post já são mantidos
+-- pelos triggers existentes (sync_post_replies_count / notify_on_reply).
 
 -- Backfill
-update public.posts p
-set replies_count = (select count(*) from public.replies r where r.post_id = p.id);
 update public.replies r
 set likes_count = (select count(*) from public.reply_likes l where l.reply_id = r.id);

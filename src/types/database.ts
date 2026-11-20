@@ -1,3 +1,5 @@
+import type { NitroCosmetics } from '@/lib/nitro/catalog';
+
 export interface CustomSocialLink {
   id: string;
   url: string;
@@ -42,6 +44,8 @@ export interface Profile {
   total_donated?: number | null;
   contributor_points?: number | null;
   contributor_level?: number | null;
+  /** Insight Nitro: itens equipados (snapshot gravado via RPC set_my_cosmetics). */
+  cosmetics?: NitroCosmetics | null;
 }
 
 export type PostBlockType =

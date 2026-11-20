@@ -10,7 +10,7 @@ import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
 import { ReplyComposer } from '@/components/replies/ReplyComposer';
 import { ReplyCarousel } from '@/components/replies/ReplyCarousel';
-import { ReplyThread } from '@/components/replies/ReplyThread';
+import { ReplyThread, AuthorProfiles } from '@/components/replies/ReplyThread';
 import { ReplyNode, ReplySort, buildReplyTree } from '@/components/replies/utils';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
@@ -34,6 +34,7 @@ export default function PostDiscussionPage() {
   const [loggedUser, setLoggedUser] = useState<Profile | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [authorProfiles, setAuthorProfiles] = useState<AuthorProfiles>({});
   const [sort, setSort] = useState<ReplySort>('top');
   const [activeComposerId, setActiveComposerId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -94,6 +95,25 @@ export default function PostDiscussionPage() {
 
     const typedReplies = (repliesData as Reply[]) || [];
     setReplies(typedReplies);
+
+    // Perfis atuais dos autores (molduras/títulos do Insight Nitro)
+    const authorIds = [
+      ...new Set(typedReplies.map((r) => r.profile_id).filter((v): v is string => Boolean(v))),
+    ];
+    if (authorIds.length > 0) {
+      const { data: authorsData } = await supabase
+        .from('profiles')
+        .select('id, cosmetics')
+        .in('id', authorIds);
+      const map: AuthorProfiles = {};
+      (authorsData || []).forEach((p: { id: string; cosmetics?: Profile['cosmetics'] }) => {
+        map[p.id] = p;
+      });
+      if (me) map[me.id] = me;
+      setAuthorProfiles(map);
+    } else {
+      setAuthorProfiles(me ? { [me.id]: me } : {});
+    }
 
     if (me && typedReplies.length > 0) {
       const { data: likesData } = await supabase
@@ -214,11 +234,11 @@ export default function PostDiscussionPage() {
     const created = { likes_count: 0, ...(data as Reply) };
     setReplies((prev) => [...prev, created]);
 
-    // Notifica o autor do post e, se for resposta a alguém, o autor da resposta.
-    const recipients = new Set<string>();
-    if (author) recipients.add(author.id);
-    if (parent?.profile_id) recipients.add(parent.profile_id);
-    recipients.forEach((id) => notify(id, me, text));
+    // O dono do post já é notificado pelo trigger notify_on_reply do banco.
+    // Aqui notificamos só o autor da resposta respondida (se for outra pessoa).
+    if (parent?.profile_id && parent.profile_id !== author?.id) {
+      notify(parent.profile_id, me, text);
+    }
 
     if (!parent) {
       // Nova resposta direta: garante que ela apareça logo e a destaca.
@@ -404,6 +424,7 @@ export default function PostDiscussionPage() {
           likedIds={likedIds}
           onSelect={focusReply}
           onToggleLike={toggleLike}
+          authorProfiles={authorProfiles}
         />
       )}
 
@@ -449,6 +470,7 @@ export default function PostDiscussionPage() {
         <ReplyThread
           nodes={tree}
           loggedUser={loggedUser}
+          authorProfiles={authorProfiles}
           likedIds={likedIds}
           highlightedId={highlightedId}
           activeComposerId={activeComposerId}

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { Menu, X, Heart, Info, FileText, Shield } from 'lucide-react';
 
 const FULLSCREEN_ROUTES = ['/login'];
@@ -35,10 +36,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [menuOpen]);
 
   if (isFullscreen) {
-    return <main className="w-full min-h-screen">{children}</main>;
+    return (
+      <NitroProvider>
+        <main className="w-full min-h-screen">{children}</main>
+      </NitroProvider>
+    );
   }
 
   return (
+    <NitroProvider>
     <>
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
@@ -106,5 +112,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <MobileBottomNav />
     </>
+    </NitroProvider>
   );
 }

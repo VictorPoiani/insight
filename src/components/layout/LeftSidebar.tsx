@@ -18,7 +18,12 @@ import {
   PanelLeftOpen,
   MoreHorizontal,
   User,
+  Zap,
+  Lock,
 } from 'lucide-react';
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
+import type { NitroCosmetics } from '@/lib/nitro/catalog';
 
 const navItems = [
   { name: 'Início', href: '/', icon: House },
@@ -46,6 +51,7 @@ export function LeftSidebar() {
     display_name?: string | null;
     avatar_url: string | null;
     role?: string;
+    cosmetics?: NitroCosmetics | null;
   } | null>(null);
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -53,6 +59,8 @@ export function LeftSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [nitroHint, setNitroHint] = useState(false);
+  const { hasAccess: hasNitroAccess } = useNitro();
 
   const sidebarRef = useRef<HTMLElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -113,7 +121,7 @@ export function LeftSidebar() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('id, username, full_name, display_name, avatar_url, role')
+        .select('id, username, full_name, display_name, avatar_url, role, cosmetics')
         .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
         .maybeSingle();
 
@@ -354,6 +362,67 @@ export function LeftSidebar() {
             );
           })}
 
+          {/* Insight Nitro — beta fechada: liberado só para admin */}
+          {hasNitroAccess ? (
+            <Link
+              href="/nitro"
+              title={isCollapsed ? 'Insight Nitro' : undefined}
+              className={`flex items-center rounded-lg text-sm font-semibold transition-colors ${
+                isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+              } ${
+                pathname.startsWith('/nitro')
+                  ? 'bg-surface text-accent border border-border'
+                  : 'text-secondary hover:bg-surface hover:text-primary'
+              }`}
+            >
+              <Zap className="w-5 h-5 shrink-0 text-accent" />
+              {!isCollapsed && (
+                <>
+                  <span className="truncate flex-1 bg-gradient-to-r from-sky-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+                    Insight Nitro
+                  </span>
+                </>
+              )}
+            </Link>
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                aria-disabled="true"
+                onClick={() => {
+                  setNitroHint(true);
+                  setTimeout(() => setNitroHint(false), 2600);
+                }}
+                title={isCollapsed ? 'Insight Nitro · em breve' : undefined}
+                className={`w-full flex items-center rounded-lg text-sm font-medium text-muted cursor-not-allowed hover:bg-surface/60 transition-colors ${
+                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+                }`}
+              >
+                <div className="relative shrink-0">
+                  <Zap className="w-5 h-5" />
+                  {isCollapsed && (
+                    <Lock className="w-2.5 h-2.5 absolute -bottom-0.5 -right-1 text-muted bg-background rounded-full" />
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <>
+                    <span className="truncate flex-1 text-left">Insight Nitro</span>
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                  </>
+                )}
+              </button>
+              {nitroHint && (
+                <div
+                  role="status"
+                  className={`absolute z-50 top-full mt-1 px-3 py-2 rounded-xl bg-surface border border-border shadow-xl text-[11px] text-secondary ${
+                    isCollapsed ? 'left-0 w-48' : 'left-2 right-2'
+                  }`}
+                >
+                  <span className="font-bold text-primary">Em breve.</span> O Insight Nitro está em beta fechada.
+                </div>
+              )}
+            </div>
+          )}
         </nav>
       </div>
 
@@ -429,11 +498,13 @@ export function LeftSidebar() {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative shrink-0">
-                  <img
-                    src={currentUser.avatar_url || '/assets/net/default-perfil'}
-                    alt={currentUser.full_name}
-                    className="w-9 h-9 rounded-full object-cover ring-1 ring-border group-hover/account:ring-accent/60 transition-all"
-                  />
+                  <CosmeticAvatar profile={currentUser} size={36}>
+                    <img
+                      src={currentUser.avatar_url || '/assets/net/default-perfil'}
+                      alt={currentUser.full_name}
+                      className="w-9 h-9 rounded-full object-cover ring-1 ring-border group-hover/account:ring-accent/60 transition-all"
+                    />
+                  </CosmeticAvatar>
                   {isDevUser && (
                     <span
                       title="Desenvolvedor Insight"

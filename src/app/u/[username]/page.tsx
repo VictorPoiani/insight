@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { ProfileHeader } from '@/components/feed/ProfileHeader';
+import { ProfileIntro } from '@/components/nitro/ProfileIntro';
 import {
   TopicTabsManager,
   DEFAULT_TABS,
@@ -419,6 +420,9 @@ function UserProfileContent() {
           </div>
         </div>
       )}
+
+      {/* Insight Nitro: animação de abertura (uma vez por sessão) */}
+      <ProfileIntro profile={profile} />
 
       {/* 1. Cabeçalho do Perfil */}
       <ProfileHeader

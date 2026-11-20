@@ -12,6 +12,7 @@ import {
 } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle } from '@/lib/grid';
+import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { PostComposer } from './PostComposer';
 import { SharePostModal } from './SharePostModal';
 import {
@@ -520,19 +521,22 @@ export function PostCard({
           href={authorProfileHref}
           className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
         >
-          <img
-            src={author.avatar_url || '/assets/net/default-perfil'}
-            alt={author.full_name}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
-          />
+          <CosmeticAvatar profile={author} size={40}>
+            <img
+              src={author.avatar_url || '/assets/net/default-perfil'}
+              alt={author.full_name}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
+            />
+          </CosmeticAvatar>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 truncate">
               <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
-                {author.display_name || author.full_name}
+                <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
               </span>
               <span className="text-xs text-muted truncate">
                 @{author.username || 'insight'}
               </span>
+              <CosmeticTag profile={author} className="shrink-0" />
             </div>
             <time className="text-[11px] sm:text-xs text-muted block">
               {formattedDate}

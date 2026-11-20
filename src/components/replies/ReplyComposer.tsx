@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { LogIn, Music, Send, X } from 'lucide-react';
 import { Profile } from '@/types/database';
 import { extractSpotifyTrackId } from '@/lib/spotify';
+import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 
 const MAX_LEN = 280;
 
@@ -79,11 +80,13 @@ export function ReplyComposer({
       onSubmit={handleSubmit}
       className={`flex gap-3 ${compact ? '' : 'p-3.5 rounded-xl bg-surface border border-border'}`}
     >
-      <img
-        src={loggedUser.avatar_url || '/assets/net/default-perfil'}
-        alt={loggedUser.full_name}
-        className={`${compact ? 'w-7 h-7' : 'w-9 h-9'} rounded-full object-cover border border-border shrink-0`}
-      />
+      <CosmeticAvatar profile={loggedUser} size={compact ? 28 : 36} className="self-start">
+        <img
+          src={loggedUser.avatar_url || '/assets/net/default-perfil'}
+          alt={loggedUser.full_name}
+          className={`${compact ? 'w-7 h-7' : 'w-9 h-9'} rounded-full object-cover border border-border shrink-0`}
+        />
+      </CosmeticAvatar>
 
       <div className="flex-1 min-w-0 space-y-2">
         {replyingTo && (

@@ -67,6 +67,60 @@
   z-index: 0;
 }
 
+/* ---------- Efeito pré-renderizado (WebP): 2× o avatar, centro transparente ---------- */
+.nx-efx {
+  position: absolute;
+  inset: -50%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.nx-efx img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.nx-fx-anim {
+  display: none;
+}
+
+.nx-fx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.25s ease;
+}
+
+.nx-frame:is(.nx-live, .nx-on) .nx-fx-anim,
+.nx-frame.nx-auto:hover .nx-fx-anim {
+  display: block;
+}
+
+.nx-frame:is(.nx-live, .nx-on) .nx-efx-ready .nx-fx-still,
+.nx-frame.nx-auto:hover .nx-efx-ready .nx-fx-still {
+  visibility: hidden;
+}
+
+.nx-frame.nx-static .nx-fx-anim {
+  display: none !important;
+}
+
+.nx-frame.nx-static .nx-fx-still {
+  visibility: visible !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-fx-anim { display: none !important; }
+  .nx-fx-still { visibility: visible !important; }
+}
+
+html[data-reduce-motion='true'] .nx-fx-anim { display: none !important; }
+html[data-reduce-motion='true'] .nx-fx-still { visibility: visible !important; }
+
 /* ---------- Arte das molduras v2 (frameArt.tsx) ---------- */
 .nx-a { transform-box: fill-box; }
 

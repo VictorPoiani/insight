@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { observeFrame } from './inViewBudget';
 import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
+import { NitroFxCanvas } from './NitroFxCanvas';
 import {
   Cpu,
   Crown,
@@ -112,17 +113,24 @@ function FrameShell({
 
   return (
     <span ref={ref} className={`nx-frame ${mode} ${className}`} style={style}>
-      {frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
+      {!frame.fx && frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
       {frame.back && <BackArt kind={frame.back} />}
-      <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />
+      {!frame.fx && <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />}
       {children}
+      {frame.fx &&
+        // WebGL ao vivo só em avatares grandes (poucos por página); o resto usa WebP leve
+        (mode === 'nx-live' && size >= 64 ? (
+          <NitroFxCanvas fx={frame.fx} cssSize={size * 2} />
+        ) : (
+          <FxLayer fx={frame.fx} />
+        ))}
       {frame.ornament &&
         (FRONT_ART_KINDS.includes(frame.ornament) ? (
           <FrontArt kind={frame.ornament} />
         ) : (
           <FrameOrnamentSvg kind={frame.ornament} animated={animatedOrnament} />
         ))}
-      {frame.particles && (
+      {!frame.fx && frame.particles && (
         <span aria-hidden className={`nx-deco nx-particles nx-p--${frame.particles.mode} nx-anim`}>
           {Array.from({ length: frame.particles.count }, (_, i) => {
             const n = frame.particles!.count;
@@ -141,6 +149,30 @@ function FrameShell({
           })}
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * Efeito pré-renderizado (shader → WebP). O quadro parado fica sempre por baixo;
+ * o animado só é exibido (e baixado) quando a moldura está animando, e só
+ * esconde o parado depois de carregar — sem piscar.
+ */
+function FxLayer({ fx }: { fx: string }) {
+  const [ready, setReady] = useState(false);
+  const animSize = 128;
+  return (
+    <span aria-hidden className={`nx-deco nx-efx${ready ? ' nx-efx-ready' : ''}`}>
+      <img className="nx-fx-still" src={`/nitro/frames/${fx}-still.webp`} alt="" decoding="async" draggable={false} />
+      <img
+        className="nx-fx-anim"
+        src={`/nitro/frames/${fx}-${animSize}.webp`}
+        alt=""
+        decoding="async"
+        loading="lazy"
+        draggable={false}
+        onLoad={() => setReady(true)}
+      />
     </span>
   );
 }
@@ -189,9 +221,18 @@ function FrameOrnamentSvg({ kind, animated }: { kind: FrameOrnament; animated: b
     }
     case 'horns':
       content = (
-        <g fill="url(#nxHorn)" stroke="#1c0505" strokeWidth="0.6">
-          <path d="M30 22 C22 14 20 6 24 0 C26 8 31 12 37 15 Z" />
-          <path d="M70 22 C78 14 80 6 76 0 C74 8 69 12 63 15 Z" />
+        <g>
+          {[1, -1].map((side) => (
+            <g key={side} transform={side === -1 ? 'translate(100 0) scale(-1 1)' : undefined}>
+              <path d="M31 23 C 21 15, 17 4, 23 -3 C 24 6, 30 12, 38 15 Z" fill="url(#nxHorn)" stroke="#1c0505" strokeWidth="0.7" />
+              {/* anéis do chifre */}
+              {[0, 1, 2, 3].map((k) => (
+                <path key={k} d={`M${25.5 + k * 1.6} ${15 - k * 4.2} q 4 ${1.2 - k * 0.2} 7.5 ${-0.4 + k * 0.6}`} fill="none" stroke="#450a0a" strokeOpacity="0.65" strokeWidth="0.6" />
+              ))}
+              {/* brilho de borda */}
+              <path d="M23 -2 C 21.5 6, 25 13, 32 18" fill="none" stroke="#fca5a5" strokeOpacity="0.55" strokeWidth="0.8" strokeLinecap="round" />
+            </g>
+          ))}
         </g>
       );
       break;
@@ -321,9 +362,11 @@ function FrameOrnamentSvg({ kind, animated }: { kind: FrameOrnament; animated: b
           <stop offset="50%" stopColor="#eab308" />
           <stop offset="100%" stopColor="#a16207" />
         </linearGradient>
-        <linearGradient id="nxHorn" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#450a0a" />
-          <stop offset="100%" stopColor="#dc2626" />
+        <linearGradient id="nxHorn" x1="0" y1="1" x2="0.3" y2="0">
+          <stop offset="0%" stopColor="#1c0505" />
+          <stop offset="45%" stopColor="#7f1d1d" />
+          <stop offset="85%" stopColor="#d6c7b0" />
+          <stop offset="100%" stopColor="#f5efe4" />
         </linearGradient>
         <linearGradient id="nxSaturn" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#a78bfa" />

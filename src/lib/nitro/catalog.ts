@@ -64,6 +64,11 @@ export type FrameOrnament =
   | 'storm'
   | 'halo';
 
+/** Efeitos renderizados por scripts/nitro-render (shader → WebP animado). */
+export type FrameFx =
+  | 'fire' | 'aurora' | 'electric' | 'ocean' | 'shadow' | 'spirit' | 'nebula'
+  | 'magma' | 'frost' | 'gold' | 'neon' | 'sakura' | 'forest';
+
 /** Camada desenhada ATRÁS do avatar (profundidade). */
 export type FrameBackLayer = 'flames' | 'fox-tails' | 'smoke' | 'foliage' | 'storm-cloud';
 
@@ -80,6 +85,8 @@ export interface FrameItem extends BaseItem {
   glow?: string;
   ornament?: FrameOrnament;
   back?: FrameBackLayer;
+  /** Efeito procedural pré-renderizado (public/nitro/frames/<fx>-*.webp). Substitui anel e brilho CSS. */
+  fx?: FrameFx;
   particles?: { glyph: string; mode: ParticleMode; count: number; color?: string };
   /** Molduras de patente 0–3 são sempre estáticas. */
   alwaysStatic?: boolean;
@@ -238,72 +245,70 @@ const FRAMES: FrameItem[] = [
     description: 'Guirlanda de azevinho com neve caindo.',
     ring: { colors: ['#166534', '#15803d', '#dc2626', '#166534', '#22c55e', '#166534'], anim: 'none', width: 0.11 },
     ornament: 'wreath', particles: { glyph: '❄', mode: 'fall', count: 7, color: '#e0f2fe' } },
-  { id: 'frame-royal-snowflake', kind: 'frame', name: 'Floco de Neve Real', collection: 'natal', rarity: 'rara', requirement: NITRO,
+  { id: 'frame-royal-snowflake', kind: 'frame', name: 'Floco de Neve Real', collection: 'natal', rarity: 'rara', requirement: NITRO, fx: 'frost',
     description: 'Cristais de gelo girando devagar.',
-    ring: { colors: ['#e0f2fe', '#7dd3fc', '#bae6fd', '#e0f2fe'], anim: 'spin', width: 0.06 }, glow: 'rgba(125,211,252,0.55)',
-    ornament: 'snowflake' },
-  { id: 'frame-flame-crown', kind: 'frame', name: 'Coroa de Chamas', collection: 'infernal', rarity: 'lendária', requirement: NITRO,
+    ring: { colors: ['#e0f2fe', '#7dd3fc', '#bae6fd', '#e0f2fe'], anim: 'spin', width: 0.06 }, glow: 'rgba(125,211,252,0.55)' },
+  { id: 'frame-flame-crown', kind: 'frame', name: 'Coroa de Chamas', collection: 'infernal', rarity: 'lendária', requirement: NITRO, fx: 'fire',
     description: 'Chamas subindo pela borda.',
     ring: { colors: ['#fde047', '#f97316', '#dc2626', '#7f1d1d', '#f97316', '#fde047'], anim: 'flicker', width: 0.09 },
-    glow: 'rgba(249,115,22,0.7)', back: 'flames', particles: { glyph: '🔥', mode: 'rise', count: 6 } },
-  { id: 'frame-abyss-horns', kind: 'frame', name: 'Chifres do Abismo', collection: 'infernal', rarity: 'épica', requirement: NITRO,
+    glow: 'rgba(249,115,22,0.7)' },
+  { id: 'frame-abyss-horns', kind: 'frame', name: 'Chifres do Abismo', collection: 'infernal', rarity: 'épica', requirement: NITRO, fx: 'magma',
     description: 'Chifres no topo e um brilho vermelho respirando.',
     ring: { colors: ['#450a0a', '#991b1b', '#dc2626', '#450a0a'], anim: 'pulse', width: 0.07 }, glow: 'rgba(220,38,38,0.65)',
     ornament: 'horns' },
-  { id: 'frame-imperial-laurel', kind: 'frame', name: 'Laurel Imperial', collection: 'imperial', rarity: 'lendária', requirement: NITRO,
+  { id: 'frame-imperial-laurel', kind: 'frame', name: 'Laurel Imperial', collection: 'imperial', rarity: 'lendária', requirement: NITRO, fx: 'gold',
     description: 'Ramos de louro dourados com reflexo.',
     ring: { colors: ['#a16207', '#facc15', '#fef08a', '#ca8a04', '#a16207'], anim: 'shimmer', width: 0.06 },
-    glow: 'rgba(250,204,21,0.45)', ornament: 'laurel' },
-  { id: 'frame-aurora-halo', kind: 'frame', name: 'Halo Aurora', collection: 'celestial', rarity: 'épica', requirement: NITRO,
+    glow: 'rgba(250,204,21,0.45)' },
+  { id: 'frame-aurora-halo', kind: 'frame', name: 'Halo Aurora', collection: 'celestial', rarity: 'épica', requirement: NITRO, fx: 'aurora',
     description: 'Aurora boreal girando em volta do avatar.',
     ring: { colors: ['#5eead4', '#38bdf8', '#a78bfa', '#f0abfc', '#5eead4'], anim: 'spin', width: 0.09 },
-    glow: 'rgba(94,234,212,0.55)', ornament: 'halo', particles: { glyph: '✦', mode: 'twinkle', count: 5, color: '#f0fdfa' } },
-  { id: 'frame-sakura-petals', kind: 'frame', name: 'Pétalas de Sakura', collection: 'anime', rarity: 'rara', requirement: NITRO,
+    glow: 'rgba(94,234,212,0.55)', ornament: 'halo' },
+  { id: 'frame-sakura-petals', kind: 'frame', name: 'Pétalas de Sakura', collection: 'anime', rarity: 'rara', requirement: NITRO, fx: 'sakura',
     description: 'Pétalas orbitando e caindo.',
     ring: { colors: ['#fbcfe8', '#f9a8d4', '#fdf2f8', '#f472b6', '#fbcfe8'], anim: 'none', width: 0.07 },
-    particles: { glyph: '🌸', mode: 'orbit', count: 5 } },
+  },
   { id: 'frame-crystal-tiara', kind: 'frame', name: 'Tiara de Cristal', collection: 'princess', rarity: 'épica', requirement: NITRO,
     description: 'Tiara de cristal com faíscas.',
     ring: { colors: ['#fbcfe8', '#e9d5ff', '#fdf2f8', '#c4b5fd', '#fbcfe8'], anim: 'shimmer', width: 0.06 },
     glow: 'rgba(244,114,182,0.45)', ornament: 'tiara', particles: { glyph: '✧', mode: 'twinkle', count: 6, color: '#fdf2f8' } },
-  { id: 'frame-neon-circuit', kind: 'frame', name: 'Circuito Néon', collection: 'cyber', rarity: 'épica', requirement: NITRO,
+  { id: 'frame-neon-circuit', kind: 'frame', name: 'Circuito Néon', collection: 'cyber', rarity: 'épica', requirement: NITRO, fx: 'neon',
     description: 'Trilhas de circuito com pulsos de luz.',
-    ring: { colors: ['#22d3ee', '#0e7490', '#e11d48', '#22d3ee'], anim: 'spin', width: 0.05 }, glow: 'rgba(34,211,238,0.6)',
-    ornament: 'circuit' },
-  { id: 'frame-saturn-ring', kind: 'frame', name: 'Anel de Saturno', collection: 'cosmico', rarity: 'lendária', requirement: NITRO,
+    ring: { colors: ['#22d3ee', '#0e7490', '#e11d48', '#22d3ee'], anim: 'spin', width: 0.05 }, glow: 'rgba(34,211,238,0.6)' },
+  { id: 'frame-saturn-ring', kind: 'frame', name: 'Anel de Saturno', collection: 'cosmico', rarity: 'lendária', requirement: NITRO, fx: 'nebula',
     description: 'Anel planetário com uma lua em órbita.',
     ring: { colors: ['#6d28d9', '#db2777', '#f59e0b', '#6d28d9'], anim: 'spin', width: 0.05 }, glow: 'rgba(219,39,119,0.5)',
     ornament: 'saturn' },
 
   // ---- Novas: chapéu, natureza, animais, monstros, oceano ----
-  { id: 'frame-santa-hat', kind: 'frame', name: 'Gorro do Noel', collection: 'natal', rarity: 'épica', requirement: NITRO,
+  { id: 'frame-santa-hat', kind: 'frame', name: 'Gorro do Noel', collection: 'natal', rarity: 'épica', requirement: NITRO, fx: 'frost',
     description: 'Gorro inclinado com pompom balançando e pisca-pisca.',
     ring: { colors: ['#dc2626', '#facc15', '#16a34a', '#38bdf8', '#dc2626', '#facc15', '#16a34a', '#38bdf8', '#dc2626'], anim: 'pulse', width: 0.06 },
-    glow: 'rgba(250,204,21,0.35)', ornament: 'santa-hat', particles: { glyph: '❄', mode: 'fall', count: 6, color: '#ffffff' } },
-  { id: 'frame-living-forest', kind: 'frame', name: 'Floresta Viva', collection: 'selva', rarity: 'lendária', requirement: NITRO,
+    glow: 'rgba(250,204,21,0.35)', ornament: 'santa-hat' },
+  { id: 'frame-living-forest', kind: 'frame', name: 'Floresta Viva', collection: 'selva', rarity: 'lendária', requirement: NITRO, fx: 'forest',
     description: 'Cipós crescem pelo anel, folhas balançam e vaga-lumes piscam.',
     ring: { colors: ['#14532d', '#15803d', '#65a30d', '#14532d'], anim: 'none', width: 0.06 },
-    glow: 'rgba(132,204,22,0.35)', back: 'foliage', ornament: 'vines' },
+    glow: 'rgba(132,204,22,0.35)' },
   { id: 'frame-jaguar', kind: 'frame', name: 'Onça-Pintada', collection: 'selva', rarity: 'lendária', requirement: NITRO,
     description: 'Orelhas atentas, cauda que balança e anel de rosetas.',
     ring: { colors: ['#b45309', '#1c1917', '#f59e0b', '#1c1917', '#d97706', '#1c1917', '#fbbf24', '#1c1917', '#b45309'], anim: 'none', width: 0.08 },
     glow: 'rgba(245,158,11,0.45)', ornament: 'jaguar' },
-  { id: 'frame-spirit-fox', kind: 'frame', name: 'Raposa Espiritual', collection: 'anime', rarity: 'lendária', requirement: NITRO,
+  { id: 'frame-spirit-fox', kind: 'frame', name: 'Raposa Espiritual', collection: 'anime', rarity: 'lendária', requirement: NITRO, fx: 'spirit',
     description: 'Três caudas de luz atrás do avatar e chamas-fantasma em órbita.',
     ring: { colors: ['#fb923c', '#fde68a', '#f472b6', '#fb923c'], anim: 'spin', width: 0.06 },
-    glow: 'rgba(251,146,60,0.5)', back: 'fox-tails', ornament: 'fox', particles: { glyph: '🔥', mode: 'orbit', count: 3 } },
-  { id: 'frame-lurking-eyes', kind: 'frame', name: 'Olhos na Escuridão', collection: 'sombras', rarity: 'lendária', requirement: NITRO,
+    glow: 'rgba(251,146,60,0.5)', back: 'fox-tails', ornament: 'fox' },
+  { id: 'frame-lurking-eyes', kind: 'frame', name: 'Olhos na Escuridão', collection: 'sombras', rarity: 'lendária', requirement: NITRO, fx: 'shadow',
     description: 'Fumaça escura, olhos que piscam e um tentáculo que espia.',
     ring: { colors: ['#020617', '#1e293b', '#3f6212', '#020617'], anim: 'spin', width: 0.08 },
-    glow: 'rgba(163,230,53,0.35)', back: 'smoke', ornament: 'lurking' },
-  { id: 'frame-great-wave', kind: 'frame', name: 'Onda de Kanagawa', collection: 'oceano', rarity: 'lendária', requirement: NITRO,
+    glow: 'rgba(163,230,53,0.35)' },
+  { id: 'frame-great-wave', kind: 'frame', name: 'Onda de Kanagawa', collection: 'oceano', rarity: 'lendária', requirement: NITRO, fx: 'ocean',
     description: 'Onda em xilogravura com garras de espuma quebrando no avatar.',
     ring: { colors: ['#1e3a5f', '#3b6e8f', '#9ec5d6', '#f7f3e8', '#1e3a5f'], anim: 'none', width: 0.07 },
     ornament: 'wave' },
-  { id: 'frame-storm-cloud', kind: 'frame', name: 'Nuvem de Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO,
+  { id: 'frame-storm-cloud', kind: 'frame', name: 'Nuvem de Tempestade', collection: 'selva', rarity: 'épica', requirement: NITRO, fx: 'electric',
     description: 'Nuvem carregada, chuva caindo e relâmpagos.',
     ring: { colors: ['#334155', '#64748b', '#93c5fd', '#334155'], anim: 'pulse', width: 0.06 },
-    glow: 'rgba(147,197,253,0.4)', back: 'storm-cloud', ornament: 'storm' },
+    glow: 'rgba(147,197,253,0.4)', ornament: 'storm' },
 
   // ---- Patentes (todos os níveis; animadas só 4 e 5) ----
   { id: 'frame-tier-0', kind: 'frame', name: 'Observador', collection: 'patentes', rarity: 'comum', requirement: { type: 'level', min: 0 },

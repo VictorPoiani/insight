@@ -8,8 +8,9 @@
  */
 
 import { CRITTERS2, type Critter2Id } from './critters2';
+import { CRITTERS3, type Critter3Id } from './critters3';
 
-export type CritterId = 'cat-ribbon' | 'bunny-daisy' | 'fox-shrine' | 'shiba-nap' | 'ghost-hug' | 'bear-honey' | 'frog-king' | 'storm-cloud' | Critter2Id;
+export type CritterId = 'cat-ribbon' | 'bunny-daisy' | 'fox-shrine' | 'shiba-nap' | 'ghost-hug' | 'bear-honey' | 'frog-king' | 'storm-cloud' | Critter2Id | Critter3Id;
 
 const LINE = '#4a2c2a';
 
@@ -345,4 +346,5 @@ export const CRITTERS: Record<CritterId, { back?: string; front: string }> = {
   'frog-king': frogKing,
   'storm-cloud': stormCloud,
   ...CRITTERS2,
+  ...CRITTERS3,
 };

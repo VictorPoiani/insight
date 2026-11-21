@@ -764,6 +764,52 @@ html[data-reduce-motion='true'] .nx-tag--art::after { animation: none !important
   100% { opacity: 0; transform: translateY(-26px) scale(1.1); }
 }
 
+
+/* molduras ilustradas — pacote 3 (critters3.ts) */
+.nx-frame .cr-delay2 { animation-delay: -1.8s; }
+.nx-frame .cr-pulse2 { animation: cr-pulse2 3.2s ease-in-out infinite; }
+.nx-frame .cr-glint { animation: cr-glint 4.2s ease-in-out infinite; }
+.nx-frame .cr-glint-y { animation: cr-glint-y 3.8s ease-in-out infinite; }
+.nx-frame .cr-grip { animation: cr-grip 3s ease-in-out infinite; }
+.nx-frame .cr-lace { animation: cr-lace 2.4s ease-in-out infinite; }
+.nx-frame .cr-hairwave { animation: cr-hairwave 4.4s ease-in-out infinite; }
+.nx-frame .cr-shine { animation: cr-shine 4.6s ease-in-out infinite; opacity: 0; }
+.nx-frame .cr-blink-slow { animation: cr-blink-slow 5.6s ease-in-out infinite; }
+.nx-frame .cr-jitter { animation: cr-jitter 0.9s steps(2, jump-none) infinite; }
+.nx-frame .cr-burst { animation: cr-burst 1.1s ease-out infinite; }
+.nx-frame .cr-guard { animation: cr-guard 1.6s ease-in-out infinite; }
+.nx-frame .cr-card { animation: cr-card 3.4s cubic-bezier(0.3, 0, 0.3, 1) infinite; }
+.nx-frame .cr-fingerheart { animation: cr-fingerheart 2.4s ease-in-out infinite; }
+.nx-frame .cr-pixsway { animation: cr-pixsway 2s steps(2, jump-none) infinite; }
+.nx-frame .cr-pixbreathe { animation: cr-pixbreathe 2.4s steps(2, jump-none) infinite; }
+.nx-frame .cr-pixz { animation: cr-pixz 2.7s steps(4, jump-none) infinite; opacity: 0; }
+.nx-frame.nx-static .cr-shine { opacity: 0.6; }
+.nx-frame.nx-static .cr-pixz { opacity: 0.85; }
+.nx-frame.nx-static .cr-glint, .nx-frame.nx-static .cr-glint-y { opacity: 0; }
+
+@keyframes cr-pulse2 { 0%, 100% { transform: scale(0.94); opacity: 0.65; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes cr-glint { 0%, 55% { transform: translateX(-20px); opacity: 0; } 60% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(110px); opacity: 0; } }
+@keyframes cr-glint-y { 0%, 60% { transform: translateY(-6px); opacity: 0; } 66% { opacity: 1; } 100% { transform: translateY(26px); opacity: 0; } }
+@keyframes cr-grip { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(0.97) rotate(2deg); } }
+@keyframes cr-lace { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(0.6px); } }
+@keyframes cr-hairwave { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(1.6deg); } }
+@keyframes cr-shine { 0%, 40% { transform: translateX(-14px); opacity: 0; } 55% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateX(18px); opacity: 0; } }
+@keyframes cr-blink-slow { 0%, 86%, 100% { transform: scaleY(1); } 90% { transform: scaleY(0.15); } 94% { transform: scaleY(1); } }
+@keyframes cr-jitter { 0% { transform: translate(0, 0); } 50% { transform: translate(0.5px, -0.4px); } 100% { transform: translate(-0.4px, 0.3px); } }
+@keyframes cr-burst { 0% { transform: scale(0.5); opacity: 0; } 25% { opacity: 1; } 70% { transform: scale(1.15); opacity: 0.9; } 100% { transform: scale(1.3); opacity: 0; } }
+@keyframes cr-guard { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-1.6px) rotate(-2deg); } }
+@keyframes cr-card {
+  0%, 100% { transform: translateY(4px) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-3deg); }
+  35% { transform: translateY(-2px) rotate(3deg); }
+  45% { transform: translateY(-2px) rotate(-2deg); }
+  60% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes cr-fingerheart { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.06) translate(0.6px, -0.8px); } 55% { transform: scale(0.99); } }
+@keyframes cr-pixsway { 0% { transform: translateX(-0.8px); } 100% { transform: translateX(0.8px); } }
+@keyframes cr-pixbreathe { 0% { transform: translateY(0); } 100% { transform: translateY(-1.6px); } }
+@keyframes cr-pixz { 0% { opacity: 0; transform: translate(0, 0); } 25% { opacity: 1; } 100% { opacity: 0.2; transform: translate(3.2px, -4.8px); } }
+
 /* --------------------------------------------------- MOVIMENTO REDUZIDO */
 
 @media (prefers-reduced-motion: reduce) {
@@ -783,6 +829,8 @@ html[data-reduce-motion='true'] .nx-tag--art::after { animation: none !important
   .nx-intro {
     display: none !important;
   }
+  .nx-frame .cr-shine { opacity: 0.6; }
+  .nx-frame .cr-pixz { opacity: 0.85; }
 }
 
 html[data-reduce-motion='true'] .nx-frame .nx-a,

@@ -32,6 +32,7 @@ export type NitroCollectionId =
   | 'animes'
   | 'datas'
   | 'pacote'
+  | 'atelie'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -223,6 +224,7 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'games', name: 'Games, RPG & Geek', description: 'Barra de vida, crítico e chefão final.', colors: ['#ef4444', '#22c55e'] },
   { id: 'animes', name: 'Animes Clássicos', description: 'Auras, ninjas e garotas mágicas.', colors: ['#facc15', '#f472b6'] },
   { id: 'datas', name: 'Datas Comemorativas', description: 'Réveillon, Carnaval, Arraiá, Halloween e Namorados.', colors: ['#f97316', '#a855f7'] },
+  { id: 'atelie', name: 'Ateliê Ilustrado', description: 'Molduras desenhadas à mão: flores, góticas, fofas e de atitude.', colors: ['#a855f7', '#6ee7b7'] },
   { id: 'pacote', name: 'Super Pacote', description: 'Exclusivos de quem libera o Nitro.', colors: ['#7dd3fc', '#f472b6'] },
 ];
 
@@ -470,6 +472,30 @@ const FRAMES: FrameItem[] = [
     description: 'Deitada no topo, laranja na cabeça e um passarinho de companhia.', ring: { colors: ['#a16207'], anim: 'none' } },
   { id: 'frame-panda', kind: 'frame', name: 'Panda do Bambu', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'panda',
     description: 'Espiando por baixo, mastigando bambu entre folhas que balançam.', ring: { colors: ['#4d7c0f'], anim: 'none' } },
+  { id: 'frame-lirio', kind: 'frame', name: 'Lírio-do-vale', collection: 'atelie', rarity: 'rara', requirement: NITRO, critter: 'lily',
+    description: 'Crescente de folhas e sininhos brancos com faixa perolada e brilho deslizando.', ring: { colors: ['#7dd3fc'], anim: 'none' } },
+  { id: 'frame-mana-preta', kind: 'frame', name: 'Mana Preta', collection: 'atelie', rarity: 'lendária', requirement: NITRO, critter: 'mana-preta',
+    description: 'Aro de metal gótico, garras de osso agarrando a borda e brasão de crânio pulsando.', ring: { colors: ['#6d28d9'], anim: 'none' } },
+  { id: 'frame-ametista', kind: 'frame', name: 'Gargantilha de Ametista', collection: 'atelie', rarity: 'épica', requirement: NITRO, critter: 'amethyst-choker',
+    description: 'Choker de malha com renda branca, pingentes e gema oval facetada que cintila.', ring: { colors: ['#a855f7'], anim: 'none' } },
+  { id: 'frame-morceguinha', kind: 'frame', name: 'Morceguinha', collection: 'atelie', rarity: 'épica', requirement: NITRO, critter: 'batgirl',
+    description: 'Cabelo índigo em camadas, orelhinhas de morcego e coleira com lua.', ring: { colors: ['#4c3b9e'], anim: 'none' } },
+  { id: 'frame-depresso', kind: 'frame', name: 'Depresso', collection: 'atelie', rarity: 'rara', requirement: NITRO, critter: 'depresso',
+    description: 'Um bichinho cansado de moicano e picareta, respirando devagar no canto.', ring: { colors: ['#64748b'], anim: 'none' } },
+  { id: 'frame-patinha-chapeu', kind: 'frame', name: 'Patinha de Chapéu', collection: 'atelie', rarity: 'épica', requirement: NITRO, critter: 'duckling-hat',
+    description: 'Arco lilás e uma patinha de boina e laço rosa balançando no topo.', ring: { colors: ['#8b5cf6'], anim: 'none' } },
+  { id: 'frame-querendo-briga', kind: 'frame', name: 'Querendo Briga', collection: 'atelie', rarity: 'rara', requirement: NITRO, critter: 'angry-fists',
+    description: 'Punhos cerrados tremendo, traços de impacto e a veia saltando.', ring: { colors: ['#facc15'], anim: 'none' } },
+  { id: 'frame-lutador-arcade', kind: 'frame', name: 'Lutador de Arcade', collection: 'atelie', rarity: 'épica', requirement: NITRO, critter: 'arcade-fighter',
+    description: 'Topete loiro espetado e luvas de couro em guarda, prontas pro round.', ring: { colors: ['#f6c443'], anim: 'none' } },
+  { id: 'frame-harmonia-floral', kind: 'frame', name: 'Harmonia Floral', collection: 'atelie', rarity: 'épica', requirement: NITRO, critter: 'floral-harmony',
+    description: 'Guirlanda de folhas finas com flores amarelas e roxas ao vento.', ring: { colors: ['#65a30d'], anim: 'none' } },
+  { id: 'frame-cartao-amarelo', kind: 'frame', name: 'Cartão Amarelo', collection: 'atelie', rarity: 'rara', requirement: NITRO, critter: 'yellow-card',
+    description: 'A mão do juiz erguendo o cartão — penalidade aplicada.', ring: { colors: ['#facc15'], anim: 'none' } },
+  { id: 'frame-coracao-coreano', kind: 'frame', name: 'Coração Coreano', collection: 'atelie', rarity: 'rara', requirement: NITRO, critter: 'finger-heart',
+    description: 'Coraçãozinho com os dedos e corações subindo.', ring: { colors: ['#f43f5e'], anim: 'none' } },
+  { id: 'frame-abelhinha', kind: 'frame', name: 'Abelhinha Dorminhoca', collection: 'atelie', rarity: 'lendária', requirement: NITRO, critter: 'sleepy-bee',
+    description: 'Pixel art: trepadeira florida em volta e uma abelha cochilando com Zzz.', ring: { colors: ['#facc15'], anim: 'none' } },
   { id: 'frame-cat-ribbon', kind: 'frame', name: 'Gatinho de Fita', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'cat-ribbon',
     description: 'Orelhas de gato tricolor, laço de cetim, patinhas e plaquinha de coração.',
     ring: { colors: ['#f9b8c6'], anim: 'none' } },

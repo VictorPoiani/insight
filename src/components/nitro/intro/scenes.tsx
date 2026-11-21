@@ -90,6 +90,16 @@ export function IntroScene({ id }: { id: IntroSceneId }) {
       return <FairyScene />;
     case 'glitch-boot':
       return <GlitchScene />;
+    case 'sapphire':
+      return <SapphireScene />;
+    case 'singularity':
+      return <SingularityScene />;
+    case 'power-up':
+      return <PowerUpScene />;
+    case 'reveillon':
+      return <ReveillonScene />;
+    case 'halloween':
+      return <HalloweenScene />;
   }
 }
 
@@ -838,6 +848,320 @@ function GlitchScene() {
         <div className="gl-scan" />
       </div>
       <div className="gl-off" />
+    </div>
+  );
+}
+
+// ============================================================================
+// ASCENSÃO SAFIRA (Nível 4) — estilhaços convergem e lapidam uma safira,
+// brilho percorre as facetas, raios e onda de choque com grade técnica
+// ============================================================================
+
+const SHARDS = range(14).map((i) => {
+  const a = (i / 14) * Math.PI * 2 + rand(i) * 0.4;
+  const d = 55 + rand(i * 3.3) * 25;
+  return {
+    '--sx': `${(Math.cos(a) * d).toFixed(1)}vmin`,
+    '--sy': `${(Math.sin(a) * d).toFixed(1)}vmin`,
+    '--sr': `${Math.round((rand(i * 7.7) - 0.5) * 540)}deg`,
+    '--dl': `calc(var(--nx-dur) * ${(rand(i * 5.1) * 0.12).toFixed(3)})`,
+  } as CSSVars;
+});
+
+function SapphireGem() {
+  // facetas de uma lapidação brilhante vista de cima
+  const facets = range(8).map((i) => {
+    const a0 = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const a1 = ((i + 1) / 8) * Math.PI * 2 - Math.PI / 2;
+    const P = (a: number, r: number) => `${(Math.cos(a) * r).toFixed(2)},${(Math.sin(a) * r).toFixed(2)}`;
+    return { outer: `${P(a0, 46)} ${P(a1, 46)} ${P((a0 + a1) / 2, 28)}`, inner: `0,0 ${P(a0, 22)} ${P((a0 + a1) / 2, 28)} ${P(a1, 22)}`, i };
+  });
+  return (
+    <svg viewBox="-50 -50 100 100" className="sa-gem-svg" aria-hidden>
+      <defs>
+        <linearGradient id="saG1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#bae6fd" />
+          <stop offset="0.5" stopColor="#2563eb" />
+          <stop offset="1" stopColor="#1e1b4b" />
+        </linearGradient>
+        <linearGradient id="saG2" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e0f2fe" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+        <clipPath id="saClip">
+          <polygon points={range(8).map((i) => { const a = (i / 8) * Math.PI * 2 - Math.PI / 2; return `${(Math.cos(a) * 46).toFixed(2)},${(Math.sin(a) * 46).toFixed(2)}`; }).join(' ')} />
+        </clipPath>
+      </defs>
+      <g stroke="#e0f2fe" strokeOpacity="0.55" strokeWidth="0.6" strokeLinejoin="round">
+        {facets.map((f) => (
+          <g key={f.i}>
+            <polygon points={f.outer} fill={f.i % 2 ? 'url(#saG1)' : 'url(#saG2)'} />
+            <polygon points={f.inner} fill={f.i % 2 ? '#1e40af' : '#3b82f6'} fillOpacity="0.9" />
+          </g>
+        ))}
+        <polygon points={range(8).map((i) => { const a = (i / 8) * Math.PI * 2 - Math.PI / 2 + Math.PI / 8; return `${(Math.cos(a) * 14).toFixed(2)},${(Math.sin(a) * 14).toFixed(2)}`; }).join(' ')} fill="#60a5fa" />
+      </g>
+      {/* faixa de brilho percorrendo as facetas */}
+      <g clipPath="url(#saClip)">
+        <rect className="sa-glint" x="-70" y="-60" width="18" height="120" fill="#ffffff" opacity="0.75" transform="rotate(25)" />
+      </g>
+      <path d="M-30 -30 L -18 -36" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+    </svg>
+  );
+}
+
+function SapphireScene() {
+  return (
+    <div className="sc sc-sa">
+      <div className="sa-bg" />
+      <svg className="sa-grid" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice" aria-hidden>
+        <defs>
+          <pattern id="saHex" width="12" height="10.4" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+            <path d="M3 0 H9 L12 5.2 L9 10.4 H3 L0 5.2 Z" fill="none" stroke="#38bdf8" strokeWidth="0.35" />
+          </pattern>
+          <radialGradient id="saFade">
+            <stop offset="0" stopColor="#fff" stopOpacity="1" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </radialGradient>
+          <mask id="saMask">
+            <rect width="200" height="200" fill="url(#saFade)" />
+          </mask>
+        </defs>
+        <rect width="200" height="200" fill="url(#saHex)" mask="url(#saMask)" />
+      </svg>
+      <div className="sa-shards">
+        {SHARDS.map((st, i) => (
+          <span key={i} style={st}>
+            <svg viewBox="0 0 20 30" aria-hidden>
+              <polygon points="10,0 20,12 12,30 0,14" fill={i % 2 ? '#60a5fa' : '#bae6fd'} stroke="#e0f2fe" strokeWidth="0.8" />
+            </svg>
+          </span>
+        ))}
+      </div>
+      <div className="sa-gem">
+        <SapphireGem />
+      </div>
+      <svg className="sa-arcs" viewBox="-100 -100 200 200" aria-hidden>
+        {range(5).map((i) => {
+          const a = (i / 5) * Math.PI * 2 + 0.4;
+          let d = `M${(Math.cos(a) * 26).toFixed(1)} ${(Math.sin(a) * 26).toFixed(1)}`;
+          for (let k = 1; k <= 6; k++) {
+            const r = 26 + k * 10;
+            const j = (rand(i * 11 + k) - 0.5) * 0.35;
+            d += ` L${(Math.cos(a + j) * r).toFixed(1)} ${(Math.sin(a + j) * r).toFixed(1)}`;
+          }
+          return <path key={i} d={d} className="sa-arc" style={{ animationDelay: `calc(var(--nx-dur) * ${(0.42 + i * 0.03).toFixed(2)})` }} />;
+        })}
+      </svg>
+      <div className="sa-wave" />
+      <div className="sa-sparks">
+        <Bokeh count={30} colors={['#e0f2fe', '#7dd3fc', '#ffffff', '#93c5fd']} seed={404} mode="burst" />
+      </div>
+      <div className="sa-flash" />
+    </div>
+  );
+}
+
+// ============================================================================
+// SINGULARIDADE PRISMÁTICA (Nível 5) — estrelas sugadas, disco de acreção em
+// espectro, lente gravitacional, colapso e explosão prismática
+// ============================================================================
+
+function SingularityScene() {
+  return (
+    <div className="sc sc-sg">
+      <div className="sg-bg" />
+      <StarField className="sg-stars" seed={505} count={160} colors={['#ffffff', '#c7d2fe', '#fde68a']} />
+      <div className="sg-swirl">
+        <Bokeh count={44} colors={['#ffffff', '#a5b4fc', '#f0abfc', '#67e8f9']} seed={77} mode="swirl-in" />
+      </div>
+      <div className="sg-core-wrap">
+        <div className="sg-disk sg-disk-back" />
+        <div className="sg-lens" />
+        <div className="sg-hole" />
+        <div className="sg-front-clip">
+          <div className="sg-disk sg-disk-front" />
+        </div>
+      </div>
+      <div className="sg-rays" />
+      <div className="sg-ring" />
+      <div className="sg-flash" />
+    </div>
+  );
+}
+
+// ============================================================================
+// TRANSFORMAÇÃO (anime) — aura dourada sobe, raios estalam, pedras flutuam,
+// a tela treme e explode em luz
+// ============================================================================
+
+const ROCKS = range(12).map((i) => ({
+  '--x': `${(8 + rand(i * 2.7) * 84).toFixed(1)}%`,
+  '--s': `${(1.2 + rand(i * 4.4) * 2.6).toFixed(2)}vmin`,
+  '--dl': `calc(var(--nx-dur) * ${(0.1 + rand(i * 6.1) * 0.25).toFixed(3)})`,
+  '--rr': `${Math.round((rand(i * 3.1) - 0.5) * 300)}deg`,
+}) as CSSVars);
+
+const AURA_FLAMES = range(22).map((i) => ({
+  '--a': `${Math.round((i / 22) * 360)}deg`,
+  '--h': `${(0.75 + rand(i * 5.5) * 0.6).toFixed(2)}`,
+  '--dl': `calc(var(--nx-dur) * ${(rand(i * 2.2) * 0.12).toFixed(3)})`,
+}) as CSSVars);
+
+function PowerUpScene() {
+  return (
+    <div className="sc sc-pu">
+      <div className="pu-bg" />
+      <div className="pu-shake">
+        <div className="pu-ground" />
+        <div className="pu-rocks">
+          {ROCKS.map((st, i) => (
+            <span key={i} style={st} />
+          ))}
+        </div>
+        <div className="pu-aura">
+          {AURA_FLAMES.map((st, i) => (
+            <span key={i} style={st} />
+          ))}
+          <div className="pu-core" />
+        </div>
+        <svg className="pu-bolts" viewBox="-100 -100 200 200" aria-hidden>
+          {range(6).map((i) => {
+            const a = (i / 6) * Math.PI * 2 + 0.3;
+            let d = `M${(Math.cos(a) * 20).toFixed(1)} ${(Math.sin(a) * 20).toFixed(1)}`;
+            for (let k = 1; k <= 5; k++) {
+              const r = 20 + k * 11;
+              const j = (rand(i * 13 + k) - 0.5) * 0.5;
+              d += ` L${(Math.cos(a + j) * r).toFixed(1)} ${(Math.sin(a + j) * r).toFixed(1)}`;
+            }
+            return <path key={i} d={d} className="pu-bolt" style={{ animationDelay: `calc(var(--nx-dur) * ${(0.2 + i * 0.07).toFixed(2)})` }} />;
+          })}
+        </svg>
+      </div>
+      <div className="pu-sparks">
+        <Bokeh count={34} colors={['#fef08a', '#fde047', '#ffffff', '#fb923c']} seed={9001} mode="burst" />
+      </div>
+      <div className="pu-flash" />
+    </div>
+  );
+}
+
+// ============================================================================
+// RÉVEILLON — horizonte da cidade, contagem 3·2·1, rojões e estouros
+// ============================================================================
+
+const BURSTS = range(7).map((i) => ({
+  '--x': `${(12 + rand(i * 3.9) * 76).toFixed(1)}%`,
+  '--y': `${(14 + rand(i * 5.3) * 34).toFixed(1)}%`,
+  '--c': ['#facc15', '#f472b6', '#22d3ee', '#a78bfa', '#4ade80', '#fb923c', '#ffffff'][i],
+  '--dl': `calc(var(--nx-dur) * ${(0.42 + (i % 4) * 0.08 + rand(i) * 0.04).toFixed(3)})`,
+  '--sz': `${(22 + rand(i * 2.1) * 16).toFixed(1)}vmin`,
+}) as CSSVars);
+
+function ReveillonScene() {
+  return (
+    <div className="sc sc-rv">
+      <div className="rv-bg" />
+      <StarField className="rv-stars" seed={2027} count={90} colors={['#ffffff', '#fde68a']} />
+      <div className="rv-count">
+        {['3', '2', '1'].map((n, i) => (
+          <span key={n} style={{ '--i': i } as CSSVars}>
+            {n}
+          </span>
+        ))}
+      </div>
+      {BURSTS.map((st, i) => (
+        <div key={i} className="rv-burst" style={st}>
+          <svg viewBox="-50 -50 100 100" aria-hidden>
+            {range(24).map((k) => {
+              const a = (k / 24) * Math.PI * 2;
+              return (
+                <g key={k} transform={`rotate(${(a * 180) / Math.PI})`}>
+                  <line x1="10" y1="0" x2="40" y2="0" stroke="var(--c)" strokeWidth="1.2" strokeLinecap="round" opacity="0.55" />
+                  <circle cx="44" cy="0" r="2.2" fill="var(--c)" />
+                </g>
+              );
+            })}
+            <circle r="7" fill="#fff" opacity="0.8" />
+          </svg>
+        </div>
+      ))}
+      <svg className="rv-city" viewBox="0 0 400 100" preserveAspectRatio="xMidYMax slice" aria-hidden>
+        <defs>
+          <linearGradient id="rvCity" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#1e1b4b" />
+            <stop offset="1" stopColor="#020617" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M0 100 V70 H18 V52 H34 V64 H46 V40 H58 V30 H62 V40 H74 V60 H92 V48 H112 V66 H128 V36 H144 V58 H160 V44 H176 V62 H196 V28 H204 V18 H208 V28 H216 V56 H236 V46 H254 V64 H270 V38 H288 V60 H306 V50 H324 V68 H340 V42 H356 V62 H372 V54 H400 V100 Z"
+          fill="url(#rvCity)"
+        />
+        {range(40).map((i) => (
+          <rect key={i} x={10 + rand(i * 3.3) * 380} y={45 + rand(i * 7.1) * 45} width="2.4" height="3" fill="#fde68a" opacity={0.35 + rand(i) * 0.5} />
+        ))}
+      </svg>
+      <div className="rv-hello">Feliz Ano Novo!</div>
+      <div className="rv-flash" />
+    </div>
+  );
+}
+
+// ============================================================================
+// HALLOWEEN — lua cheia, névoa, revoada de morcegos, abóbora que acende
+// ============================================================================
+
+const BATS = range(9).map((i) => ({
+  '--y': `${(10 + rand(i * 4.1) * 45).toFixed(1)}%`,
+  '--s': `${(0.6 + rand(i * 2.3) * 0.9).toFixed(2)}`,
+  '--dl': `calc(var(--nx-dur) * ${(rand(i * 6.6) * 0.3).toFixed(3)})`,
+}) as CSSVars);
+
+function HalloweenScene() {
+  return (
+    <div className="sc sc-hw">
+      <div className="hw-bg" />
+      <StarField className="hw-stars" seed={1031} count={70} colors={['#e9d5ff', '#ffffff']} />
+      <div className="hw-moon" />
+      <img className="hw-fog hw-fog-a" src={`${TEX}/smoke-a.webp`} alt="" />
+      <img className="hw-fog hw-fog-b" src={`${TEX}/smoke-b.webp`} alt="" />
+      {BATS.map((st, i) => (
+        <div key={i} className="hw-bat" style={st}>
+          <svg viewBox="-12 -6 24 12" aria-hidden>
+            <g className="hw-wings">
+              <path d="M0 0 C -2 -2, -6 -4, -11 -1 C -9 0, -8 1.6, -8.4 3 C -6 2, -4 2.4, -2.6 3.8 C -1.4 2.6, 1.4 2.6, 2.6 3.8 C 4 2.4, 6 2, 8.4 3 C 8 1.6, 9 0, 11 -1 C 6 -4, 2 -2, 0 0 Z" fill="#12091f" />
+            </g>
+            <circle cx="-0.9" cy="0.4" r="0.45" fill="#fde047" />
+            <circle cx="0.9" cy="0.4" r="0.45" fill="#fde047" />
+          </svg>
+        </div>
+      ))}
+      <div className="hw-pumpkin">
+        <svg viewBox="-30 -30 60 60" aria-hidden>
+          <defs>
+            <radialGradient id="hwP" cx="0.4" cy="0.35" r="0.8">
+              <stop offset="0" stopColor="#fdba74" />
+              <stop offset="0.6" stopColor="#ea580c" />
+              <stop offset="1" stopColor="#7c2d12" />
+            </radialGradient>
+            <radialGradient id="hwL" cx="0.5" cy="0.6" r="0.6">
+              <stop offset="0" stopColor="#fffbeb" />
+              <stop offset="0.5" stopColor="#fde047" />
+              <stop offset="1" stopColor="#f59e0b" />
+            </radialGradient>
+          </defs>
+          <path d="M-2 -20 C -2 -25, 3 -27, 6 -25" fill="none" stroke="#365314" strokeWidth="3" strokeLinecap="round" />
+          <ellipse cx="-11" cy="0" rx="13" ry="18" fill="url(#hwP)" />
+          <ellipse cx="11" cy="0" rx="13" ry="18" fill="url(#hwP)" />
+          <ellipse cx="0" cy="0" rx="14" ry="19" fill="url(#hwP)" />
+          <g className="hw-face">
+            <path d="M-13 -5 L -5 -11 L -3 -2 Z M13 -5 L 5 -11 L 3 -2 Z" fill="url(#hwL)" />
+            <path d="M-15 5 C -8 16, 8 16, 15 5 L 10 8 L 7 5 L 3.5 9 L 0 5.5 L -3.5 9 L -7 5 L -10 8 Z" fill="url(#hwL)" />
+          </g>
+        </svg>
+      </div>
+      <div className="hw-glow" />
+      <div className="hw-flash" />
     </div>
   );
 }

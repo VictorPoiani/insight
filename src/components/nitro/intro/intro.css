@@ -1990,3 +1990,170 @@
   72% { opacity: 1; transform: scale(1); }
   90%, 100% { opacity: 0; transform: scale(2); }
 }
+
+.sc-sa > *, .sc-sg > *, .sc-pu > *, .sc-rv > *, .sc-hw > *, .pu-shake > * { position: absolute; }
+
+/* ============================================================ ASCENSÃO SAFIRA (N4) */
+.sa-bg { inset: 0; background: radial-gradient(ellipse at 50% 40%, #0c2a5b 0%, #050b1f 60%, #01030a 100%); animation: sa-bg var(--nx-dur) ease forwards; }
+@keyframes sa-bg { 0%, 70% { opacity: 1; } 90%, 100% { opacity: 0; } }
+.sa-grid { inset: 0; width: 100%; height: 100%; opacity: 0; animation: sa-grid var(--nx-dur) ease-out forwards; }
+@keyframes sa-grid { 0% { opacity: 0; transform: scale(1.4); } 25%, 60% { opacity: 0.7; transform: scale(1); } 85%, 100% { opacity: 0; transform: scale(0.85); } }
+.sa-shards { left: 50%; top: 40%; width: 0; height: 0; }
+.sa-shards span {
+  position: absolute; width: 4vmin; height: 6vmin; margin: -3vmin 0 0 -2vmin; opacity: 0;
+  animation: sa-shard var(--nx-dur) cubic-bezier(0.6, 0, 0.3, 1) var(--dl) forwards;
+}
+.sa-shards svg { width: 100%; height: 100%; overflow: visible; }
+@keyframes sa-shard {
+  0% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(1.2); }
+  10% { opacity: 1; }
+  34% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(0.5); }
+  38%, 100% { opacity: 0; transform: translate(0, 0) scale(0.2); }
+}
+.sa-gem { left: 50%; top: 40%; width: 34vmin; height: 34vmin; margin: -17vmin 0 0 -17vmin; opacity: 0; animation: sa-gem var(--nx-dur) cubic-bezier(0.34, 1.4, 0.5, 1) forwards; }
+.sa-gem-svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 3vmin rgba(56, 189, 248, 0.6)); }
+@keyframes sa-gem {
+  0%, 30% { opacity: 0; transform: scale(0.2) rotate(-60deg); }
+  42% { opacity: 1; transform: scale(1) rotate(0deg); }
+  66% { opacity: 1; transform: scale(1.06) rotate(8deg); }
+  72% { opacity: 1; transform: scale(0.94) rotate(10deg); }
+  84%, 100% { opacity: 0; transform: scale(2.2) rotate(18deg); }
+}
+.sa-glint { animation: sa-glint var(--nx-dur) ease-in-out forwards; }
+@keyframes sa-glint { 0%, 44% { transform: rotate(25deg) translateX(0); } 64%, 100% { transform: rotate(25deg) translateX(140px); } }
+.sa-arcs { left: 50%; top: 40%; width: 80vmin; height: 80vmin; margin: -40vmin 0 0 -40vmin; overflow: visible; }
+.sa-arc { fill: none; stroke: #e0f2fe; stroke-width: 1.2; stroke-linejoin: round; opacity: 0; animation: sa-arc calc(var(--nx-dur) * 0.14) steps(1, end) forwards; filter: drop-shadow(0 0 1.5px #38bdf8); }
+@keyframes sa-arc { 0% { opacity: 1; } 30% { opacity: 0.2; } 50% { opacity: 1; } 80% { opacity: 0.5; } 100% { opacity: 0; } }
+.sa-wave { left: 50%; top: 40%; width: 36vmin; height: 36vmin; margin: -18vmin 0 0 -18vmin; border-radius: 50%; box-shadow: 0 0 0 1vmin rgba(125, 211, 252, 0.8), 0 0 5vmin 1vmin rgba(56, 189, 248, 0.6); opacity: 0; animation: sa-wave var(--nx-dur) cubic-bezier(0.2, 0.6, 0.3, 1) forwards; }
+@keyframes sa-wave { 0%, 70% { opacity: 0; transform: scale(0.8); } 72% { opacity: 1; } 96%, 100% { opacity: 0; transform: scale(6); } }
+.sa-sparks { inset: 0; }
+.sa-sparks .bk { animation-name: sa-spark; }
+@keyframes sa-spark { 0%, 70% { opacity: 0; transform: translate(0, 0) scale(0.3); } 73% { opacity: var(--o); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.1); } }
+.sa-flash { inset: 0; background: radial-gradient(circle at 50% 40%, rgba(224, 242, 254, 0.95), rgba(56, 189, 248, 0.35) 30%, transparent 65%); opacity: 0; animation: sa-flash var(--nx-dur) ease-out forwards; }
+@keyframes sa-flash { 0%, 70% { opacity: 0; } 74% { opacity: 1; } 92%, 100% { opacity: 0; } }
+
+/* ============================================================ SINGULARIDADE PRISMÁTICA (N5) */
+.sg-bg { inset: 0; background: radial-gradient(ellipse at 50% 40%, #0b0620 0%, #030108 60%, #000 100%); animation: sg-bg var(--nx-dur) ease forwards; }
+@keyframes sg-bg { 0%, 74% { opacity: 1; } 92%, 100% { opacity: 0; } }
+.sg-stars { inset: -10%; width: 120%; height: 120%; opacity: 0; transform-origin: 50% 40%; animation: sg-stars var(--nx-dur) ease-in forwards; }
+@keyframes sg-stars { 0% { opacity: 0; transform: scale(1.2) rotate(0deg); } 15% { opacity: 0.9; } 62% { opacity: 0.8; transform: scale(0.55) rotate(40deg); } 70%, 100% { opacity: 0; transform: scale(0.2) rotate(60deg); } }
+.sg-swirl { inset: 0; transform-origin: 50% 40%; animation: sg-swirl var(--nx-dur) cubic-bezier(0.5, 0, 0.3, 1) forwards; }
+@keyframes sg-swirl { 0% { transform: rotate(0deg) scale(1.3); } 64% { transform: rotate(260deg) scale(0.25); } 100% { transform: rotate(300deg) scale(0.2); } }
+.sg-core-wrap { left: 50%; top: 40%; width: 46vmin; height: 46vmin; margin: -23vmin 0 0 -23vmin; animation: sg-core var(--nx-dur) cubic-bezier(0.6, 0, 0.3, 1) forwards; }
+@keyframes sg-core { 0%, 8% { opacity: 0; transform: scale(0.3); } 28% { opacity: 1; transform: scale(1); } 62% { opacity: 1; transform: scale(1.05); } 70% { opacity: 1; transform: scale(0.15); } 72%, 100% { opacity: 0; transform: scale(0.1); } }
+.sg-core-wrap > * { position: absolute; border-radius: 50%; }
+.sg-disk { inset: -20%; background: conic-gradient(from 0deg, #ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444); -webkit-mask: radial-gradient(circle, transparent 36%, #000 40%, #000 52%, transparent 70%); mask: radial-gradient(circle, transparent 36%, #000 40%, #000 52%, transparent 70%); }
+.sg-disk-back { transform: scaleY(0.32) rotate(0deg); opacity: 0.7; animation: sg-disk-b var(--nx-dur) linear forwards; }
+.sg-front-clip { inset: -30%; clip-path: inset(50% 0 0 0); border-radius: 0 !important; }
+.sg-front-clip .sg-disk { position: absolute; inset: 6.25%; border-radius: 50%; }
+.sg-disk-front { transform: scaleY(0.32); animation: sg-disk-b var(--nx-dur) linear forwards; }
+.sg-lens { inset: 18%; box-shadow: 0 0 0 0.6vmin rgba(255, 255, 255, 0.85), 0 0 3vmin 1vmin rgba(196, 181, 253, 0.7), inset 0 0 2vmin rgba(165, 180, 252, 0.6); }
+.sg-hole { inset: 22%; background: radial-gradient(circle, #000 70%, #0b0620 100%); }
+.sg-rays { left: 50%; top: 40%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax; border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgba(239, 68, 68, 0.5) 0deg 3deg, transparent 3deg 9deg, rgba(234, 179, 8, 0.5) 9deg 12deg, transparent 12deg 18deg, rgba(59, 130, 246, 0.5) 18deg 21deg, transparent 21deg 27deg, rgba(236, 72, 153, 0.5) 27deg 30deg, transparent 30deg 36deg); -webkit-mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0.6) 18%, transparent 45%); mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0.6) 18%, transparent 45%); opacity: 0; animation: sg-rays var(--nx-dur) ease-out forwards; }
+@keyframes sg-rays { 0%, 70% { opacity: 0; transform: rotate(0deg) scale(0.1); } 74% { opacity: 1; transform: rotate(10deg) scale(0.7); } 100% { opacity: 0; transform: rotate(40deg) scale(1.4); } }
+.sg-ring { left: 50%; top: 40%; width: 30vmin; height: 30vmin; margin: -15vmin 0 0 -15vmin; border-radius: 50%; background: conic-gradient(#ef4444, #f59e0b, #22c55e, #06b6d4, #8b5cf6, #ec4899, #ef4444); -webkit-mask: radial-gradient(circle, transparent 62%, #000 66%, #000 70%, transparent 74%); mask: radial-gradient(circle, transparent 62%, #000 66%, #000 70%, transparent 74%); opacity: 0; animation: sg-ring var(--nx-dur) cubic-bezier(0.2, 0.6, 0.3, 1) forwards; }
+@keyframes sg-ring { 0%, 70% { opacity: 0; transform: scale(0.4); } 73% { opacity: 1; } 98%, 100% { opacity: 0; transform: scale(7) rotate(90deg); } }
+.sg-flash { inset: 0; background: radial-gradient(circle at 50% 40%, #ffffff 0%, rgba(253, 230, 138, 0.6) 15%, rgba(167, 139, 250, 0.3) 35%, transparent 65%); opacity: 0; animation: sg-flash var(--nx-dur) ease-out forwards; }
+@keyframes sg-flash { 0%, 69% { opacity: 0; } 72% { opacity: 1; } 94%, 100% { opacity: 0; } }
+
+/* ============================================================ TRANSFORMAÇÃO (anime) */
+.pu-bg { inset: 0; background: radial-gradient(ellipse at 50% 55%, #3b2604 0%, #120a01 60%, #000 100%); animation: pu-bg var(--nx-dur) ease forwards; }
+@keyframes pu-bg { 0%, 72% { opacity: 1; } 90%, 100% { opacity: 0; } }
+.pu-shake { inset: 0; animation: pu-shake var(--nx-dur) linear forwards; }
+@keyframes pu-shake {
+  0%, 18% { transform: translate(0, 0); }
+  20% { transform: translate(-0.6vmin, 0.4vmin); } 22% { transform: translate(0.7vmin, -0.3vmin); } 24% { transform: translate(-0.4vmin, -0.5vmin); }
+  26% { transform: translate(0.5vmin, 0.5vmin); } 28% { transform: translate(-0.7vmin, 0.2vmin); } 30% { transform: translate(0.4vmin, -0.4vmin); }
+  40% { transform: translate(-0.5vmin, 0.3vmin); } 44% { transform: translate(0.6vmin, -0.5vmin); } 48% { transform: translate(-0.3vmin, 0.6vmin); }
+  56% { transform: translate(0.8vmin, 0.2vmin); } 60% { transform: translate(-0.8vmin, -0.3vmin); } 64%, 100% { transform: translate(0, 0); }
+}
+.pu-ground { left: -10%; right: -10%; bottom: 0; height: 32%; background: radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.25), transparent 60%), linear-gradient(180deg, #2a1a06, #0a0602); border-top: 0.4vmin solid rgba(253, 224, 71, 0.25); }
+.pu-rocks { inset: 0; }
+.pu-rocks span {
+  position: absolute; left: var(--x); bottom: 30%; width: var(--s); height: calc(var(--s) * 0.8);
+  background: linear-gradient(135deg, #78716c, #292524); border-radius: 30% 45% 35% 40%; box-shadow: inset 0.3vmin 0.3vmin 0 rgba(255, 255, 255, 0.15);
+  opacity: 0; animation: pu-rock var(--nx-dur) cubic-bezier(0.3, 0, 0.4, 1) var(--dl) forwards;
+}
+@keyframes pu-rock { 0% { opacity: 0; transform: translateY(0) rotate(0deg); } 12% { opacity: 1; } 60% { opacity: 1; transform: translateY(-28vh) rotate(var(--rr)); } 75%, 100% { opacity: 0; transform: translateY(-60vh) rotate(var(--rr)); } }
+.pu-aura { left: 50%; top: 40%; width: 0; height: 0; }
+.pu-aura span {
+  position: absolute; left: -2.4vmin; bottom: 0; width: 4.8vmin; height: calc(30vmin * var(--h));
+  transform-origin: 50% 100%; border-radius: 50% 50% 10% 10% / 90% 90% 10% 10%;
+  background: linear-gradient(0deg, rgba(254, 249, 195, 0.9), rgba(250, 204, 21, 0.75) 40%, rgba(234, 88, 12, 0.25) 85%, transparent);
+  opacity: 0; animation: pu-flame var(--nx-dur) ease-out var(--dl) forwards;
+}
+@keyframes pu-flame {
+  0%, 10% { opacity: 0; transform: rotate(var(--a)) translateY(-6vmin) scaleY(0.1); }
+  30% { opacity: 1; transform: rotate(var(--a)) translateY(-8vmin) scaleY(1); }
+  40% { transform: rotate(var(--a)) translateY(-8vmin) scaleY(0.8); }
+  50% { transform: rotate(var(--a)) translateY(-8vmin) scaleY(1.15); }
+  60% { opacity: 1; transform: rotate(var(--a)) translateY(-8vmin) scaleY(0.9); }
+  74%, 100% { opacity: 0; transform: rotate(var(--a)) translateY(-14vmin) scaleY(1.6); }
+}
+.pu-core { position: absolute; left: -14vmin; top: -14vmin; width: 28vmin; height: 28vmin; border-radius: 50%; background: radial-gradient(circle, #ffffff 0%, #fef08a 30%, rgba(250, 204, 21, 0.4) 55%, transparent 70%); opacity: 0; animation: pu-core var(--nx-dur) ease-out forwards; }
+@keyframes pu-core { 0%, 12% { opacity: 0; transform: scale(0.2); } 30% { opacity: 1; transform: scale(1); } 40% { transform: scale(0.9); } 50% { transform: scale(1.05); } 64% { opacity: 1; transform: scale(0.95); } 72% { opacity: 1; transform: scale(2.4); } 82%, 100% { opacity: 0; transform: scale(5); } }
+.pu-bolts { left: 50%; top: 40%; width: 80vmin; height: 80vmin; margin: -40vmin 0 0 -40vmin; overflow: visible; }
+.pu-bolt { fill: none; stroke: #e0f2fe; stroke-width: 1.4; stroke-linejoin: round; opacity: 0; filter: drop-shadow(0 0 2px #60a5fa); animation: pu-bolt calc(var(--nx-dur) * 0.1) steps(1, end) forwards; }
+@keyframes pu-bolt { 0% { opacity: 1; } 35% { opacity: 0.1; } 55% { opacity: 1; } 100% { opacity: 0; } }
+.pu-sparks { inset: 0; }
+.pu-sparks .bk { animation-name: pu-spark; }
+@keyframes pu-spark { 0%, 68% { opacity: 0; transform: translate(0, 0) scale(0.3); } 72% { opacity: var(--o); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.2); } }
+.pu-flash { inset: 0; background: radial-gradient(circle at 50% 40%, #fffef0 0%, rgba(254, 240, 138, 0.7) 25%, transparent 65%); opacity: 0; animation: pu-flash var(--nx-dur) ease-out forwards; }
+@keyframes pu-flash { 0%, 68% { opacity: 0; } 72% { opacity: 1; } 92%, 100% { opacity: 0; } }
+
+/* ============================================================ VIRADA DE ANO */
+.rv-bg { inset: 0; background: linear-gradient(180deg, #020617 0%, #0b1240 55%, #1e1b4b 100%); animation: rv-bg var(--nx-dur) ease forwards; }
+@keyframes rv-bg { 0%, 76% { opacity: 1; } 94%, 100% { opacity: 0; } }
+.rv-stars { inset: 0; width: 100%; height: 70%; opacity: 0.8; animation: rv-fade var(--nx-dur) ease forwards; }
+@keyframes rv-fade { 0%, 76% { opacity: 0.8; } 94%, 100% { opacity: 0; } }
+.rv-count { left: 50%; top: 40%; width: 0; height: 0; }
+.rv-count span {
+  position: absolute; left: -20vmin; top: -14vmin; width: 40vmin; text-align: center;
+  font: 900 clamp(80px, 26vmin, 260px) / 1 ui-sans-serif, system-ui, sans-serif; color: #fff;
+  text-shadow: 0 0 4vmin rgba(253, 230, 138, 0.8), 0 0.8vmin 0 rgba(0, 0, 0, 0.35);
+  opacity: 0; animation: rv-num calc(var(--nx-dur) * 0.13) cubic-bezier(0.2, 1.4, 0.5, 1) forwards;
+  animation-delay: calc(var(--nx-dur) * (0.02 + var(--i) * 0.13));
+}
+@keyframes rv-num { 0% { opacity: 0; transform: scale(2.4); } 30% { opacity: 1; transform: scale(1); } 75% { opacity: 1; transform: scale(0.92); } 100% { opacity: 0; transform: scale(0.6); } }
+.rv-burst {
+  left: var(--x); top: var(--y); width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
+  opacity: 0; animation: rv-burst calc(var(--nx-dur) * 0.4) cubic-bezier(0.1, 0.8, 0.3, 1) var(--dl) forwards;
+}
+.rv-burst svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 1vmin var(--c)); }
+@keyframes rv-burst { 0% { opacity: 1; transform: scale(0.05) rotate(0deg); } 50% { opacity: 1; transform: scale(1) rotate(10deg); } 100% { opacity: 0; transform: scale(1.15) translateY(3vmin) rotate(16deg); } }
+.rv-city { left: 0; right: 0; bottom: 0; width: 100%; height: 30%; animation: rv-fade var(--nx-dur) ease forwards; }
+.rv-hello {
+  left: 0; right: 0; top: calc(40% + 18vmin); text-align: center;
+  font: 900 clamp(26px, 7vmin, 64px) / 1.1 ui-sans-serif, system-ui, sans-serif;
+  background: linear-gradient(90deg, #fde68a, #f472b6, #a78bfa, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent;
+  opacity: 0; animation: rv-hello var(--nx-dur) cubic-bezier(0.2, 1.3, 0.5, 1) forwards;
+}
+@keyframes rv-hello { 0%, 44% { opacity: 0; transform: translateY(4vmin) scale(0.8); } 54% { opacity: 1; transform: translateY(0) scale(1); } 80% { opacity: 1; } 94%, 100% { opacity: 0; transform: translateY(-2vmin) scale(1.05); } }
+.rv-flash { inset: 0; background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.6), transparent 60%); opacity: 0; animation: rv-flash var(--nx-dur) ease-out forwards; }
+@keyframes rv-flash { 0%, 42% { opacity: 0; } 45% { opacity: 1; } 60%, 100% { opacity: 0; } }
+
+/* ============================================================ HALLOWEEN */
+.hw-bg { inset: 0; background: radial-gradient(ellipse at 70% 20%, #3b1b5a 0%, #12061f 55%, #05010a 100%); animation: hw-bg var(--nx-dur) ease forwards; }
+@keyframes hw-bg { 0%, 74% { opacity: 1; } 92%, 100% { opacity: 0; } }
+.hw-stars { inset: 0; width: 100%; height: 100%; opacity: 0.6; animation: hw-fade var(--nx-dur) ease forwards; }
+@keyframes hw-fade { 0%, 74% { opacity: 0.6; } 92%, 100% { opacity: 0; } }
+.hw-moon { right: 12%; top: 8%; width: 26vmin; height: 26vmin; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #fffbeb 0%, #fde68a 55%, #d97706 100%); box-shadow: 0 0 8vmin 2vmin rgba(253, 230, 138, 0.35); opacity: 0; animation: hw-moon var(--nx-dur) ease-out forwards; }
+@keyframes hw-moon { 0% { opacity: 0; transform: translateY(6vmin) scale(0.9); } 20%, 74% { opacity: 1; transform: translateY(0) scale(1); } 92%, 100% { opacity: 0; } }
+.hw-fog { width: 90vmax; height: 40vmax; opacity: 0; filter: hue-rotate(250deg) saturate(0.6); animation: hw-fog var(--nx-dur) ease-in-out forwards; }
+.hw-fog-a { left: -30%; bottom: -10%; }
+.hw-fog-b { right: -35%; bottom: -15%; animation-delay: calc(var(--nx-dur) * 0.08); }
+@keyframes hw-fog { 0% { opacity: 0; transform: translateX(-6vw); } 25%, 70% { opacity: 0.55; } 100% { opacity: 0; transform: translateX(8vw); } }
+.hw-bat { left: -15%; top: var(--y); width: calc(14vmin * var(--s)); height: calc(7vmin * var(--s)); opacity: 0; animation: hw-bat var(--nx-dur) cubic-bezier(0.4, 0, 0.6, 1) var(--dl) forwards; }
+.hw-bat svg { width: 100%; height: 100%; overflow: visible; }
+.hw-wings { transform-origin: 0 0; animation: hw-flap 0.22s ease-in-out infinite alternate; }
+@keyframes hw-flap { from { transform: scaleY(1); } to { transform: scaleY(0.35); } }
+@keyframes hw-bat { 0% { opacity: 0; transform: translate(0, 0); } 8% { opacity: 1; } 50% { transform: translate(70vw, -6vh); } 70% { opacity: 1; } 85%, 100% { opacity: 0; transform: translate(135vw, 4vh); } }
+.hw-pumpkin { left: 50%; top: 42%; width: 34vmin; height: 34vmin; margin: -17vmin 0 0 -17vmin; opacity: 0; animation: hw-pump var(--nx-dur) cubic-bezier(0.34, 1.4, 0.5, 1) forwards; }
+.hw-pumpkin svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1.4vmin 2vmin rgba(0, 0, 0, 0.6)); }
+@keyframes hw-pump { 0%, 22% { opacity: 0; transform: translateY(14vmin) scale(0.6); } 38% { opacity: 1; transform: translateY(0) scale(1); } 74% { opacity: 1; transform: scale(1.04); } 86%, 100% { opacity: 0; transform: scale(1.8); } }
+.hw-face { opacity: 0.15; animation: hw-face var(--nx-dur) steps(1, end) forwards; }
+@keyframes hw-face { 0%, 44% { opacity: 0.15; } 46% { opacity: 1; } 49% { opacity: 0.3; } 52%, 100% { opacity: 1; } }
+.hw-glow { left: 50%; top: 42%; width: 70vmin; height: 70vmin; margin: -35vmin 0 0 -35vmin; border-radius: 50%; background: radial-gradient(circle, rgba(251, 146, 60, 0.55), rgba(234, 88, 12, 0.18) 40%, transparent 65%); opacity: 0; animation: hw-glow var(--nx-dur) ease-out forwards; }
+@keyframes hw-glow { 0%, 45% { opacity: 0; transform: scale(0.6); } 55%, 74% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1.6); } }
+.hw-flash { inset: 0; background: rgba(233, 213, 255, 0.55); opacity: 0; animation: hw-flash var(--nx-dur) steps(1, end) forwards; }
+@keyframes hw-flash { 0%, 62% { opacity: 0; } 63% { opacity: 1; } 65% { opacity: 0; } 67% { opacity: 0.8; } 69%, 100% { opacity: 0; } }

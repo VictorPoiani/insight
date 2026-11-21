@@ -170,7 +170,12 @@ export type IntroSceneId =
   | 'star-shower'
   | 'eclipse'
   | 'fairy'
-  | 'glitch-boot';
+  | 'glitch-boot'
+  | 'sapphire'
+  | 'singularity'
+  | 'power-up'
+  | 'reveillon'
+  | 'halloween';
 
 /** Estilo de exibição do nome (fonte + efeito). Combina com o Título. */
 export interface FontItem extends BaseItem {
@@ -547,12 +552,18 @@ const INTROS: IntroItem[] = [
     description: 'Onda gigante em xilogravura japonesa varre a tela.', durationMs: 2400, scene: 'tsunami' },
 
   // ---- Patentes 4 e 5 ----
+  { id: 'intro-transformacao', kind: 'intro', name: 'Transformação', collection: 'animes', rarity: 'lendária', requirement: NITRO,
+    description: 'A aura dourada sobe, raios estalam, pedras flutuam e a tela treme até explodir em luz.', durationMs: 2300, scene: 'power-up' },
+  { id: 'intro-reveillon', kind: 'intro', name: 'Virada de Ano', collection: 'datas', rarity: 'lendária', requirement: NITRO,
+    description: 'Contagem 3·2·1 sobre a cidade e o céu explode em fogos.', durationMs: 2700, scene: 'reveillon' },
+  { id: 'intro-halloween', kind: 'intro', name: 'Noite das Bruxas', collection: 'datas', rarity: 'épica', requirement: NITRO,
+    description: 'Lua cheia, névoa, revoada de morcegos e uma abóbora que acende os olhos.', durationMs: 2400, scene: 'halloween' },
   { id: 'intro-tier-4', kind: 'intro', name: 'Ascensão Safira', collection: 'patentes', rarity: 'épica', requirement: { type: 'level', min: 4 },
-    description: 'Grade técnica azul converge no selo Safira.', durationMs: 1200,
+    description: 'Estilhaços convergem e lapidam uma safira; o brilho percorre as facetas e estoura em onda de choque.', durationMs: 2300, scene: 'sapphire',
     reveal: { kind: 'iris', colors: ['#020617', '#0c4a6e', '#0284c7'] }, fx: 'glitch',
     particles: { glyph: '◆', mode: 'burst', count: 16, colors: ['#38bdf8', '#e0f2fe'] } },
   { id: 'intro-tier-5', kind: 'intro', name: 'Singularidade Prismática', collection: 'patentes', rarity: 'lendária', requirement: { type: 'level', min: 5 },
-    description: 'Um ponto de luz explode no espectro do Grão-Mestre.', durationMs: 1200,
+    description: 'Estrelas sugadas por um disco de acreção prismático que colapsa e explode em espectro.', durationMs: 2600, scene: 'singularity',
     reveal: { kind: 'circle', colors: ['#000000', '#111827'] }, fx: 'flash',
     particles: { glyph: '✦', mode: 'burst', count: 26, colors: ['#4285F4', '#34A853', '#FBBC05', '#EA4335'] } },
 ];

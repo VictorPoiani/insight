@@ -380,7 +380,7 @@ export function LeftSidebar() {
                 </span>
                 {!hasNitroAccess && (
                   <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30">
-                    Em breve
+                    Novo
                   </span>
                 )}
               </>

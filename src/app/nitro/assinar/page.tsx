@@ -20,6 +20,7 @@ import { FramePreview, NameFont, NitroBadge, TagPill, TitleText } from '@/compon
 import { IntroOverlay } from '@/components/nitro/ProfileIntro';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { NITRO_PRICE_BRL, describeNitroSource } from '@/lib/nitro/entitlement';
+import { useNitroBilling } from '@/lib/nitro/useNitroBilling';
 import './assinar.css';
 
 const PRICE = NITRO_PRICE_BRL.toFixed(2).replace('.', ',');
@@ -116,6 +117,40 @@ export default function NitroCheckoutPage() {
   const { viewer, hasAccess, entitlement } = useNitro();
   const [testing, setTesting] = useState<IntroItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const billing = useNitroBilling();
+
+  // volta do Mercado Pago: a ativação chega pelo webhook em alguns segundos
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('retorno')) {
+      setNotice('Recebemos o retorno do Mercado Pago. Assim que o pagamento for aprovado, o Nitro é ativado automaticamente — pode levar alguns minutos.');
+    }
+  }, []);
+
+  async function subscribe() {
+    if (!billing.enabled) {
+      setNotice('A assinatura abre em breve. Enquanto isso, experimente tudo no provador!');
+      return;
+    }
+    if (!viewer) {
+      window.location.href = '/login?next=/nitro/assinar';
+      return;
+    }
+    setStarting(true);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/nitro/checkout', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      setNotice(data.error || 'Não foi possível abrir o pagamento agora.');
+    } catch {
+      setNotice('Sem conexão. Tente de novo.');
+    }
+    setStarting(false);
+  }
 
   const frameI = useCycle(FRAMES.length, 2200);
   const titleI = useCycle(TITLES.length, 1800);
@@ -144,7 +179,8 @@ export default function NitroCheckoutPage() {
         <span className="na-grain" />
       </div>
 
-      {/* Faixa "Em breve" */}
+      {/* Faixa "Em breve" (só enquanto a assinatura não abre) */}
+      {!billing.enabled && (
       <div className="na-soon" role="status">
         <span className="na-soon-track">
           {Array.from({ length: 2 }, (_, k) => (
@@ -160,6 +196,7 @@ export default function NitroCheckoutPage() {
           ))}
         </span>
       </div>
+      )}
 
       <div className="na-wrap">
         <Link href="/nitro" className="na-back">
@@ -198,11 +235,12 @@ export default function NitroCheckoutPage() {
                 <button
                   type="button"
                   className="na-btn na-btn--primary"
-                  aria-disabled="true"
-                  onClick={() => setNotice('A assinatura abre em breve. Enquanto isso, experimente tudo no provador!')}
+                  aria-disabled={!billing.enabled || starting}
+                  disabled={starting}
+                  onClick={() => void subscribe()}
                 >
                   <span className="na-btn-glint" aria-hidden />
-                  Assinar Nitro · em breve
+                  {starting ? 'Abrindo o Mercado Pago…' : billing.enabled ? `Assinar Nitro · R$ ${PRICE}/mês` : 'Assinar Nitro · em breve'}
                 </button>
               )}
               <Link href="/nitro" className="na-btn na-btn--ghost">

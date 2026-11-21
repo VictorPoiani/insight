@@ -10,12 +10,12 @@ import {
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
-import { NitroCosmetics, getNitroItem } from '@/lib/nitro/catalog';
+import { NitroCosmetics, NitroItem, getNitroItem } from '@/lib/nitro/catalog';
+import { filterCosmetics, itemLockReason, type LockReason } from '@/lib/nitro/access';
 import {
   NITRO_KILL_SWITCH,
   NitroEntitlement,
   NitroEntitlementInput,
-  displaysNitro,
   resolveNitroEntitlement,
 } from '@/lib/nitro/entitlement';
 import './nitro.css';
@@ -51,6 +51,8 @@ interface NitroContextValue {
   /** Tema mostrado temporariamente (provador); null = volta ao tema salvo. */
   previewTheme: string | null;
   setPreviewTheme: (id: string | null) => void;
+  /** Por que o item está bloqueado para quem está logado (null = pode usar). */
+  lockReason: (item: NitroItem) => LockReason;
 }
 
 const NitroContext = createContext<NitroContextValue>({
@@ -64,6 +66,7 @@ const NitroContext = createContext<NitroContextValue>({
   saveCosmetics: async () => ({ ok: false, error: 'Nitro indisponível' }),
   previewTheme: null,
   setPreviewTheme: () => {},
+  lockReason: () => 'nitro',
 });
 
 /** Guardado no aparelho para aplicar o tema antes da hidratação (sem piscar). */
@@ -190,7 +193,9 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
 
   const saveCosmetics = useCallback(
     async (next: NitroCosmetics) => {
-      if (!viewer || !hasAccess) return { ok: false, error: 'Acesso restrito.' };
+      if (!viewer) return { ok: false, error: 'Entre na sua conta.' };
+      // só vai o que esta conta pode usar (o banco confere de novo, item a item)
+      next = filterCosmetics(next, viewer) || {};
       const payload = {
         title: next.title ?? null,
         tag: next.tag ?? null,
@@ -211,12 +216,14 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
       setOverrides((prev) => ({ ...prev, [viewer.id]: saved }));
       return { ok: true };
     },
-    [hasAccess, supabase, viewer]
+    [supabase, viewer]
   );
 
+  const lockReason = useCallback((item: NitroItem) => itemLockReason(item, viewer), [viewer]);
+
   const value = useMemo(
-    () => ({ ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme, setPreviewTheme }),
-    [ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme]
+    () => ({ ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme, setPreviewTheme, lockReason }),
+    [ready, viewer, hasAccess, entitlement, prefs, setPrefs, overrides, saveCosmetics, previewTheme, lockReason]
   );
 
   return <NitroContext.Provider value={value}>{children}</NitroContext.Provider>;
@@ -237,7 +244,8 @@ export function useProfileCosmetics(
   if (!profile || NITRO_KILL_SWITCH) return null;
   const cosmetics = profile.id in overrides ? overrides[profile.id] : profile.cosmetics || null;
   if (!cosmetics) return null;
-  return displaysNitro(profile) === false ? null : cosmetics;
+  // cada item vale só enquanto a conta pode usá-lo (patente pelo nível, resto pelo Nitro)
+  return filterCosmetics(cosmetics, profile);
 }
 
 /** Aparelho com poucos núcleos/memória ou modo de economia de dados. */

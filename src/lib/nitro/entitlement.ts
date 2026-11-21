@@ -14,11 +14,12 @@ export const NITRO_PRICE_BRL = 3.99;
 export const NITRO_LIFETIME_LEVEL = 5;
 
 /**
- * Lançamento: enquanto NEXT_PUBLIC_INSIGHT_NITRO != 'public', o Nitro segue em
- * beta fechada (só admin), mesmo para quem teria direito. O banco tem o mesmo
- * portão em public.nitro_is_public().
+ * Lançado: o Nitro vale para quem tem direito (assinatura ou Nível 5).
+ * NEXT_PUBLIC_INSIGHT_NITRO=beta volta à beta fechada (só admin) e =off desliga
+ * tudo. O banco tem o mesmo portão em public.nitro_is_public() (nitro_settings).
  */
-export const NITRO_PUBLIC = process.env.NEXT_PUBLIC_INSIGHT_NITRO === 'public';
+const NITRO_MODE = process.env.NEXT_PUBLIC_INSIGHT_NITRO;
+export const NITRO_PUBLIC = NITRO_MODE !== 'beta' && NITRO_MODE !== 'off';
 export const NITRO_KILL_SWITCH = process.env.NEXT_PUBLIC_INSIGHT_NITRO === 'off';
 
 export type NitroStatus = 'none' | 'active' | 'past_due' | 'canceled' | 'expired';
@@ -106,8 +107,13 @@ export function describeNitroSource(e: NitroEntitlement): string {
  */
 export function displaysNitro(p: NitroEntitlementInput | null | undefined): boolean | null {
   if (!p || NITRO_KILL_SWITCH) return false;
-  if (p.role === undefined && p.contributor_level === undefined && p.nitro_status === undefined) return null;
+  if (!hasEntitlementColumns(p) && p.role !== 'admin') return null;
   if (p.role === 'admin') return true;
   if (!NITRO_PUBLIC) return false;
   return resolveNitroEntitlement(p).entitled;
+}
+
+/** O objeto trouxe as colunas necessárias para calcular o direito ao Nitro? */
+export function hasEntitlementColumns(p: NitroEntitlementInput | null | undefined): boolean {
+  return !!p && p.contributor_level !== undefined && p.nitro_status !== undefined;
 }

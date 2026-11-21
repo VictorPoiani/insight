@@ -187,7 +187,9 @@ export default function ConfigPage() {
   const supabase = createClient();
 
   const [activeTab, setActiveTab] = useState<ConfigTabId>('appearance');
-  const { hasAccess: hasNitroAccess } = useNitro();
+  const { hasAccess: nitroActive, viewer: nitroViewer } = useNitro();
+  // aba Nitro: assinantes e quem tem itens de patente (nível 1+)
+  const hasNitroAccess = nitroActive || (nitroViewer?.contributor_level ?? 0) >= 1;
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [mounted, setMounted] = useState(false);
   const [focusSidebarsCollapsed, setFocusSidebarsCollapsed] = useState(false);

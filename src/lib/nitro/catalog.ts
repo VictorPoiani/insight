@@ -275,6 +275,17 @@ const TITLES: TitleItem[] = [
 // ============================================================================
 
 const TAGS: TagItem[] = [
+  // ---- Patentes: uma tag por nível (exclusivas do nível; o Nitro não libera)
+  { id: 'tag-tier-1', kind: 'tag', name: 'Recruta', label: 'Recruta', collection: 'patentes', category: 'Nível 1', rarity: 'comum', requirement: { type: 'level', min: 1 },
+    description: 'Cobre recém-forjado do Nível 1.', icon: 'sparkles', bg: 'linear-gradient(90deg,#7c3f16,#b86b35)', fg: '#ffedd5', border: '#dc8b52' },
+  { id: 'tag-tier-2', kind: 'tag', name: 'Escudeiro', label: 'Escudeiro', collection: 'patentes', category: 'Nível 2', rarity: 'rara', requirement: { type: 'level', min: 2 },
+    description: 'Aço polido com reflexo azul do Nível 2.', icon: 'gem', bg: 'linear-gradient(90deg,#334155,#64748b,#0284c7)', fg: '#f1f5f9', border: '#cbd5e1' },
+  { id: 'tag-tier-3', kind: 'tag', name: 'Cavaleiro', label: 'Cavaleiro', collection: 'patentes', category: 'Nível 3', rarity: 'rara', requirement: { type: 'level', min: 3 },
+    description: 'Ouro escovado do Nível 3.', icon: 'star', bg: 'linear-gradient(90deg,#854d0e,#ca8a04,#facc15)', fg: '#1c1917', border: '#fef08a' },
+  { id: 'tag-tier-4', kind: 'tag', name: 'Imperador', label: 'Imperador', collection: 'patentes', category: 'Nível 4', rarity: 'épica', requirement: { type: 'level', min: 4 },
+    description: 'Safira lapidada com brilho do Nível 4.', icon: 'crown', bg: 'linear-gradient(90deg,#0c4a6e,#0284c7,#38bdf8)', fg: '#f0f9ff', border: '#7dd3fc', shimmer: true },
+  { id: 'tag-tier-5', kind: 'tag', name: 'Grão-Mestre', label: 'Grão-Mestre', collection: 'patentes', category: 'Nível 5', rarity: 'lendária', requirement: { type: 'level', min: 5 },
+    description: 'Espectro prismático do Nível 5.', icon: 'orbit', bg: 'linear-gradient(90deg,#4285F4,#34A853,#FBBC05,#EA4335)', fg: '#ffffff', border: 'rgba(255,255,255,0.45)', shimmer: true },
   { id: 'tag-nitro-founder', kind: 'tag', name: 'Fundador Nitro', label: 'Fundador Nitro', collection: 'cosmico', rarity: 'lendária',
     requirement: { type: 'event', label: 'Beta fechada' }, description: 'Para quem testou o Nitro antes do lançamento.',
     icon: 'zap', bg: 'linear-gradient(90deg,#6d28d9,#db2777,#f59e0b)', fg: '#ffffff', border: 'rgba(255,255,255,0.25)', shimmer: true },
@@ -695,7 +706,7 @@ export function getCollection(id: NitroCollectionId): NitroCollection {
 
 export function describeRequirement(req: NitroRequirement): string {
   if (req.type === 'nitro') return 'Insight Nitro';
-  if (req.type === 'level') return `Nível ${req.min}`;
+  if (req.type === 'level') return req.min === 0 ? 'Todos os membros' : `Exclusivo do Nível ${req.min}`;
   return req.label;
 }
 

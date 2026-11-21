@@ -22,7 +22,7 @@ export function NitroMenuItem({ onNavigate }: { onNavigate?: () => void }) {
       </span>
       {!hasAccess && (
         <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-400">
-          Em breve
+          Novo
         </span>
       )}
     </Link>

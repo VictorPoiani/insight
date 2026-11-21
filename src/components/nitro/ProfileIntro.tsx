@@ -105,12 +105,13 @@ export function resolveIntro(
   cosmetics: NitroCosmetics | null,
   level: number
 ): IntroItem | null {
-  if (!cosmetics) return null;
-  if (level >= 4 && cosmetics.levelAnimation !== false) {
+  // Níveis 4 e 5 ganham a abertura da patente automaticamente,
+  // mesmo sem nenhum cosmético salvo (o dono pode desligar em levelAnimation)
+  if (level >= 4 && cosmetics?.levelAnimation !== false) {
     const tier = getNitroItem(level >= 5 ? 'intro-tier-5' : 'intro-tier-4', 'intro');
     if (tier) return tier;
   }
-  if (cosmetics.introEnabled === false) return null;
+  if (!cosmetics || cosmetics.introEnabled === false) return null;
   return getNitroItem(cosmetics.intro, 'intro');
 }
 
@@ -140,7 +141,7 @@ export function ProfileIntro({
     setIntro(chosen);
     // Só na montagem / troca de perfil
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, cosmetics?.intro, cosmetics?.introEnabled]);
+  }, [profile.id, cosmetics?.intro, cosmetics?.introEnabled, cosmetics?.levelAnimation, profile.contributor_level]);
 
   if (!intro) return null;
   return <IntroOverlay intro={intro} onDone={() => setIntro(null)} />;

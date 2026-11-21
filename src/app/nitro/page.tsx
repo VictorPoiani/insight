@@ -36,6 +36,8 @@ import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
 import { ThemeMiniature } from '@/components/nitro/ThemeMiniature';
 import { createClient } from '@/lib/supabase/client';
 import { NITRO_PRICE_BRL, NITRO_PUBLIC, describeNitroSource } from '@/lib/nitro/entitlement';
+import type { LockReason } from '@/lib/nitro/access';
+import { useNitroBilling } from '@/lib/nitro/useNitroBilling';
 
 const PRICE_LABEL = `R$ ${NITRO_PRICE_BRL.toFixed(2).replace('.', ',')}/mês`;
 
@@ -110,7 +112,8 @@ function slotOf(kind: NitroKind): keyof NitroCosmetics {
 }
 
 function NitroGallery() {
-  const { ready, viewer, hasAccess, saveCosmetics, setPreviewTheme } = useNitro();
+  const { ready, viewer, hasAccess, saveCosmetics, setPreviewTheme, lockReason } = useNitro();
+  const billing = useNitroBilling();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -167,8 +170,12 @@ function NitroGallery() {
   );
 
   if (!ready) return <AsteriskLoader size="lg" fullHeight label="Carregando Nitro..." />;
-  // Todos navegam e experimentam; só quem tem acesso salva (hoje: admin).
-  const previewOnly = !hasAccess;
+  // Todos navegam e experimentam; cada um salva só o que pode usar:
+  // itens de patente pelo nível (exclusivos) e o resto com o Nitro.
+  const previewOnly = !viewer;
+  const lockedInDraft = (['frame', 'title', 'tag', 'intro', 'font', 'theme'] as const)
+    .map((slot) => (draft[slot] ? NITRO_ITEMS.find((i) => i.id === draft[slot] && i.kind === slot) : null))
+    .filter((i): i is NitroItem => !!i && lockReason(i) !== null);
   const me = viewer
     ? { id: viewer.id, username: viewer.username, cosmetics: viewer.cosmetics }
     : { id: 'nitro-preview', username: 'voce', cosmetics: null };
@@ -184,13 +191,19 @@ function NitroGallery() {
 
   async function handleSave() {
     if (previewOnly) {
-      router.push('/nitro/assinar');
+      router.push('/login');
       return;
     }
     setSaving(true);
     const res = await saveCosmetics(draft);
     setSaving(false);
-    setStatus(res.ok ? 'Salvo! Seu perfil já está atualizado.' : `Erro ao salvar: ${res.error}`);
+    setStatus(
+      !res.ok
+        ? `Erro ao salvar: ${res.error}`
+        : lockedInDraft.length
+          ? `Salvo! ${lockedInDraft.map((i) => i.name).join(', ')} ${lockedInDraft.length > 1 ? 'ficaram' : 'ficou'} só no provador (cadeado).`
+          : 'Salvo! Seu perfil já está atualizado.'
+    );
   }
 
   return (
@@ -207,7 +220,7 @@ function NitroGallery() {
           <p className="text-[11px] text-muted">Galeria de personalização de perfil</p>
         </div>
         <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-          <Lock className="w-3 h-3" /> {NITRO_PUBLIC ? PRICE_LABEL : hasAccess ? 'Beta fechada · admin' : 'Em breve'}
+          <Lock className="w-3 h-3" /> {!NITRO_PUBLIC ? (hasAccess ? 'Beta fechada · admin' : 'Em breve') : billing.enabled ? PRICE_LABEL : 'Assinatura em breve'}
         </span>
         <Link
           href="/nitro/assinar"
@@ -221,15 +234,20 @@ function NitroGallery() {
         {/* Coluna da galeria */}
         <div className="min-w-0">
           <div className="px-4 sm:px-6 pt-5">
-            {previewOnly ? (
+            {!hasAccess ? (
               <Link
                 href="/nitro/assinar"
                 className="nx-cta-banner block rounded-2xl p-4 text-white"
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Em breve</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">
+                  {billing.enabled ? `Nitro por ${PRICE_LABEL}` : 'Assinatura em breve'}
+                </p>
                 <p className="text-base font-extrabold">Seu perfil, em outro nível.</p>
                 <p className="text-xs opacity-90">
-                  Experimente qualquer item no provador. Nitro por {PRICE_LABEL} · grátis para sempre no Nível 5.
+                  {viewer && level > 0
+                    ? `A moldura e a tag do Nível ${level}${level >= 4 ? ' (com abertura animada)' : ''} já são suas. `
+                    : ''}
+                  Experimente qualquer item no provador — os com cadeado são do Nitro{billing.enabled ? '' : ', que abre em breve'}. Grátis para sempre no Nível 5.
                 </p>
               </Link>
             ) : (
@@ -249,6 +267,7 @@ function NitroGallery() {
               status={status}
               onSave={handleSave}
               locked={previewOnly}
+              lockedItems={lockedInDraft}
               onTestIntro={() => {
                 const it = NITRO_ITEMS.find((i) => i.id === draft.intro && i.kind === 'intro') as IntroItem | undefined;
                 if (it) setTestingIntro(it);
@@ -340,7 +359,8 @@ function NitroGallery() {
                 avatar={avatar}
                 displayName={displayName}
                 onToggle={() => toggleItem(item)}
-                locked={previewOnly}
+                locked={lockReason(item) !== null}
+                lock={lockReason(item)}
                 onTest={item.kind === 'intro' ? () => setTestingIntro(item as IntroItem) : undefined}
               />
             ))}
@@ -391,6 +411,7 @@ function NitroGallery() {
               status={status}
               onSave={handleSave}
               locked={previewOnly}
+              lockedItems={lockedInDraft}
               onTestIntro={() => {
                 const it = NITRO_ITEMS.find((i) => i.id === draft.intro && i.kind === 'intro') as IntroItem | undefined;
                 if (it) setTestingIntro(it);
@@ -419,6 +440,7 @@ function PreviewCard({
   onSave,
   onTestIntro,
   locked = false,
+  lockedItems = [],
 }: {
   draft: NitroCosmetics;
   viewer: { id: string; username: string };
@@ -430,7 +452,9 @@ function PreviewCard({
   onSave: () => void;
   onTestIntro: () => void;
   locked?: boolean;
+  lockedItems?: NitroItem[];
 }) {
+  const needsNitro = lockedItems.some((i) => i.requirement.type === 'nitro');
   return (
     <div className="p-5 rounded-2xl bg-surface border border-border space-y-4">
       <div className="flex flex-col items-center text-center gap-3 pt-3">
@@ -468,7 +492,7 @@ function PreviewCard({
         >
           {locked ? (
             <>
-              <Zap className="w-3.5 h-3.5" /> Assinar Nitro
+              <Zap className="w-3.5 h-3.5" /> Entrar para salvar
             </>
           ) : (
             <>
@@ -479,6 +503,18 @@ function PreviewCard({
       </div>
       {locked && (
         <p className="text-[11px] text-muted text-center">Você está no provador: experimente à vontade, nada é salvo.</p>
+      )}
+      {!locked && lockedItems.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-300 text-center space-y-1.5">
+          <p className="flex items-center justify-center gap-1">
+            <Lock className="w-3 h-3" /> {lockedItems.map((i) => i.name).join(', ')} {lockedItems.length > 1 ? 'ficam' : 'fica'} só no provador.
+          </p>
+          {needsNitro && (
+            <Link href="/nitro/assinar" className="inline-flex items-center gap-1 font-bold text-white underline-offset-2 hover:underline">
+              <Zap className="w-3 h-3" /> Liberar com o Nitro
+            </Link>
+          )}
+        </div>
       )}
       {!locked && dirty && !saving && <p className="text-[11px] text-amber-400 text-center">Alterações não salvas</p>}
       {status && <p className="text-[11px] text-center text-secondary">{status}</p>}
@@ -494,6 +530,7 @@ function ItemCard({
   onToggle,
   onTest,
   locked = false,
+  lock = null,
 }: {
   item: NitroItem;
   equipped: boolean;
@@ -502,7 +539,10 @@ function ItemCard({
   onToggle: () => void;
   onTest?: () => void;
   locked?: boolean;
+  lock?: LockReason;
 }) {
+  const lockLabel =
+    lock === 'nitro' ? 'Nitro' : lock === 'level' && item.requirement.type === 'level' ? `Nível ${item.requirement.min}` : lock === 'event' ? 'Evento' : null;
   const coll = getCollection(item.collection);
   const category = item.kind === 'tag' && item.category ? item.category : coll.name;
 
@@ -547,6 +587,21 @@ function ItemCard({
         {equipped && (
           <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center">
             <Check className="w-3 h-3" />
+          </span>
+        )}
+        {lockLabel && (
+          <span
+            className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider backdrop-blur ${
+              lock === 'nitro' ? 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/40' : 'bg-black/50 text-amber-300 border border-amber-400/40'
+            }`}
+            title={lock === 'level' ? 'Exclusivo de quem alcança este nível — o Nitro não libera' : lock === 'nitro' ? 'Liberado com o Insight Nitro' : 'Item de evento'}
+          >
+            <Lock className="w-2.5 h-2.5" /> {lockLabel}
+          </span>
+        )}
+        {!lock && item.requirement.type === 'level' && item.requirement.min > 0 && (
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-400/40">
+            <Check className="w-2.5 h-2.5" /> Seu nível
           </span>
         )}
       </button>

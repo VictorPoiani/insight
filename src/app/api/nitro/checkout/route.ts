@@ -3,11 +3,27 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { NITRO_PRICE_BRL, resolveNitroEntitlement } from '@/lib/nitro/entitlement';
 
 /**
- * Checkout do Insight Nitro — assinatura recorrente (Mercado Pago preapproval).
+ * Checkout do Insight Nitro — assinatura recorrente (Mercado Pago preapproval):
+ * R$ 3,99 cobrados todo mês no cartão, até a pessoa cancelar.
  *
- * Travado até o lançamento: só abre com NITRO_BILLING_ENABLED=true no servidor.
- * A ativação acontece no webhook (/api/webhooks/mercadopago), nunca aqui.
+ * Abre quando NITRO_BILLING_ENABLED=true no servidor OU nitro_settings
+ * billing_enabled = 'true' no banco (liga/desliga sem deploy) — e sempre exige
+ * MERCADOPAGO_ACCESS_TOKEN. A ativação acontece no webhook
+ * (/api/webhooks/mercadopago), nunca aqui.
  */
+async function billingEnabled(supabase: Awaited<ReturnType<typeof createServerSupabase>>): Promise<boolean> {
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN) return false;
+  if (process.env.NITRO_BILLING_ENABLED === 'true') return true;
+  if (process.env.NITRO_BILLING_ENABLED === 'false') return false;
+  const { data } = await supabase.rpc('nitro_billing_enabled');
+  return data === true;
+}
+
+export async function GET() {
+  const supabase = await createServerSupabase();
+  return NextResponse.json({ enabled: await billingEnabled(supabase) }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabase();
   const {
@@ -17,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Entre na sua conta para assinar.' }, { status: 401 });
   }
 
-  if (process.env.NITRO_BILLING_ENABLED !== 'true') {
+  if (!(await billingEnabled(supabase))) {
     return NextResponse.json(
       { error: 'O Insight Nitro chega em breve. A assinatura ainda não está aberta.', comingSoon: true },
       { status: 503 }

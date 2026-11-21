@@ -1,5 +1,6 @@
 'use client';
 
+import { ShareProfileModal } from '@/components/feed/SharePostModal';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -34,6 +35,7 @@ import {
   Cpu,
   Gamepad2,
   Palette,
+  Share2,
   Layers,
   Globe,
   Crown,
@@ -519,6 +521,7 @@ export function ProfileHeader({
   const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
   const { hasAccess: hasNitroAccess, viewer: nitroViewer } = useNitro();
   const isOwnProfile = Boolean(nitroViewer && nitroViewer.id === profile.id);
+  const [shareProfileOpen, setShareProfileOpen] = useState(false);
   const [isFollowingProfile, setIsFollowingProfile] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followingCount, setFollowingCount] = useState(0);
@@ -1508,6 +1511,17 @@ export function ProfileHeader({
             )}
 
             {/* Insight Nitro: personalizar o próprio perfil (beta fechada) */}
+            <button
+              type="button"
+              onClick={() => setShareProfileOpen(true)}
+              title="Compartilhar perfil"
+              aria-label="Compartilhar perfil"
+              className="w-8 h-8 rounded-full bg-elevated border border-border hover:border-accent text-primary flex items-center justify-center transition-colors shrink-0"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+            <ShareProfileModal isOpen={shareProfileOpen} onClose={() => setShareProfileOpen(false)} profile={profile} />
+
             {isOwnProfile && (
               <Link
                 href={hasNitroAccess ? '/nitro?tab=frame' : '/nitro'}

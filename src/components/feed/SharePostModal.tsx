@@ -72,6 +72,60 @@ function plainText(post: Post) {
 }
 
 export function SharePostModal({ isOpen, onClose, post, author }: SharePostModalProps) {
+  const name = author.display_name || author.full_name || author.username;
+  const shareText = useMemo(() => {
+    const t = plainText(post);
+    const quote = t ? `“${t.length > 120 ? `${t.slice(0, 117)}…` : t}”` : '';
+    return `${quote} — ${name} no Insight*`.trim();
+  }, [post, name]);
+  return (
+    <ShareSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Compartilhar publicação"
+      imageBase={`/api/share/${post.id}`}
+      path={`/post/${post.id}`}
+      shareTitle={`${name} no Insight*`}
+      shareText={shareText}
+      fileName={`insight-post-${post.id.slice(0, 8)}`}
+      isPrivate={post.visibility === 'private' || Boolean(post.is_draft)}
+    />
+  );
+}
+
+/** Cartão "me siga" de um perfil. */
+export function ShareProfileModal({ isOpen, onClose, profile }: { isOpen: boolean; onClose: () => void; profile: Profile }) {
+  const name = profile.display_name || profile.full_name || profile.username;
+  return (
+    <ShareSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Compartilhar perfil"
+      imageBase={`/api/share/profile/${encodeURIComponent(profile.username)}`}
+      path={`/u/${encodeURIComponent(profile.username)}`}
+      shareTitle={`${name} (@${profile.username}) no Insight*`}
+      shareText={`Me siga no Insight*: ${name} (@${profile.username})`}
+      fileName={`insight-perfil-${profile.username}`}
+      isPrivate={false}
+    />
+  );
+}
+
+interface ShareSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  /** rota da imagem sem query (ex.: /api/share/<id>) */
+  imageBase: string;
+  /** caminho público (ex.: /post/<id>) */
+  path: string;
+  shareTitle: string;
+  shareText: string;
+  fileName: string;
+  isPrivate: boolean;
+}
+
+export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle, shareText, fileName, isPrivate }: ShareSheetProps) {
   const [format, setFormat] = useState<ShareFormat>('story');
   const [themeId, setThemeId] = useState(SHARE_THEMES[0].id);
   const [imgState, setImgState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -81,16 +135,9 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
   const blobRef = useRef<Blob | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
-  const isPrivate = post.visibility === 'private' || post.is_draft;
-  const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}/post/${post.id}`;
-  const imageUrl = `/api/share/${post.id}?format=${format}&theme=${themeId}`;
-  const name = author.display_name || author.full_name || author.username;
-
-  const shareText = useMemo(() => {
-    const t = plainText(post);
-    const quote = t ? `“${t.length > 120 ? `${t.slice(0, 117)}…` : t}”` : '';
-    return `${quote} — ${name} no Insight*`.trim();
-  }, [post, name]);
+  const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}${path}`;
+  const imageUrl = `${imageBase}?format=${format}&theme=${themeId}`;
+  const name = shareTitle;
 
   // Baixa a imagem assim que a prévia muda: no clique o compartilhamento é
   // imediato (o navegador só abre a gaveta de compartilhar logo após um toque).
@@ -147,7 +194,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
   function download(blob: Blob) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `insight-${format}-${post.id.slice(0, 8)}.png`;
+    a.download = `${fileName}-${format}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -162,7 +209,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
     // (sem await: no iPhone a gaveta de compartilhar precisa abrir no mesmo toque)
     let linkCopied = false;
     navigator.clipboard?.writeText(shareUrl).then(() => (linkCopied = true)).catch(() => {});
-    const file = new File([blob], `insight-${format}.png`, { type: 'image/png' });
+    const file = new File([blob], `${fileName}-${format}.png`, { type: 'image/png' });
     try {
       if (navigator.canShare?.({ files: [file] })) {
         // só o arquivo: com texto/link juntos, o Instagram não oferece "Stories"
@@ -184,7 +231,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
 
   async function shareLinkNative() {
     try {
-      if (navigator.share) await navigator.share({ title: `${name} no Insight*`, text: shareText, url: shareUrl });
+      if (navigator.share) await navigator.share({ title: name, text: shareText, url: shareUrl });
       else await copyLink();
     } catch {
       // cancelado
@@ -199,7 +246,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
       className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Compartilhar publicação"
+      aria-label={title}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -207,7 +254,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
       >
         <div className="px-5 pt-3 pb-2 flex items-center justify-between">
           <span className="sm:hidden absolute left-1/2 -translate-x-1/2 top-2 h-1 w-10 rounded-full bg-border" aria-hidden />
-          <h2 className="text-base font-extrabold">Compartilhar</h2>
+          <h2 className="text-base font-extrabold">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Fechar" className="p-1.5 rounded-full text-muted hover:text-primary hover:bg-elevated">
             <X className="w-4 h-4" />
           </button>

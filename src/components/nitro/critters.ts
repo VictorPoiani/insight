@@ -7,7 +7,9 @@
  * `nx-a` + uma classe cr-* (nitro.css) e só transform/opacity.
  */
 
-export type CritterId = 'cat-ribbon' | 'bunny-daisy' | 'fox-shrine' | 'shiba-nap' | 'ghost-hug' | 'bear-honey' | 'frog-king' | 'storm-cloud';
+import { CRITTERS2, type Critter2Id } from './critters2';
+
+export type CritterId = 'cat-ribbon' | 'bunny-daisy' | 'fox-shrine' | 'shiba-nap' | 'ghost-hug' | 'bear-honey' | 'frog-king' | 'storm-cloud' | Critter2Id;
 
 const LINE = '#4a2c2a';
 
@@ -342,4 +344,5 @@ export const CRITTERS: Record<CritterId, { back?: string; front: string }> = {
   'bear-honey': bearHoney,
   'frog-king': frogKing,
   'storm-cloud': stormCloud,
+  ...CRITTERS2,
 };

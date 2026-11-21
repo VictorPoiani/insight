@@ -7,6 +7,7 @@
 export const FX_IDS = {
   fire: 0, aurora: 1, electric: 2, ocean: 3, shadow: 4, spirit: 5,
   nebula: 6, magma: 7, frost: 8, gold: 9, neon: 10, sakura: 11, forest: 12,
+  aura: 13, fireworks: 14, sapphire: 15, singularity: 16,
 } as const;
 
 /** Duração do loop (a mesma dos WebP pré-renderizados). */
@@ -649,6 +650,162 @@ vec4 fxPetals(vec2 p, bool fireflies) {
   return over(acc, over(flowers, base));
 }
 
+// ---------------------------------------------------------------- utilidades extras
+vec3 hue(float h) {
+  return clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+}
+
+// 13 — Aura Lendária: chamas de energia douradas, pontiagudas, com raios
+vec4 fxAura(vec2 p) {
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+  float a = ang / TAU + 0.5;
+  float h = (r - R) / (0.5 - R);
+  float top = 0.5 + 0.5 * sin(ang);
+  float n = flowFbm(vec2(a * 30.0, h * 6.0), vec2(0.0, 5.0), 30.0, 3.0);
+  float ad = a + (n - 0.5) * 0.02;
+  float hd = h + (n - 0.5) * 0.08;
+  // espigões altos (pontas finas como cabelo/aura de anime) + camada curta
+  float big = flameTongues(ad, hd, 26.0, 3.0, 0.78, 0.55 + 0.45 * top);
+  float mid = flameTongues(ad + 0.5 / 26.0, hd, 26.0, 9.0, 0.46, 0.7 + 0.3 * top);
+  float heat = max(big, mid * 0.95) * (0.75 + 0.45 * n);
+  heat *= smoothstep(-0.02, 0.03, h);
+  heat = max(heat, gauss(r - R * 1.01, 0.007));
+  vec3 col = heatRamp(0.15 + heat * 0.9, vec3(0.55, 0.25, 0.0), vec3(0.98, 0.62, 0.05), vec3(1.0, 0.92, 0.35), vec3(1.0, 1.0, 0.9));
+  float alpha = smoothstep(0.02, 0.16, heat);
+  vec4 flame = vec4(col * alpha, alpha);
+  // aura externa pulsando
+  float pulse = 0.7 + 0.3 * sin(TAU * uT * 2.0);
+  float glow = gauss(r - R - 0.05, 0.11) * (0.25 + 0.25 * top) * pulse;
+  vec4 g = vec4(vec3(1.0, 0.8, 0.2) * glow, glow);
+  // raios elétricos azulados que estalam pela aura
+  float arcs = 0.0;
+  for (int k = 0; k < 4; k++) {
+    float fk = float(k);
+    float win = gauss(fract(uT * 2.0 - fk / 4.0) - 0.06, 0.04);
+    float ac = h11(fk * 7.1 + floor(uT * 8.0));
+    float jag = (fbm(vec3(r * 50.0, fk * 4.0, uT * 16.0), 64.0, 16.0) - 0.5) * 0.06;
+    float wk = gauss(fract(uT * 2.0 - fk / 4.0) - 0.08, 0.07);
+    arcs += wk * smoothstep(0.014, 0.0, abs(angDist(a, ac) - abs(jag))) * smoothstep(R + 0.22, R, r) * step(R, r);
+  }
+  arcs = clamp(arcs * 1.6, 0.0, 1.0);
+  vec4 bolt = vec4(vec3(0.7, 0.88, 1.0) * arcs + vec3(0.3, 0.5, 1.0) * arcs * 0.4, arcs);
+  float sp = risingSparks(p, 44.0, 0.26, 7.0, 0.004);
+  vec4 sparks = vec4(vec3(1.0, 0.95, 0.6) * sp, clamp(sp, 0.0, 1.0));
+  return over(bolt, over(sparks, over(flame, g)));
+}
+
+// 14 — Fogos de Réveillon: rojões estourando em volta da foto
+vec4 fxFireworks(vec2 p) {
+  vec4 acc = vec4(0.0);
+  for (int k = 0; k < 6; k++) {
+    float fk = float(k);
+    float t = fract(uT + fk / 6.0);
+    float ca = h11(fk * 3.3 + 1.0) * TAU;
+    vec2 c = vec2(cos(ca), sin(ca)) * (R + 0.11 + 0.05 * h11(fk * 5.1));
+    vec3 col = hue(h11(fk * 9.7 + 2.0));
+    // subida do rojão (0–0.25) e estouro (0.25–1)
+    float rise = smoothstep(0.0, 0.25, t);
+    vec2 start = c * (R / length(c));
+    vec2 rocket = mix(start, c, rise);
+    float dr = length(p - rocket);
+    float trail = (1.0 - step(0.25, t)) * smoothstep(0.006, 0.0, dr);
+    acc = over(vec4(vec3(1.0, 0.9, 0.7) * trail, trail), acc);
+    float e = clamp((t - 0.25) / 0.75, 0.0, 1.0);
+    if (e > 0.0) {
+      float rad = 0.15 * (1.0 - pow(1.0 - e, 3.0));
+      float fade = 1.0 - smoothstep(0.55, 1.0, e);
+      vec2 q = p - c - vec2(0.0, -0.03 * e * e);
+      float qa = atan(q.y, q.x);
+      float qr = length(q);
+      float N = 22.0;
+      float ray = fract(qa / TAU * N + h11(fk) * 0.5);
+      float spoke = smoothstep(0.32, 0.0, abs(ray - 0.5) * 2.0);
+      // ponta brilhante + rastro + segunda coroa menor
+      float tip = smoothstep(0.018, 0.0, abs(qr - rad)) * spoke;
+      float tail = smoothstep(rad, rad * 0.25, qr) * step(rad * 0.25, qr) * spoke * 0.6;
+      float ray2 = fract(qa / TAU * N + 0.5 + h11(fk) * 0.5);
+      float tip2 = smoothstep(0.014, 0.0, abs(qr - rad * 0.6)) * smoothstep(0.3, 0.0, abs(ray2 - 0.5) * 2.0) * 0.8;
+      float sparkle = 0.65 + 0.35 * sin(TAU * (uT * 12.0 + fk));
+      float I = ((tip + tip2) * sparkle + tail) * fade * 1.5;
+      float halo = gauss(qr, 0.07) * (1.0 - e) * 0.9;
+      acc = over(vec4((col * 0.7 + 0.45) * I + col * halo, clamp(I + halo, 0.0, 1.0)), acc);
+    }
+  }
+  float rim = gauss(length(p) - R * 1.01, 0.008) * 0.8;
+  return over(acc, vec4(vec3(1.0, 0.85, 0.5) * rim, rim));
+}
+
+// 15 — Safira Facetada (Nível 4): cristal lapidado com brilho que percorre as faces
+vec4 fxSapphire(vec2 p) {
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+  float a = ang / TAU + 0.5;
+  float w = 0.075;
+  if (r < R * 0.98 || r > R + w + 0.02) {
+    float g = gauss(r - R - w * 0.5, 0.07) * 0.45 * step(R * 0.98, r);
+    return vec4(vec3(0.2, 0.55, 1.0) * g, g);
+  }
+  float N = 20.0;
+  float cell = floor(a * N);
+  float fa = fract(a * N);
+  float rr = (r - R) / w;
+  // duas fileiras de facetas (coroa e pavilhão) com normais diferentes
+  float row = step(0.5, rr);
+  float tri = step(fa, mix(rr * 2.0, (1.0 - rr) * 2.0, row));
+  float facetId = cell * 4.0 + row * 2.0 + tri;
+  float shade = 0.35 + 0.65 * h11(facetId * 1.7);
+  // brilho especular viajando ao redor
+  float sweep = gauss(angDist(a, fract(uT)), 0.05) + 0.6 * gauss(angDist(a, fract(uT + 0.5)), 0.035);
+  float spec = sweep * (0.6 + 0.4 * h11(facetId + 3.0));
+  vec3 base = mix(vec3(0.02, 0.12, 0.45), vec3(0.15, 0.55, 1.0), shade);
+  vec3 col = base + vec3(0.8, 0.95, 1.0) * spec;
+  // arestas finas claras
+  float edge = smoothstep(0.06, 0.0, min(fa, 1.0 - fa)) + smoothstep(0.06, 0.0, abs(rr - 0.5)) + smoothstep(0.08, 0.0, min(rr, 1.0 - rr));
+  col += vec3(0.7, 0.9, 1.0) * edge * 0.35;
+  // grade técnica pulsando por fora
+  float pulse = 0.5 + 0.5 * sin(TAU * uT * 2.0);
+  float inside = smoothstep(0.0, 0.04, rr) * smoothstep(1.0, 0.96, rr);
+  float alpha = clamp(inside, 0.0, 1.0);
+  col *= 0.85 + 0.25 * pulse;
+  return vec4(col * alpha, alpha);
+}
+
+// 16 — Singularidade Prismática (Nível 5): disco de acreção em espectro com lente gravitacional
+vec4 fxSingularity(vec2 p) {
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+  float a = ang / TAU + 0.5;
+  float h = (r - R) / (0.5 - R);
+  if (r < R * 0.97) return vec4(0.0);
+  // espiral girando para dentro (loop: rotação inteira por ciclo)
+  float sw = a - uT + h * 0.9;
+  float bands = flowFbm(vec2(sw * 16.0, h * 5.0), vec2(0.0, -2.0), 16.0, 2.0);
+  float fine = flowFbm(vec2(sw * 40.0, h * 12.0), vec2(0.0, -4.0), 40.0, 3.0);
+  float disk = gauss(h - 0.12, 0.16) * smoothstep(-0.02, 0.04, h);
+  float I = disk * (0.35 + 1.1 * bands) * (0.8 + 0.4 * fine);
+  vec3 col = hue(a * 2.0 - uT + h * 0.6) * 0.75 + 0.25;
+  col *= I;
+  // anel de lente (fino, quase branco, com aberração cromática)
+  float ring = gauss(r - R * 1.015, 0.006);
+  col += vec3(1.0, 0.55, 0.55) * gauss(r - R * 1.012, 0.006) * 0.6 + vec3(0.55, 0.7, 1.0) * gauss(r - R * 1.02, 0.006) * 0.6 + vec3(1.0) * ring * 0.8;
+  // estrelas esticadas sendo puxadas para o centro
+  float st = 0.0;
+  for (int k = 0; k < 10; k++) {
+    float fk = float(k);
+    float sa = h11(fk * 4.4) ;
+    float life = fract(uT + h11(fk * 2.2));
+    float sr = mix(0.5, R * 1.02, life * life);
+    float sa2 = sa + life * 0.15;
+    vec2 sp = vec2(cos((sa2 - 0.5) * TAU), sin((sa2 - 0.5) * TAU)) * sr;
+    float d = length(p - sp);
+    st += smoothstep(0.004, 0.0, d) * (1.0 - life) + gauss(d, 0.01) * 0.25 * (1.0 - life);
+  }
+  col += vec3(1.0) * st;
+  float alpha = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  return vec4(col / max(max(col.r, max(col.g, col.b)), 1e-3) * alpha, alpha);
+}
+
 void main() {
   vec2 p = (gl_FragCoord.xy / uRes) - 0.5;
   vec4 c = vec4(0.0);
@@ -680,6 +837,10 @@ void main() {
   else if (uFx == 10) c = fxNeon(p);
   else if (uFx == 11) c = fxPetals(p, false);
   else if (uFx == 12) c = fxPetals(p, true);
+  else if (uFx == 13) c = fxAura(p);
+  else if (uFx == 14) c = fxFireworks(p);
+  else if (uFx == 15) c = fxSapphire(p);
+  else if (uFx == 16) c = fxSingularity(p);
   // nunca pinta o rosto: só uma borda suave sobre a beira do avatar
   float faceMask = smoothstep(R * 0.93, R * 0.99, length(p));
   c *= faceMask;

@@ -13,6 +13,7 @@ import path from 'node:path';
 const EFFECTS = {
   fire: 0, aurora: 1, electric: 2, ocean: 3, shadow: 4, spirit: 5,
   nebula: 6, magma: 7, frost: 8, gold: 9, neon: 10, sakura: 11, forest: 12,
+  aura: 13, fireworks: 14, sapphire: 15, singularity: 16,
 };
 
 const [outDir = 'nitro-render-out', only, framesArg = '60', sizeArg = '1024'] = process.argv.slice(2);

@@ -29,6 +29,8 @@ export type NitroCollectionId =
   | 'temas'
   | 'tipografia'
   | 'games'
+  | 'animes'
+  | 'datas'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -77,7 +79,8 @@ export type FrameOrnament =
 /** Efeitos renderizados por scripts/nitro-render (shader → WebP animado). */
 export type FrameFx =
   | 'fire' | 'aurora' | 'electric' | 'ocean' | 'shadow' | 'spirit' | 'nebula'
-  | 'magma' | 'frost' | 'gold' | 'neon' | 'sakura' | 'forest';
+  | 'magma' | 'frost' | 'gold' | 'neon' | 'sakura' | 'forest'
+  | 'aura' | 'fireworks' | 'sapphire' | 'singularity';
 
 /** Camada desenhada ATRÁS do avatar (profundidade). */
 export type FrameBackLayer = 'flames' | 'fox-tails' | 'smoke' | 'foliage' | 'storm-cloud';
@@ -212,6 +215,8 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'temas', name: 'Temas de App', description: 'Seu Insight com outras cores — só você vê.', colors: ['#f472b6', '#38bdf8'] },
   { id: 'tipografia', name: 'Estilos de Nome', description: 'Fontes e efeitos para o seu nome.', colors: ['#facc15', '#22c55e'] },
   { id: 'games', name: 'Games, RPG & Geek', description: 'Barra de vida, crítico e chefão final.', colors: ['#ef4444', '#22c55e'] },
+  { id: 'animes', name: 'Animes Clássicos', description: 'Auras, ninjas e garotas mágicas.', colors: ['#facc15', '#f472b6'] },
+  { id: 'datas', name: 'Datas Comemorativas', description: 'Réveillon, Carnaval, Arraiá, Halloween e Namorados.', colors: ['#f97316', '#a855f7'] },
 ];
 
 const NITRO: NitroRequirement = { type: 'nitro' };
@@ -432,6 +437,27 @@ const FRAMES: FrameItem[] = [
     ring: { colors: ['#334155', '#64748b', '#93c5fd', '#334155'], anim: 'none', width: 0.06 } },
 
   // ---- Bichinhos ilustrados ----
+  // ---- pacote 2: animes clássicos, datas comemorativas e bichos queridos
+  { id: 'frame-aura-lendaria', kind: 'frame', name: 'Aura Lendária', collection: 'animes', rarity: 'lendária', requirement: NITRO, fx: 'aura',
+    description: 'Energia dourada em espigões, faíscas e raios — o poder sobe a cada episódio.', ring: { colors: ['#facc15'], anim: 'none' } },
+  { id: 'frame-pergaminho-ninja', kind: 'frame', name: 'Pergaminho Ninja', collection: 'animes', rarity: 'épica', requirement: NITRO, critter: 'ninja',
+    description: 'Faixa com placa, kunais cruzadas, shuriken girando e fumaça.', ring: { colors: ['#334155'], anim: 'none' } },
+  { id: 'frame-garota-magica', kind: 'frame', name: 'Garota Mágica', collection: 'animes', rarity: 'épica', requirement: NITRO, critter: 'magical-girl',
+    description: 'Broche de coração alado, fitas e a varinha de estrela da transformação.', ring: { colors: ['#f472b6'], anim: 'none' } },
+  { id: 'frame-reveillon', kind: 'frame', name: 'Fogos de Réveillon', collection: 'datas', rarity: 'lendária', requirement: NITRO, fx: 'fireworks',
+    description: 'Rojões subindo e estourando em cores ao redor da foto.', ring: { colors: ['#fde68a'], anim: 'none' } },
+  { id: 'frame-carnaval', kind: 'frame', name: 'Carnaval', collection: 'datas', rarity: 'épica', requirement: NITRO, critter: 'carnaval',
+    description: 'Máscara de plumas, serpentinas e chuva de confete.', ring: { colors: ['#7c3aed'], anim: 'none' } },
+  { id: 'frame-arraia', kind: 'frame', name: 'Arraiá', collection: 'datas', rarity: 'rara', requirement: NITRO, critter: 'junina',
+    description: 'Bandeirinhas, chapéu de palha, fogueirinha e milho.', ring: { colors: ['#ca8a04'], anim: 'none' } },
+  { id: 'frame-halloween', kind: 'frame', name: 'Noite das Bruxas', collection: 'datas', rarity: 'épica', requirement: NITRO, critter: 'halloween',
+    description: 'Abóbora iluminada, morcegos, teia e uma aranha curiosa.', ring: { colors: ['#f97316'], anim: 'none' } },
+  { id: 'frame-cupido', kind: 'frame', name: 'Cupido', collection: 'datas', rarity: 'rara', requirement: NITRO, critter: 'cupido',
+    description: 'Asas, coração flechado batendo e corações subindo.', ring: { colors: ['#fb7185'], anim: 'none' } },
+  { id: 'frame-capivara', kind: 'frame', name: 'Capivara Zen', collection: 'bichos', rarity: 'lendária', requirement: NITRO, critter: 'capivara',
+    description: 'Deitada no topo, laranja na cabeça e um passarinho de companhia.', ring: { colors: ['#a16207'], anim: 'none' } },
+  { id: 'frame-panda', kind: 'frame', name: 'Panda do Bambu', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'panda',
+    description: 'Espiando por baixo, mastigando bambu entre folhas que balançam.', ring: { colors: ['#4d7c0f'], anim: 'none' } },
   { id: 'frame-cat-ribbon', kind: 'frame', name: 'Gatinho de Fita', collection: 'bichos', rarity: 'épica', requirement: NITRO, critter: 'cat-ribbon',
     description: 'Orelhas de gato tricolor, laço de cetim, patinhas e plaquinha de coração.',
     ring: { colors: ['#f9b8c6'], anim: 'none' } },
@@ -467,11 +493,11 @@ const FRAMES: FrameItem[] = [
     description: 'Ouro escovado com rebites.', ring: { colors: ['#b48219', '#eab308', '#fef08a', '#b48219'], anim: 'none', width: 0.07 },
     glow: 'rgba(234,179,8,0.35)', ornament: 'laurel', alwaysStatic: true },
   { id: 'frame-tier-4', kind: 'frame', name: 'Imperador', collection: 'patentes', rarity: 'épica', requirement: { type: 'level', min: 4 },
-    description: 'Safira com grade técnica e pulso luminoso.', ring: { colors: ['#0c4a6e', '#0284c7', '#38bdf8', '#0284c7', '#0c4a6e'], anim: 'pulse', width: 0.07 },
-    glow: 'rgba(56,189,248,0.55)', ornament: 'grid' },
+    description: 'Safira lapidada: facetas que refletem um brilho girando e pulso luminoso.', ring: { colors: ['#0c4a6e', '#0284c7', '#38bdf8', '#0284c7', '#0c4a6e'], anim: 'pulse', width: 0.07 },
+    glow: 'rgba(56,189,248,0.55)', fx: 'sapphire' },
   { id: 'frame-tier-5', kind: 'frame', name: 'Grão-Mestre', collection: 'patentes', rarity: 'lendária', requirement: { type: 'level', min: 5 },
-    description: 'Espectro prismático completo em rotação.', ring: { colors: ['#4285F4', '#34A853', '#FBBC05', '#EA4335', '#4285F4'], anim: 'spin', width: 0.08 },
-    glow: 'rgba(66,133,244,0.55)', ornament: 'crown', particles: { glyph: '✦', mode: 'orbit', count: 4, color: '#ffffff' } },
+    description: 'Disco de acreção em espectro, lente gravitacional e estrelas sendo puxadas.', ring: { colors: ['#4285F4', '#34A853', '#FBBC05', '#EA4335', '#4285F4'], anim: 'spin', width: 0.08 },
+    glow: 'rgba(66,133,244,0.55)', fx: 'singularity' },
 ];
 
 // ============================================================================

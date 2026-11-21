@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { observeFrame } from './inViewBudget';
 import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
 import { NitroFxCanvas } from './NitroFxCanvas';
@@ -110,6 +110,18 @@ function FrameShell({
   };
   const animatedOrnament = mode === 'nx-live';
   const ref = useRef<HTMLSpanElement>(null);
+  // IDs de degradê únicos por instância: a mesma moldura aparece várias vezes na
+  // página (galeria, prévia, feed) e IDs repetidos fazem o navegador perder o degradê.
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const critterArt = useMemo(() => {
+    if (!frame.critter) return null;
+    const art = CRITTERS[frame.critter];
+    const scope = (html?: string) =>
+      html
+        ? html.replace(/id="([^"]+)"/g, `id="$1-${uid}"`).replace(/url\(#([^)]+)\)/g, `url(#$1-${uid})`)
+        : undefined;
+    return { back: scope(art.back), front: scope(art.front)! };
+  }, [frame.critter, uid]);
 
   useEffect(() => {
     if (mode !== 'nx-auto' || !ref.current) return;
@@ -120,8 +132,8 @@ function FrameShell({
     <span ref={ref} className={`nx-frame ${mode} ${className}`} style={style}>
       {!frame.fx && !frame.critter && frame.glow && <span aria-hidden className="nx-deco nx-glow nx-anim" />}
       {frame.back && <BackArt kind={frame.back} />}
-      {frame.critter && CRITTERS[frame.critter].back && (
-        <svg aria-hidden className="nx-deco nx-orn nx-back" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: CRITTERS[frame.critter].back! }} />
+      {critterArt?.back && (
+        <svg aria-hidden className="nx-deco nx-orn nx-back" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: critterArt.back }} />
       )}
       {frame.ornament === 'saturn' && <SaturnBack animated={mode !== 'nx-static'} />}
       {!frame.fx && !frame.critter && <span aria-hidden className={`nx-deco nx-ring nx-anim nx-ring--${frame.ring.anim}`} />}
@@ -133,8 +145,8 @@ function FrameShell({
         ) : (
           <FxLayer fx={frame.fx} />
         ))}
-      {frame.critter && (
-        <svg aria-hidden className="nx-deco nx-orn" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: CRITTERS[frame.critter].front }} />
+      {critterArt && (
+        <svg aria-hidden className="nx-deco nx-orn" viewBox="0 0 100 100" overflow="visible" dangerouslySetInnerHTML={{ __html: critterArt.front }} />
       )}
       {frame.ornament === 'saturn' && <SaturnFront animated={mode !== 'nx-static'} />}
       {frame.ornament && frame.ornament !== 'saturn' &&

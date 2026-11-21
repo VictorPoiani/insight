@@ -729,6 +729,41 @@ html[data-reduce-motion='true'] .nx-tag--art::after { animation: none !important
   100% { opacity: 0; transform: translateY(9px); }
 }
 
+
+/* molduras ilustradas — pacote 2 (critters2.ts) */
+.nx-frame .cr-spin { animation: cr-spin 1.6s linear infinite; }
+.nx-frame .cr-tw { animation: cr-tw 2.2s ease-in-out infinite; }
+.nx-frame .cr-glow { animation: cr-glow 1.4s ease-in-out infinite; }
+.nx-frame .cr-bat { animation: cr-bat 0.5s ease-in-out infinite alternate, cr-batfly 4s ease-in-out infinite; }
+.nx-frame .cr-flame { animation: cr-flame 0.7s ease-in-out infinite alternate; }
+.nx-frame .cr-confetti { animation: cr-confetti 2.6s linear infinite; opacity: 0; }
+.nx-frame .cr-chew { animation: cr-chew 0.9s ease-in-out infinite; }
+.nx-frame .cr-wingflap { animation: cr-wingflap 1.8s ease-in-out infinite; }
+.nx-frame .cr-beat { animation: cr-beat 1.2s ease-in-out infinite; }
+.nx-frame .cr-heartrise { animation: cr-heartrise 3.6s ease-out infinite; opacity: 0; }
+.nx-frame.nx-static .cr-confetti, .nx-frame.nx-static .cr-heartrise { opacity: 0.85; }
+
+@keyframes cr-spin { to { transform: rotate(360deg); } }
+@keyframes cr-tw { 0%, 100% { transform: scale(0.4) rotate(0deg); opacity: 0.35; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+@keyframes cr-glow { 0%, 100% { opacity: 0.75; } 40% { opacity: 1; } 55% { opacity: 0.6; } 70% { opacity: 0.95; } }
+@keyframes cr-bat { from { transform: scaleY(1); } to { transform: scaleY(0.45); } }
+@keyframes cr-batfly { 0%, 100% { translate: 0 0; } 50% { translate: 2px -2px; } }
+@keyframes cr-flame { from { transform: scale(0.92, 0.86); } to { transform: scale(1.05, 1.12); } }
+@keyframes cr-confetti {
+  0% { opacity: 0; transform: translateY(-14px) rotate(0deg); }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(40px) rotate(540deg); }
+}
+@keyframes cr-chew { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(0.6px) rotate(-4deg); } }
+@keyframes cr-wingflap { 0%, 100% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(-9deg) scale(1.04); } }
+@keyframes cr-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.14); } 30% { transform: scale(0.98); } 45% { transform: scale(1.08); } }
+@keyframes cr-heartrise {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px) scale(1.1); }
+}
+
 /* --------------------------------------------------- MOVIMENTO REDUZIDO */
 
 @media (prefers-reduced-motion: reduce) {

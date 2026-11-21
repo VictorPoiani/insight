@@ -15,6 +15,9 @@ import {
   NitroKind,
   describeRequirement,
   getCollection,
+  getNitroItem,
+  NITRO_BUNDLES,
+  type NitroBundle,
 } from '@/lib/nitro/catalog';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import {
@@ -249,6 +252,20 @@ function NitroGallery() {
               onTestIntro={() => {
                 const it = NITRO_ITEMS.find((i) => i.id === draft.intro && i.kind === 'intro') as IntroItem | undefined;
                 if (it) setTestingIntro(it);
+              }}
+            />
+          </div>
+
+          {/* Pacotes */}
+          <div className="px-4 sm:px-6 pt-5">
+            <BundleShelf
+              avatar={avatar}
+              displayName={displayName}
+              locked={previewOnly}
+              equippedIds={draft}
+              onApply={(b) => {
+                setDraft((prev) => ({ ...prev, ...b.items }));
+                setStatus(previewOnly ? `Experimentando o ${b.name}.` : `${b.name} equipado — toque em Salvar.`);
               }}
             />
           </div>
@@ -575,5 +592,107 @@ export default function NitroPage() {
     <Suspense fallback={<AsteriskLoader size="lg" fullHeight />}>
       <NitroGallery />
     </Suspense>
+  );
+}
+
+
+/** Pacotes prontos (um cosmético de cada tipo). */
+function BundleShelf({
+  avatar,
+  displayName,
+  locked,
+  equippedIds,
+  onApply,
+}: {
+  avatar: string;
+  displayName: string;
+  locked: boolean;
+  equippedIds: NitroCosmetics;
+  onApply: (b: NitroBundle) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {NITRO_BUNDLES.map((b) => {
+        const frame = getNitroItem(b.items.frame, 'frame');
+        const title = getNitroItem(b.items.title, 'title');
+        const font = getNitroItem(b.items.font, 'font');
+        const theme = getNitroItem(b.items.theme, 'theme');
+        const parts: [string, string | undefined][] = [
+          ['Moldura', frame?.name],
+          ['Título', title?.name],
+          ['Tag', getNitroItem(b.items.tag, 'tag')?.name],
+          ['Abertura', getNitroItem(b.items.intro, 'intro')?.name],
+          ['Estilo de nome', font?.name],
+          ['Tema', theme?.name],
+        ];
+        const applied = (Object.keys(b.items) as (keyof NitroBundle['items'])[]).every((k) => equippedIds[k] === b.items[k]);
+        const nameEl = title ? <TitleText title={title}>{displayName}</TitleText> : displayName;
+        return (
+          <div
+            key={b.id}
+            className={`relative overflow-hidden rounded-2xl border ${
+              b.featured ? 'border-fuchsia-500/50 p-4 sm:p-5' : 'border-border p-3'
+            } bg-surface`}
+          >
+            {b.featured && (
+              <div aria-hidden className="absolute inset-0 opacity-30 pointer-events-none bg-[radial-gradient(circle_at_10%_0%,#7c3aed,transparent_55%),radial-gradient(circle_at_100%_100%,#db2777,transparent_55%)]" />
+            )}
+            <div className="relative flex flex-wrap items-center gap-4">
+              {frame && (
+                <FramePreview frameId={frame.id} size={b.featured ? 76 : 52} live={b.featured}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={avatar}
+                    alt=""
+                    className="rounded-full object-cover bg-elevated"
+                    style={{ width: b.featured ? 76 : 52, height: b.featured ? 76 : 52 }}
+                  />
+                </FramePreview>
+              )}
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-400">
+                  {b.featured ? 'Super Pacote · exclusivo' : 'Pacote'}
+                </p>
+                <p className={`${b.featured ? 'text-lg' : 'text-sm'} font-extrabold text-primary`}>{b.name}</p>
+                <p className="text-[11px] text-muted">{b.tagline}</p>
+                {b.featured && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-base font-extrabold">{font ? <NameFont font={font}>{nameEl}</NameFont> : nameEl}</span>
+                    <TagPill tagId={b.items.tag} />
+                  </div>
+                )}
+              </div>
+              {b.featured && theme && (
+                <div className="hidden sm:block w-40">
+                  <ThemeMiniature themeId={theme.id} name={displayName} />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => onApply(b)}
+                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors ${
+                  applied
+                    ? 'bg-elevated border border-border text-secondary'
+                    : b.featured
+                      ? 'text-white bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-pink-500'
+                      : 'bg-accent text-white hover:bg-accent-hover'
+                }`}
+              >
+                {applied ? 'Equipado' : locked ? 'Experimentar pacote' : 'Equipar pacote'}
+              </button>
+            </div>
+            {b.featured && (
+              <ul className="relative mt-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-[11px]">
+                {parts.map(([k, v]) => (
+                  <li key={k} className="text-muted truncate">
+                    {k}: <span className="text-secondary font-semibold">{v}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

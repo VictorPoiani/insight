@@ -7,7 +7,9 @@ import {
   FontItem,
   FrameItem,
   IntroItem,
+  NITRO_BUNDLES,
   NITRO_ITEMS,
+  getNitroItem,
   TagItem,
   ThemeItem,
   TitleItem,
@@ -411,6 +413,62 @@ export default function NitroCheckoutPage() {
           </div>
         </section>
 
+        {/* SUPER PACOTE */}
+        {(() => {
+          const b = NITRO_BUNDLES.find((x) => x.featured)!;
+          const frameB = getNitroItem(b.items.frame, 'frame');
+          const titleB = getNitroItem(b.items.title, 'title');
+          const fontB = getNitroItem(b.items.font, 'font');
+          const themeB = getNitroItem(b.items.theme, 'theme');
+          const rows: [string, string | undefined][] = [
+            ['Moldura', frameB?.name],
+            ['Título exclusivo', titleB?.name],
+            ['Tag exclusiva', getNitroItem(b.items.tag, 'tag')?.name],
+            ['Abertura', getNitroItem(b.items.intro, 'intro')?.name],
+            ['Estilo de nome', fontB?.name],
+            ['Tema do app', themeB?.name],
+          ];
+          const nm = titleB ? <TitleText title={titleB}>{name}</TitleText> : name;
+          return (
+            <section className="na-section">
+              <Reveal>
+                <div className="na-bundle">
+                  <div className="na-bundle-art">
+                    {frameB && (
+                      <FramePreview frameId={frameB.id} size={120} live>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={avatar} alt="" className="rounded-full object-cover bg-neutral-800" style={{ width: 120, height: 120 }} />
+                      </FramePreview>
+                    )}
+                  </div>
+                  <div className="na-bundle-copy">
+                    <p className="na-eyebrow">Super Pacote de boas-vindas</p>
+                    <h2 className="na-h2">Um de cada, assim que liberar o Nitro</h2>
+                    <p className="na-sub">{b.tagline}</p>
+                    <div className="na-bundle-name">
+                      {fontB ? <NameFont font={fontB}>{nm}</NameFont> : nm}
+                      <TagPill tagId={b.items.tag} />
+                    </div>
+                    <ul className="na-bundle-list">
+                      {rows.map(([k, v]) => (
+                        <li key={k}>
+                          <span>{k}</span>
+                          <strong>{v}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {themeB && (
+                    <div className="na-bundle-theme">
+                      <ThemeMiniature themeId={themeB.id} name={name} large />
+                    </div>
+                  )}
+                </div>
+              </Reveal>
+            </section>
+          );
+        })()}
+
         {/* COMPARATIVO */}
         <section className="na-section">
           <Reveal>
@@ -438,6 +496,7 @@ export default function NitroCheckoutPage() {
               </p>
               <ul>
                 <li>Galeria completa de cosméticos</li>
+                <li>Super Pacote com título e tag exclusivos</li>
                 <li>{THEMES.length} temas de app e {FONTS.length} estilos de nome</li>
                 <li>Selo Nitro e Rainbow</li>
                 <li>Grupo VIP no WhatsApp</li>

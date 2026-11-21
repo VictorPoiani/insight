@@ -919,4 +919,22 @@ export const TAG_ART: Record<string, TagArt> = {
       </g>
     ),
   },
+
+  'tag-super-nitro': {
+    icon: (
+      <g>
+        <path d="M8 0.8 15 4.9v6.2L8 15.2 1 11.1V4.9Z" fill="#c084fc" stroke={K} strokeWidth="0.8" strokeLinejoin="round" />
+        <path d="M8 0.8 15 4.9 8 9 1 4.9Z" fill="#ffffff" fillOpacity="0.3" />
+        <path d="M9.2 3.4 5.6 8.8h2.4l-.8 4.4 3.6-5.4H8.4Z" fill="#fff" stroke={K} strokeWidth="0.6" strokeLinejoin="round" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[[70, 0], [82, 0.4], [94, 0.8], [106, 1.2], [116, 0.6], [60, 1.4]].map(([x, d]) => (
+          <path key={x} className="ta-rise" style={{ animationDelay: `${d}s` }} d={`M${x} 16 l1 -2 l1 2 l-1 2 Z`} fill="#fde68a" />
+        ))}
+        <circle className="ta-pulse" cx="100" cy="10" r="9" fill="#f0abfc" opacity="0.25" />
+      </g>
+    ),
+  },
 };

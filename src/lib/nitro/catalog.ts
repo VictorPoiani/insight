@@ -31,6 +31,7 @@ export type NitroCollectionId =
   | 'games'
   | 'animes'
   | 'datas'
+  | 'pacote'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -222,6 +223,7 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'games', name: 'Games, RPG & Geek', description: 'Barra de vida, crítico e chefão final.', colors: ['#ef4444', '#22c55e'] },
   { id: 'animes', name: 'Animes Clássicos', description: 'Auras, ninjas e garotas mágicas.', colors: ['#facc15', '#f472b6'] },
   { id: 'datas', name: 'Datas Comemorativas', description: 'Réveillon, Carnaval, Arraiá, Halloween e Namorados.', colors: ['#f97316', '#a855f7'] },
+  { id: 'pacote', name: 'Super Pacote', description: 'Exclusivos de quem libera o Nitro.', colors: ['#7dd3fc', '#f472b6'] },
 ];
 
 const NITRO: NitroRequirement = { type: 'nitro' };
@@ -231,6 +233,9 @@ const NITRO: NitroRequirement = { type: 'nitro' };
 // ============================================================================
 
 const TITLES: TitleItem[] = [
+  { id: 'title-super-nitro', kind: 'title', name: 'Super Nitro', collection: 'pacote', rarity: 'lendária', requirement: NITRO,
+    description: 'Exclusivo do Super Pacote: azul, lilás, rosa e ouro fluindo com brilho.',
+    colors: ['#7dd3fc', '#c084fc', '#f472b6', '#fbbf24', '#7dd3fc'], anim: 'flow', fallback: '#c084fc', glow: 'rgba(192,132,252,0.5)' },
   { id: 'title-gold-brushed', kind: 'title', name: 'Ouro Escovado', collection: 'imperial', rarity: 'rara', requirement: NITRO,
     description: 'Ouro em quatro tons com uma faixa de brilho atravessando o nome.',
     colors: ['#a16207', '#facc15', '#fef08a', '#ca8a04'], anim: 'shine', fallback: '#d4a72c' },
@@ -290,6 +295,8 @@ const TAGS: TagItem[] = [
   { id: 'tag-cosmic-voyager', kind: 'tag', name: 'Viajante Cósmico', label: 'Viajante Cósmico', collection: 'cosmico', rarity: 'rara', requirement: NITRO,
     description: 'Já esteve além da heliopausa.', icon: 'orbit', bg: 'linear-gradient(90deg,#4c1d95,#be185d)', fg: '#fdf4ff', border: 'rgba(244,114,182,0.5)' },
   // ---- tags ilustradas (arte em components/nitro/tagArt.tsx)
+  { id: 'tag-super-nitro', kind: 'tag', name: 'Super Nitro', label: 'Super Nitro', collection: 'pacote', category: 'Super Pacote', rarity: 'lendária', requirement: NITRO,
+    description: 'Exclusiva do Super Pacote: quem liberou o Nitro.', icon: 'zap', bg: 'linear-gradient(110deg,#4338ca,#a21caf,#db2777,#f59e0b)', fg: '#ffffff', border: '#f0abfc' },
   { id: 'tag-tranquilao', kind: 'tag', name: 'Tô Tranquilão', label: 'Tô Tranquilão', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
     description: 'Paz absoluta mesmo com tudo pegando fogo', icon: 'sparkles', bg: 'linear-gradient(110deg,#065f46,#0f766e,#b45309)', fg: '#ecfdf5', border: '#34d399' },
   { id: 'tag-nem-te-conto', kind: 'tag', name: 'Nem te Conto', label: 'Nem te Conto', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
@@ -694,3 +701,60 @@ export interface NitroCosmetics {
   rainbow?: boolean;
   updatedAt?: string;
 }
+
+
+// ============================================================================
+// PACOTES — um cosmético de cada tipo, equipados de uma vez
+// ============================================================================
+
+export interface NitroBundle {
+  id: string;
+  name: string;
+  tagline: string;
+  /** destaque: o Super Pacote de quem libera o Nitro */
+  featured?: boolean;
+  items: { frame: string; title: string; tag: string; intro: string; font: string; theme: string };
+}
+
+export const NITRO_BUNDLES: NitroBundle[] = [
+  {
+    id: 'bundle-super',
+    name: 'Super Pacote Nitro',
+    tagline: 'Quem libera o Nitro já começa com um de cada — com título e tag exclusivos.',
+    featured: true,
+    items: {
+      frame: 'frame-aura-lendaria',
+      title: 'title-super-nitro',
+      tag: 'tag-super-nitro',
+      intro: 'intro-transformacao',
+      font: 'font-orbital',
+      theme: 'theme-espacial',
+    },
+  },
+  {
+    id: 'bundle-festa',
+    name: 'Pacote Festa',
+    tagline: 'Fogos, neon e o refrão final.',
+    items: {
+      frame: 'frame-reveillon',
+      title: 'title-rainbow-prism',
+      tag: 'tag-encore',
+      intro: 'intro-reveillon',
+      font: 'font-neon',
+      theme: 'theme-synthwave',
+    },
+  },
+  {
+    id: 'bundle-fofura',
+    name: 'Pacote Fofura',
+    tagline: 'Capivara, tons pastel e letra de caderno.',
+    items: {
+      frame: 'frame-capivara',
+      title: 'title-sakura',
+      tag: 'tag-stan',
+      intro: 'intro-fairy-tale',
+      font: 'font-manuscrito',
+      theme: 'theme-algodao',
+    },
+  },
+];

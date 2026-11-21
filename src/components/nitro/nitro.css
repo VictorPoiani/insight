@@ -374,7 +374,63 @@ html[data-reduce-motion='true'] .nx-fx-still { visibility: visible !important; }
   padding: 0 8px 0 4px;
   overflow: hidden;
   isolation: isolate;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25);
+  /* 1) gradiente deslizante (2–3 cores da coleção) */
+  background: var(--nx-tg, var(--nx-tbg));
+  background-size: 220% 220%;
+  animation: nx-tag-slide 8s ease-in-out infinite;
+  /* 4) aura contida: brilho interno + borda em degradê, sem vazar do selo */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 6px color-mix(in srgb, var(--nx-tb) 45%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+@keyframes nx-tag-slide {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+/* 3) textura sutil (pontilhado) deslizando devagar, por cima do cenário */
+.nx-tag--art::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.9) 0.6px, transparent 1px);
+  background-size: 5px 5px;
+  animation: nx-tag-texture 14s linear infinite;
+}
+@keyframes nx-tag-texture {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(10px, 10px, 0); }
+}
+/* 2) varredura de brilho diagonal: só épica e lendária */
+.nx-tag--art[data-rarity='épica']::after,
+.nx-tag--art[data-rarity='lendária']::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: 0;
+  width: 28%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: translateX(-150%) skewX(-25deg);
+  animation: nx-tag-sweep 4.2s ease-in-out infinite;
+}
+.nx-tag--art[data-rarity='lendária']::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 244, 200, 0.32), transparent);
+  animation-duration: 3.2s;
+}
+@keyframes nx-tag-sweep {
+  0%, 55% { transform: translateX(-150%) skewX(-25deg); }
+  100% { transform: translateX(480%) skewX(-25deg); }
+}
+.nx-tag--art .nx-tag-icon,
+.nx-tag--art .nx-tag-label {
+  position: relative;
+  z-index: 2;
 }
 .nx-tag-scene {
   position: absolute;
@@ -418,6 +474,10 @@ html[data-reduce-motion='true'] .nx-fx-still { visibility: visible !important; }
 .nx-tag-scene .ta-glow { animation: ta-glow 2s ease-in-out infinite; }
 .nx-tag-scene .ta-wave { transform-box: view-box; animation: ta-wave 1.2s ease-in-out infinite alternate; }
 .nx-tag-scene .ta-swing { transform-box: view-box; animation: ta-swing 3s ease-in-out infinite alternate; }
+.nx-tag-scene .ta-breathe { transform-box: view-box; animation: ta-breathe 3.3s ease-out infinite; }
+.nx-tag-scene .ta-scroll-fast { transform-box: view-box; animation: ta-scroll 1.6s linear infinite; }
+.nx-tag-scene .ta-credits { transform-box: view-box; animation: ta-credits 6s linear infinite; }
+.nx-tag-scene .ta-eq { transform-box: view-box; animation: ta-eq 0.9s ease-in-out infinite alternate; }
 .nx-tag-scene .ta-swing-rev { transform-box: view-box; animation: ta-swing 3.4s ease-in-out infinite alternate-reverse; }
 
 @keyframes ta-scroll { from { transform: translateX(0); } to { transform: translateX(-120px); } }
@@ -437,13 +497,20 @@ html[data-reduce-motion='true'] .nx-fx-still { visibility: visible !important; }
 @keyframes ta-drift { from { transform: translateX(-6px); } to { transform: translateX(8px); } }
 @keyframes ta-glow { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.45; } }
 @keyframes ta-wave { from { transform: scaleY(0.4); } to { transform: scaleY(1.3); } }
+@keyframes ta-breathe { 0% { transform: scale(0.2); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes ta-credits { from { transform: translateY(20px); } to { transform: translateY(-48px); } }
+@keyframes ta-eq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
 @keyframes ta-swing { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
 
+/* 5) movimento reduzido: tudo parado, gradiente estático como fallback */
 @media (prefers-reduced-motion: reduce) {
-  .nx-tag-scene *, .nx-badge-shine { animation: none !important; }
+  .nx-tag-scene *, .nx-badge-shine, .nx-tag--art, .nx-tag--art::before, .nx-tag--art::after { animation: none !important; }
 }
 html[data-reduce-motion='true'] .nx-tag-scene *,
-html[data-reduce-motion='true'] .nx-badge-shine { animation: none !important; }
+html[data-reduce-motion='true'] .nx-badge-shine,
+html[data-reduce-motion='true'] .nx-tag--art,
+html[data-reduce-motion='true'] .nx-tag--art::before,
+html[data-reduce-motion='true'] .nx-tag--art::after { animation: none !important; }
 
 /* ------------------------------------------------------------ CTAs na galeria */
 .nx-cta-mini {

@@ -28,6 +28,7 @@ export type NitroCollectionId =
   | 'musica'
   | 'temas'
   | 'tipografia'
+  | 'games'
   | 'patentes';
 
 export type NitroRarity = 'comum' | 'rara' | 'épica' | 'lendária';
@@ -210,6 +211,7 @@ export const NITRO_COLLECTIONS: NitroCollection[] = [
   { id: 'musica', name: 'Música', description: 'Rock, pop, indie e clássicos.', colors: ['#ea580c', '#34d399'] },
   { id: 'temas', name: 'Temas de App', description: 'Seu Insight com outras cores — só você vê.', colors: ['#f472b6', '#38bdf8'] },
   { id: 'tipografia', name: 'Estilos de Nome', description: 'Fontes e efeitos para o seu nome.', colors: ['#facc15', '#22c55e'] },
+  { id: 'games', name: 'Games, RPG & Geek', description: 'Barra de vida, crítico e chefão final.', colors: ['#ef4444', '#22c55e'] },
 ];
 
 const NITRO: NitroRequirement = { type: 'nitro' };
@@ -278,6 +280,38 @@ const TAGS: TagItem[] = [
   { id: 'tag-cosmic-voyager', kind: 'tag', name: 'Viajante Cósmico', label: 'Viajante Cósmico', collection: 'cosmico', rarity: 'rara', requirement: NITRO,
     description: 'Já esteve além da heliopausa.', icon: 'orbit', bg: 'linear-gradient(90deg,#4c1d95,#be185d)', fg: '#fdf4ff', border: 'rgba(244,114,182,0.5)' },
   // ---- tags ilustradas (arte em components/nitro/tagArt.tsx)
+  { id: 'tag-tranquilao', kind: 'tag', name: 'Tô Tranquilão', label: 'Tô Tranquilão', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
+    description: 'Paz absoluta mesmo com tudo pegando fogo', icon: 'sparkles', bg: 'linear-gradient(110deg,#065f46,#0f766e,#b45309)', fg: '#ecfdf5', border: '#34d399' },
+  { id: 'tag-nem-te-conto', kind: 'tag', name: 'Nem te Conto', label: 'Nem te Conto', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
+    description: 'A fofoca já veio com trilha sonora', icon: 'sparkles', bg: 'linear-gradient(110deg,#831843,#be185d,#7e22ce)', fg: '#fdf2f8', border: '#f472b6' },
+  { id: 'tag-calabreso', kind: 'tag', name: 'Calma, Calabreso', label: 'Calma, Calabreso', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
+    description: 'Respirando fundo antes de responder', icon: 'sparkles', bg: 'linear-gradient(110deg,#7f1d1d,#b91c1c,#0369a1)', fg: '#fff1f2', border: '#fca5a5' },
+  { id: 'tag-sextou', kind: 'tag', name: 'Sextou de Verdade', label: 'Sextou de Verdade', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,
+    description: 'Encerrando o expediente mental', icon: 'sparkles', bg: 'linear-gradient(110deg,#4c1d95,#be185d,#ea580c)', fg: '#fff7ed', border: '#f9a8d4' },
+  { id: 'tag-bigode', kind: 'tag', name: 'Bigode Grosso', label: 'Bigode Grosso', collection: 'memes', category: 'Internet', rarity: 'épica', requirement: NITRO,
+    description: 'Respeito máximo na resenha', icon: 'sparkles', bg: 'linear-gradient(110deg,#1c1917,#44403c,#a16207)', fg: '#fde68a', border: '#ca8a04' },
+  { id: 'tag-ping', kind: 'tag', name: 'Ping 999ms', label: 'Ping 999ms', collection: 'memes', category: 'Internet', rarity: 'rara', requirement: NITRO,
+    description: 'Pensando em português, digitando no futuro', icon: 'sparkles', bg: 'linear-gradient(110deg,#0f172a,#1e293b,#7f1d1d)', fg: '#fecaca', border: '#f87171' },
+  { id: 'tag-hp-baixo', kind: 'tag', name: 'HP Baixo', label: 'HP Baixo', collection: 'games', category: 'Games', rarity: 'comum', requirement: NITRO,
+    description: 'Vivendo no limite da barra de vida', icon: 'sparkles', bg: 'linear-gradient(110deg,#1f2937,#450a0a,#1f2937)', fg: '#fecaca', border: '#ef4444' },
+  { id: 'tag-critical', kind: 'tag', name: 'Critical Hit', label: 'Critical Hit', collection: 'games', category: 'Games', rarity: 'rara', requirement: NITRO,
+    description: 'Acertou em cheio no argumento', icon: 'sparkles', bg: 'linear-gradient(110deg,#7c2d12,#c2410c,#a16207)', fg: '#fef9c3', border: '#facc15' },
+  { id: 'tag-speedrunner', kind: 'tag', name: 'Speedrunner', label: 'Speedrunner', collection: 'games', category: 'Games', rarity: 'épica', requirement: NITRO,
+    description: 'Pulando diálogo e indo direto ao ponto', icon: 'sparkles', bg: 'linear-gradient(110deg,#0c4a6e,#0369a1,#4338ca)', fg: '#e0f2fe', border: '#38bdf8' },
+  { id: 'tag-boss-final', kind: 'tag', name: 'Boss Final', label: 'Boss Final', collection: 'games', category: 'Games', rarity: 'lendária', requirement: NITRO,
+    description: 'Só aparece quando o assunto fica sério', icon: 'sparkles', bg: 'linear-gradient(110deg,#0a0a0a,#450a0a,#1c1917)', fg: '#fecaca', border: '#dc2626' },
+  { id: 'tag-respawn', kind: 'tag', name: 'Respawnando', label: 'Respawnando', collection: 'games', category: 'Games', rarity: 'comum', requirement: NITRO,
+    description: 'Voltei mais forte depois da queda', icon: 'sparkles', bg: 'linear-gradient(110deg,#052e16,#14532d,#065f46)', fg: '#dcfce7', border: '#4ade80' },
+  { id: 'tag-main-vocal', kind: 'tag', name: 'Main Vocal', label: 'Main Vocal', collection: 'kpop', category: 'K-Pop', rarity: 'rara', requirement: NITRO,
+    description: 'Entregando o refrão com emoção máxima', icon: 'sparkles', bg: 'linear-gradient(110deg,#3b0764,#6b21a8,#be185d)', fg: '#fae8ff', border: '#d8b4fe' },
+  { id: 'tag-stan', kind: 'tag', name: 'Stan Account', label: 'Stan Account', collection: 'kpop', category: 'K-Pop', rarity: 'comum', requirement: NITRO,
+    description: 'Defendendo a fave com unhas e dentes', icon: 'sparkles', bg: 'linear-gradient(110deg,#4c1d95,#7c3aed,#db2777)', fg: '#f5f3ff', border: '#c084fc' },
+  { id: 'tag-pos-creditos', kind: 'tag', name: 'Cena Pós-Créditos', label: 'Cena Pós-Créditos', collection: 'telas', category: 'Cinema', rarity: 'rara', requirement: NITRO,
+    description: 'O melhor ficou pro final', icon: 'sparkles', bg: 'linear-gradient(110deg,#09090b,#27272a,#3f3f46)', fg: '#fafafa', border: '#facc15' },
+  { id: 'tag-trilha', kind: 'tag', name: 'Trilha Sonora', label: 'Trilha Sonora', collection: 'musica', category: 'Música', rarity: 'comum', requirement: NITRO,
+    description: 'Cada momento pede uma música diferente', icon: 'sparkles', bg: 'linear-gradient(110deg,#022c22,#065f46,#155e75)', fg: '#d1fae5', border: '#34d399' },
+  { id: 'tag-encore', kind: 'tag', name: 'Encore', label: 'Encore', collection: 'musica', category: 'Música', rarity: 'épica', requirement: NITRO,
+    description: 'Ninguém vai embora sem mais uma', icon: 'sparkles', bg: 'linear-gradient(110deg,#1c1917,#78350f,#9a3412)', fg: '#fef3c7', border: '#fbbf24' },
   { id: 'tag-caneta-azul', kind: 'tag', name: 'Caneta Azul', label: 'Caneta Azul', collection: 'memes', category: 'Memes BR', rarity: 'rara', requirement: NITRO,
     description: 'Tá marcado com a minha caneta', icon: 'sparkles', bg: '#dbeafe', fg: '#1e3a8a', border: '#3b82f6' },
   { id: 'tag-bora-bill', kind: 'tag', name: 'Bora Bill', label: 'Bora Bill', collection: 'memes', category: 'Memes BR', rarity: 'comum', requirement: NITRO,

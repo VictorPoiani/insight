@@ -530,9 +530,13 @@ export function TagPill({ tagId, className = '' }: { tagId: string; className?: 
   if (!tag) return null;
   const art = TAG_ART[tag.id];
   if (art) {
-    const style: CSSVars = { '--nx-tbg': tag.bg, '--nx-tfg': tag.fg, '--nx-tb': tag.border };
+    // gradiente deslizante: usa o degradê da tag ou cria um a partir da cor sólida + borda
+    const grad = tag.bg.includes('gradient')
+      ? tag.bg
+      : `linear-gradient(115deg, ${tag.bg} 0%, color-mix(in srgb, ${tag.border} 35%, ${tag.bg}) 50%, ${tag.bg} 100%)`;
+    const style: CSSVars = { '--nx-tbg': tag.bg, '--nx-tfg': tag.fg, '--nx-tb': tag.border, '--nx-tg': grad };
     return (
-      <span className={`nx-tag nx-tag--art ${className}`} style={style} title={tag.name}>
+      <span className={`nx-tag nx-tag--art ${className}`} style={style} title={tag.name} data-rarity={tag.rarity}>
         <svg className="nx-tag-scene" viewBox="0 0 120 20" preserveAspectRatio="xMidYMid slice" aria-hidden>
           {art.scene}
         </svg>

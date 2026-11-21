@@ -616,4 +616,307 @@ export const TAG_ART: Record<string, TagArt> = {
       </g>
     ),
   },
+
+  // ============================================================ MEMES BR 2
+  'tag-tranquilao': {
+    icon: (
+      <g>
+        <circle cx="8" cy="8.5" r="6.4" fill="#fde047" stroke={K} strokeWidth="0.9" />
+        <path d="M3.6 7.2 H12.4 L12 9 C 11.6 10, 10.2 10, 9.8 9 L 9.4 8 H6.6 L6.2 9 C 5.8 10, 4.4 10, 4 9 Z" fill={K} />
+        <path d="M5.6 11.8 C 6.8 12.8, 9.2 12.8, 10.4 11.8" fill="none" stroke={K} strokeWidth="0.9" strokeLinecap="round" />
+        <path d="M4.6 7.6 L5.6 7.6" stroke="#fff" strokeWidth="0.6" strokeLinecap="round" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[4, 14, 98, 108, 116].map((x, i) => (
+          <path
+            key={x}
+            className="ta-flicker"
+            style={{ animationDelay: `${i * 0.21}s` }}
+            d={`M${x} 20 C ${x} 15, ${x + 3} 13, ${x + 4} ${10 + (i % 2) * 2} C ${x + 5} 13, ${x + 8} 15, ${x + 8} 20 Z`}
+            fill={i % 2 ? '#fb923c' : '#facc15'}
+            opacity="0.75"
+          />
+        ))}
+        <circle className="ta-pulse" cx="70" cy="10" r="7" fill="none" stroke="#a7f3d0" strokeWidth="0.8" opacity="0.6" />
+      </g>
+    ),
+  },
+  'tag-nem-te-conto': {
+    icon: (
+      <g>
+        <path d="M2 4.5 C 2 3, 3 2, 4.5 2 H11.5 C 13 2, 14 3, 14 4.5 V9 C 14 10.5, 13 11.5, 11.5 11.5 H7 L3.6 14 L4.2 11.5 C 2.8 11.3, 2 10.4, 2 9 Z" fill="#f9a8d4" stroke={K} strokeWidth="0.9" strokeLinejoin="round" />
+        {[5.4, 8, 10.6].map((x) => (
+          <circle key={x} cx={x} cy="6.8" r="0.9" fill={K} />
+        ))}
+      </g>
+    ),
+    scene: (
+      <g>
+        {[20, 46, 74, 100].map((x, i) => (
+          <g key={x} className="ta-rise" style={{ animationDelay: `${i * 0.6}s` }}>
+            <path d={`M${x} 16 V9 L${x + 5} 8 V15`} fill="none" stroke="#fbcfe8" strokeWidth="0.9" />
+            <circle cx={x - 1.2} cy="16" r="1.6" fill="#fbcfe8" />
+            <circle cx={x + 3.8} cy="15" r="1.6" fill="#fbcfe8" />
+          </g>
+        ))}
+      </g>
+    ),
+  },
+  'tag-calabreso': {
+    icon: (
+      <g>
+        <circle cx="8" cy="8" r="6.2" fill="#fca5a5" stroke={K} strokeWidth="0.9" />
+        <path d="M4.6 6.6 C 5.4 6, 6.2 6, 6.8 6.6 M9.2 6.6 C 9.8 6, 10.6 6, 11.4 6.6" fill="none" stroke={K} strokeWidth="0.9" strokeLinecap="round" />
+        <circle cx="8" cy="11" r="1.2" fill={K} />
+        <path d="M12.8 3 C 14 3.6, 14.6 4.6, 14.6 5.8 M13.6 1.6 C 15.2 2.6, 15.8 4, 15.6 5.4" fill="none" stroke="#e0f2fe" strokeWidth="0.8" strokeLinecap="round" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[0, 1, 2].map((i) => (
+          <circle
+            key={i}
+            className="ta-breathe"
+            style={{ animationDelay: `${i * 1.1}s`, transformOrigin: '96px 10px' }}
+            cx="96"
+            cy="10"
+            r="9"
+            fill="none"
+            stroke="#bae6fd"
+            strokeWidth="0.9"
+          />
+        ))}
+      </g>
+    ),
+  },
+  'tag-sextou': {
+    icon: (
+      <g>
+        <path d="M3 3 H13 L8.6 8.6 V13 H10.8 V14.6 H5.2 V13 H7.4 V8.6 Z" fill="#a5f3fc" fillOpacity="0.5" stroke={K} strokeWidth="0.9" strokeLinejoin="round" />
+        <path d="M4.6 4.6 H11.4 L9.4 7 H6.6 Z" fill="#f472b6" />
+        <circle cx="11.6" cy="3.6" r="1.6" fill="#facc15" stroke={K} strokeWidth="0.6" />
+        <path d="M10.4 1.6 L12.4 5.4" stroke="#16a34a" strokeWidth="0.7" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[[10, '#f472b6', 0], [30, '#facc15', 0.5], [52, '#22d3ee', 1], [76, '#a78bfa', 0.3], [96, '#f472b6', 0.8], [112, '#facc15', 1.3]].map(([x, c, d]) => (
+          <rect key={x as number} className="ta-fall" style={{ animationDelay: `${d}s` }} x={x as number} y="-4" width="2.2" height="3.2" rx="0.4" fill={c as string} />
+        ))}
+      </g>
+    ),
+  },
+  'tag-bigode': {
+    icon: (
+      <g>
+        <path d="M8 7.4 C 6.6 5.6, 3.6 5.8, 2.4 7.8 C 1.6 9.2, 0.8 9.4, 0.4 8.8 C 0.6 11.4, 3.6 12.2, 6 10.8 C 7 10.2, 7.6 9.6, 8 9 C 8.4 9.6, 9 10.2, 10 10.8 C 12.4 12.2, 15.4 11.4, 15.6 8.8 C 15.2 9.4, 14.4 9.2, 13.6 7.8 C 12.4 5.8, 9.4 5.6, 8 7.4 Z" fill="#3f2a1d" stroke="#facc15" strokeWidth="0.6" strokeLinejoin="round" />
+        <path d="M3.6 8 C 4.6 7.2, 6 7.2, 6.8 8" fill="none" stroke="#fde68a" strokeOpacity="0.6" strokeWidth="0.5" />
+      </g>
+    ),
+    scene: (
+      <g>
+        <Loop cls="ta-scroll">
+          {Array.from({ length: 12 }, (_, i) => (
+            <path key={i} d={`M${i * 10} 20 L${i * 10 + 10} 0`} stroke="#facc15" strokeOpacity="0.14" strokeWidth="3" />
+          ))}
+        </Loop>
+        {[[90, 5], [104, 13], [114, 6]].map(([x, y], i) => (
+          <path key={i} className="ta-twinkle" style={{ animationDelay: `${i * 0.4}s`, transformOrigin: `${x}px ${y}px` }} d={`M${x} ${y - 2} L${x + 0.6} ${y - 0.6} L${x + 2} ${y} L${x + 0.6} ${y + 0.6} L${x} ${y + 2} L${x - 0.6} ${y + 0.6} L${x - 2} ${y} L${x - 0.6} ${y - 0.6} Z`} fill="#fde68a" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-ping': {
+    icon: (
+      <g>
+        <path d="M1.6 6 C 5.2 2.6, 10.8 2.6, 14.4 6" fill="none" stroke="#475569" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M3.8 8.4 C 6.2 6.2, 9.8 6.2, 12.2 8.4" fill="none" stroke="#475569" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M6.2 10.8 C 7.2 9.8, 8.8 9.8, 9.8 10.8" fill="none" stroke="#f87171" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="8" cy="13.2" r="1.1" fill="#f87171" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <rect key={i} className="ta-blink" style={{ animationDelay: `${i * 0.3}s` }} x={84 + i * 6} y={16 - i * 2.4} width="4" height={2 + i * 2.4} rx="0.8" fill={i < 1 ? '#f87171' : '#334155'} />
+        ))}
+        <rect className="ta-glitch" x="0" y="8" width="120" height="1.2" fill="#f87171" opacity="0.2" />
+      </g>
+    ),
+  },
+
+  // ============================================================ GAMES
+  'tag-hp-baixo': {
+    icon: (
+      <g>
+        <path d="M8 14 C 2 10, 1 6.5, 2.4 4.4 C 3.8 2.3, 6.6 2.6, 8 4.6 C 9.4 2.6, 12.2 2.3, 13.6 4.4 C 15 6.5, 14 10, 8 14 Z" fill="#334155" stroke={K} strokeWidth="0.9" strokeLinejoin="round" />
+        <path d="M8 14 C 2 10, 1 6.5, 2.4 4.4 C 3 3.5, 3.8 3, 4.8 3 V12 C 6 12.8, 7 13.4, 8 14 Z" fill="#ef4444" />
+      </g>
+    ),
+    scene: (
+      <g>
+        <rect x="76" y="7" width="38" height="6" rx="3" fill="#0b1020" stroke="#475569" strokeWidth="0.6" />
+        <rect className="ta-blink" x="77" y="8" width="7" height="4" rx="2" fill="#ef4444" />
+        {[0, 1, 2].map((i) => (
+          <circle key={i} className="ta-rise" style={{ animationDelay: `${i * 0.7}s` }} cx={14 + i * 22} cy="17" r="1" fill="#f87171" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-critical': {
+    icon: (
+      <g>
+        <path d="M8 0.8 L9.6 5.6 L14.8 4 L11.2 8 L15 11.6 L9.8 10.8 L8 15.2 L6.2 10.8 L1 11.6 L4.8 8 L1.2 4 L6.4 5.6 Z" fill="#fde047" stroke={K} strokeWidth="0.8" strokeLinejoin="round" />
+        <path d="M5 11 L11 5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round" />
+      </g>
+    ),
+    scene: (
+      <g className="ta-pulse" style={{ transformOrigin: '96px 10px' }}>
+        {Array.from({ length: 10 }, (_, i) => {
+          const a = (i / 10) * Math.PI * 2;
+          return <path key={i} d={`M${96 + Math.cos(a) * 4} ${10 + Math.sin(a) * 4} L${96 + Math.cos(a) * 14} ${10 + Math.sin(a) * 14}`} stroke="#fde047" strokeWidth="1.2" opacity="0.65" />;
+        })}
+      </g>
+    ),
+  },
+  'tag-speedrunner': {
+    icon: (
+      <g>
+        <circle cx="8" cy="9" r="5.6" fill="#e0f2fe" stroke={K} strokeWidth="0.9" />
+        <rect x="6.6" y="1.4" width="2.8" height="1.8" rx="0.4" fill="#94a3b8" stroke={K} strokeWidth="0.6" />
+        <path d="M8 9 L8 5.4 M8 9 L10.6 10.4" stroke="#dc2626" strokeWidth="1" strokeLinecap="round" />
+        <circle cx="8" cy="9" r="0.8" fill={K} />
+      </g>
+    ),
+    scene: (
+      <Loop cls="ta-scroll-fast">
+        {[[4, 5, 18], [26, 12, 26], [50, 7, 14], [70, 15, 22], [92, 9, 20]].map(([x, y, w], i) => (
+          <rect key={i} x={x} y={y} width={w} height="1.2" rx="0.6" fill="#7dd3fc" opacity="0.55" />
+        ))}
+      </Loop>
+    ),
+  },
+  'tag-boss-final': {
+    icon: (
+      <g>
+        <path d="M3 5 L1.6 1.4 L5 3.4 Z M13 5 L14.4 1.4 L11 3.4 Z" fill="#f87171" stroke={K} strokeWidth="0.6" />
+        <path d="M8 2.6 C 4.4 2.6, 2.6 5, 2.6 8 C 2.6 10.2, 3.6 11.6, 5 12.2 V14.6 H11 V12.2 C 12.4 11.6, 13.4 10.2, 13.4 8 C 13.4 5, 11.6 2.6, 8 2.6 Z" fill="#e5e7eb" stroke={K} strokeWidth="0.9" />
+        <circle cx="5.8" cy="8.2" r="1.5" fill="#dc2626" />
+        <circle cx="10.2" cy="8.2" r="1.5" fill="#dc2626" />
+        <path d="M6.6 14.6 V12.8 M8 14.6 V12.8 M9.4 14.6 V12.8" stroke={K} strokeWidth="0.6" />
+      </g>
+    ),
+    scene: (
+      <g>
+        <ellipse className="ta-pulse" cx="96" cy="12" rx="26" ry="10" fill="#7f1d1d" opacity="0.6" />
+        {[[80, 0], [92, 0.5], [104, 1], [112, 1.5], [70, 0.8]].map(([x, d]) => (
+          <circle key={x} className="ta-rise" style={{ animationDelay: `${d}s` }} cx={x} cy="18" r="0.9" fill="#fb923c" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-respawn': {
+    icon: (
+      <g>
+        <path d="M13 8 A5 5 0 1 1 11.2 4.2" fill="none" stroke="#86efac" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M10.4 1.8 L12.2 4.4 L9.2 5.2" fill="none" stroke="#86efac" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 6 V10 M6 8 H10" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[[86, 0], [96, 0.5], [106, 1], [114, 1.5], [76, 1.2]].map(([x, d]) => (
+          <path key={x} className="ta-rise" style={{ animationDelay: `${d}s` }} d={`M${x} 16 h3 M${x + 1.5} 14.5 v3`} stroke="#86efac" strokeWidth="0.9" />
+        ))}
+      </g>
+    ),
+  },
+
+  // ============================================================ K-POP / CINEMA / MÚSICA
+  'tag-main-vocal': {
+    icon: (
+      <g>
+        <circle cx="10" cy="5" r="3.4" fill="#e5e7eb" stroke={K} strokeWidth="0.9" />
+        <path d="M7.8 7.4 L2 13.6 L3.2 14.6 L9 8.6" fill="#a78bfa" stroke={K} strokeWidth="0.8" strokeLinejoin="round" />
+        <path d="M14 1 L14.5 2.4 L16 2.6 L14.8 3.4 L15.2 4.8 L14 4 L12.8 4.8 L13.2 3.4 L12 2.6 L13.5 2.4 Z" fill="#fde047" />
+      </g>
+    ),
+    scene: (
+      <g>
+        <path className="ta-pulse" d="M70 0 L92 0 L106 20 L56 20 Z" fill="#f5d0fe" opacity="0.18" />
+        {[0, 1, 2].map((i) => (
+          <path key={i} className="ta-wave" style={{ animationDelay: `${i * 0.3}s`, transformOrigin: '100px 10px' }} d={`M84 10 Q 90 ${4 + i * 2} 96 10 T 108 10 T 120 10`} fill="none" stroke="#e9d5ff" strokeWidth="0.9" opacity="0.7" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-stan': {
+    icon: (
+      <g>
+        <path d="M8 1.6 L13.6 3.6 V7.6 C 13.6 11, 11 13.6, 8 14.8 C 5 13.6, 2.4 11, 2.4 7.6 V3.6 Z" fill="#7c3aed" stroke={K} strokeWidth="0.9" strokeLinejoin="round" />
+        <path d="M8 11.4 C 5.4 9.8, 4.8 8.2, 5.4 7.2 C 6 6.2, 7.2 6.4, 8 7.4 C 8.8 6.4, 10 6.2, 10.6 7.2 C 11.2 8.2, 10.6 9.8, 8 11.4 Z" fill="#f9a8d4" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {[14, 40, 66, 92, 114].map((x, i) => (
+          <path key={x} className="ta-rise" style={{ animationDelay: `${i * 0.5}s` }} d={`M${x} 18 c -2.4 -1.6 -2.8 -3.2 -2 -4 c 0.8 -0.8 1.6 -0.5 2 0.2 c 0.4 -0.7 1.2 -1 2 -0.2 c 0.8 0.8 0.4 2.4 -2 4 Z`} fill={i % 2 ? '#c084fc' : '#f9a8d4'} />
+        ))}
+      </g>
+    ),
+  },
+  'tag-pos-creditos': {
+    icon: (
+      <g>
+        <rect x="1.6" y="6" width="12.8" height="8.4" rx="1" fill="#1f2937" stroke={K} strokeWidth="0.9" />
+        <path d="M1.6 6 L13.4 2.4 L14.2 5 L2.4 8.6" fill="#f8fafc" stroke={K} strokeWidth="0.8" strokeLinejoin="round" />
+        <path d="M4.4 5.2 L5.8 7.6 M8 4.2 L9.4 6.6 M11.4 3.2 L12.8 5.6" stroke={K} strokeWidth="0.8" />
+        <circle cx="12" cy="11.6" r="1.2" fill="#facc15" />
+      </g>
+    ),
+    scene: (
+      <g className="ta-credits">
+        {Array.from({ length: 8 }, (_, i) => (
+          <rect key={i} x={i % 2 ? 84 : 80} y={i * 6} width={i % 2 ? 22 : 30} height="1.4" rx="0.7" fill="#e5e7eb" opacity="0.35" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-trilha': {
+    icon: (
+      <g>
+        <path d="M2.6 10 V8 C 2.6 4.6, 5 2.2, 8 2.2 C 11 2.2, 13.4 4.6, 13.4 8 V10" fill="none" stroke={K} strokeWidth="1.4" />
+        <rect x="1.6" y="9" width="3.4" height="5.4" rx="1.4" fill="#34d399" stroke={K} strokeWidth="0.8" />
+        <rect x="11" y="9" width="3.4" height="5.4" rx="1.4" fill="#34d399" stroke={K} strokeWidth="0.8" />
+      </g>
+    ),
+    scene: (
+      <g>
+        {Array.from({ length: 9 }, (_, i) => (
+          <rect key={i} className="ta-eq" style={{ animationDelay: `${(i % 4) * 0.18}s`, transformOrigin: `${78 + i * 4.4}px 18px` }} x={78 + i * 4.4} y="6" width="2.6" height="12" rx="1.2" fill="#6ee7b7" opacity="0.6" />
+        ))}
+      </g>
+    ),
+  },
+  'tag-encore': {
+    icon: (
+      <g>
+        <rect x="5.6" y="7" width="4.8" height="8" rx="1" fill="#94a3b8" stroke={K} strokeWidth="0.8" />
+        <path className="ta-flicker" d="M8 1 C 6 3.6, 6.4 5.4, 8 6.6 C 9.6 5.4, 10 3.6, 8 1 Z" fill="#fb923c" stroke={K} strokeWidth="0.6" />
+        <path d="M8 3.6 C 7.4 4.6, 7.6 5.4, 8 5.8 C 8.4 5.4, 8.6 4.6, 8 3.6 Z" fill="#fde047" />
+      </g>
+    ),
+    scene: (
+      <g>
+        <g className="ta-swing" style={{ transformOrigin: '86px -2px' }}>
+          <path d="M86 -2 L74 22 L98 22 Z" fill="#fef08a" opacity="0.2" />
+        </g>
+        {Array.from({ length: 10 }, (_, i) => (
+          <circle key={i} className="ta-pulse" style={{ animationDelay: `${(i % 4) * 0.22}s`, transformOrigin: `${62 + i * 6}px ${16 + (i % 2) * 2}px` }} cx={62 + i * 6} cy={16 + (i % 2) * 2} r="1.4" fill="#fde68a" opacity="0.8" />
+        ))}
+      </g>
+    ),
+  },
 };

@@ -14,7 +14,8 @@ export interface NewsSource {
 }
 
 /** Busca do Google News (agrega os grandes portais) para temas sem feed próprio bom. */
-const gnews = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+// when:2d = só matérias dos últimos 2 dias (sem isso vem muita coisa velha)
+const gnews = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(`${q} when:2d`)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
 
 export const NEWS_SOURCES: NewsSource[] = [
   // ---- portais gerais
@@ -38,7 +39,7 @@ export const NEWS_SOURCES: NewsSource[] = [
   // ---- economia, games, cultura
   { id: 'infomoney', name: 'InfoMoney', home: 'https://www.infomoney.com.br', url: 'https://www.infomoney.com.br/feed/', kind: 'rss', topics: ['economia'], weight: 1.05 },
   { id: 'ign-brasil', name: 'IGN Brasil', home: 'https://br.ign.com', url: 'https://br.ign.com/feed.xml', kind: 'rss', topics: ['games'], weight: 1.05 },
-  { id: 'jovem-nerd', name: 'Jovem Nerd', home: 'https://jovemnerd.com.br', url: 'https://jovemnerd.com.br/feed/', kind: 'rss', topics: ['cultura-pop'], weight: 1.0 },
+  { id: 'gn-cultura-pop', name: 'Google News', home: 'https://news.google.com', url: gnews('anime OR Marvel OR quadrinhos OR "cultura pop"'), kind: 'gnews', topics: ['cultura-pop'], weight: 0.9 },
   // ---- Google News por tema (os melhores portais para temas de nicho)
   { id: 'gn-ia', name: 'Google News', home: 'https://news.google.com', url: gnews('inteligência artificial'), kind: 'gnews', topics: ['ia'], weight: 0.95 },
   { id: 'gn-espaco', name: 'Google News', home: 'https://news.google.com', url: gnews('NASA OR SpaceX OR astronomia'), kind: 'gnews', topics: ['espaco'], weight: 0.95 },
@@ -48,5 +49,6 @@ export const NEWS_SOURCES: NewsSource[] = [
   { id: 'gn-cinema', name: 'Google News', home: 'https://news.google.com', url: gnews('filme série estreia Netflix'), kind: 'gnews', topics: ['cinema'], weight: 0.9 },
   { id: 'gn-futebol', name: 'Google News', home: 'https://news.google.com', url: gnews('futebol brasileirão'), kind: 'gnews', topics: ['futebol'], weight: 0.9 },
   { id: 'gn-games', name: 'Google News', home: 'https://news.google.com', url: gnews('games lançamento PlayStation Xbox Nintendo'), kind: 'gnews', topics: ['games'], weight: 0.9 },
+  { id: 'gn-ciencia', name: 'Google News', home: 'https://news.google.com', url: gnews('ciência descoberta cientistas'), kind: 'gnews', topics: ['ciencia'], weight: 0.9 },
   { id: 'gn-saude', name: 'Google News', home: 'https://news.google.com', url: gnews('saúde pesquisa medicina'), kind: 'gnews', topics: ['saude'], weight: 0.9 },
 ];

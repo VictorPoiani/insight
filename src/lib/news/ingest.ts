@@ -15,6 +15,27 @@ const UA = 'Mozilla/5.0 (compatible; InsightNews/1.0; +https://www.insight.app.b
 const TIMEOUT_MS = 8000;
 const CONCURRENCY = 8;
 
+/**
+ * Decodifica pelo charset declarado (cabeçalho HTTP ou <?xml encoding?>).
+ * Vários portais (ex.: Folha) ainda publicam em ISO-8859-1/Windows-1252;
+ * ler como UTF-8 gera "B�lgica".
+ */
+export function decodeBody(bytes: Uint8Array, contentType: string | null): string {
+  const fromHeader = contentType?.match(/charset=["']?([\w-]+)/i)?.[1];
+  const head = new TextDecoder('latin1').decode(bytes.slice(0, 300));
+  const fromXml = head.match(/<\?xml[^>]*encoding=["']([\w-]+)["']/i)?.[1];
+  let charset = (fromXml || fromHeader || 'utf-8').toLowerCase();
+  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252'; // superconjunto (aspas curvas, travessão)
+  try {
+    const text = new TextDecoder(charset).decode(bytes);
+    // declarou UTF-8 mas não é: tenta windows-1252
+    if (charset === 'utf-8' && text.includes('\uFFFD')) return new TextDecoder('windows-1252').decode(bytes);
+    return text;
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
+
 async function fetchText(url: string): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -25,7 +46,7 @@ async function fetchText(url: string): Promise<string> {
       cache: 'no-store',
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
+    return decodeBody(new Uint8Array(await res.arrayBuffer()), res.headers.get('content-type'));
   } finally {
     clearTimeout(t);
   }

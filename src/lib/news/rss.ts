@@ -89,6 +89,8 @@ export function parseFeed(xml: string, max = 25): ParsedItem[] {
     if (summary.startsWith(title)) summary = summary.slice(title.length).replace(/^[\s\-–—:]+/, '');
     if (publisher && summary.endsWith(publisher)) summary = summary.slice(0, -publisher.length).trim();
     if (summary && title.toLowerCase().startsWith(summary.toLowerCase())) summary = '';
+    // chamadas de "leia mais" que os portais colam no fim
+    summary = summary.replace(/\s*(\[\s*(…|\.\.\.)\s*\]|leia mais\W*|continue lendo\W*|leia a matéria completa\W*|the post .+ appeared first on .+)$/i, '').trim();
 
     out.push({
       title: title.slice(0, 300),

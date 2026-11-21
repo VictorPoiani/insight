@@ -639,7 +639,7 @@ export function PostCard({
           />
         </div>
       ) : hasRichBlocks ? (
-        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base text-primary leading-relaxed items-start break-words">
+        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
           {blocksState.map((b, idx) => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
@@ -1186,7 +1186,7 @@ export function PostCard({
       ) : (
         <>
           {postContent && (
-            <div className="mt-4 text-sm sm:text-base text-primary whitespace-pre-line leading-relaxed break-words">
+            <div className="mt-4 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary whitespace-pre-line leading-relaxed break-words">
               {postContent}
             </div>
           )}

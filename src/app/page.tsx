@@ -6,6 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
+import { NewsCard } from '@/components/news/NewsCard';
+import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
+import { useNewsFeed, useNewsFollows, type NewsItem } from '@/components/news/useNews';
 import { PostComposer } from '@/components/feed/PostComposer';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
@@ -110,7 +113,7 @@ function CommunityHomeFeed() {
   const [followLoadingId, setFollowLoadingId] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'for_you' | 'following' | 'members'>('for_you');
+  const [activeTab, setActiveTab] = useState<'for_you' | 'news' | 'following' | 'members'>('for_you');
   const [tabSwitching, setTabSwitching] = useState(false);
   const [search, setSearch] = useState('');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -132,7 +135,7 @@ function CommunityHomeFeed() {
     if (tParam !== null) setSelectedTag(tParam.toLowerCase());
   }, [searchParams]);
 
-  function handleSelectTab(nextTab: 'for_you' | 'following' | 'members') {
+  function handleSelectTab(nextTab: 'for_you' | 'news' | 'following' | 'members') {
     if (nextTab === activeTab) return;
     setActiveTab(nextTab);
     setTabSwitching(true);
@@ -348,6 +351,41 @@ function CommunityHomeFeed() {
     });
   }, [posts, profilesMap, activeTab, followingIds, loggedProfile, selectedTag, query]);
 
+  // ---------------------------------------------------- notícias no Para você
+  // Só temas que a pessoa segue; a aba Notícias mostra todos.
+  const newsFollows = useNewsFollows(loggedProfile?.id ?? null);
+  const mixNews = activeTab === 'for_you' && !selectedTag && !search.trim() && Boolean(loggedProfile);
+  const followsKey = Array.from(newsFollows.follows).sort().join(',');
+  const forYouNews = useNewsFeed('for_you', {
+    enabled: mixNews && newsFollows.follows.size > 0,
+    pageSize: 15,
+    version: followsKey,
+  });
+  // o convite para escolher temas fica até sair da página (dá para marcar vários)
+  const [showNewsOnboarding, setShowNewsOnboarding] = useState(false);
+  useEffect(() => {
+    if (mixNews && newsFollows.ready && newsFollows.follows.size === 0) setShowNewsOnboarding(true);
+  }, [mixNews, newsFollows.ready, newsFollows.follows.size]);
+
+  type FeedEntry = { kind: 'post'; post: Post } | { kind: 'news'; item: NewsItem } | { kind: 'onboarding' };
+  const mixedFeed = useMemo<FeedEntry[]>(() => {
+    const out: FeedEntry[] = [];
+    const news = mixNews ? forYouNews.items : [];
+    const onboarding = mixNews && showNewsOnboarding;
+    let k = 0;
+    filteredPosts.forEach((post, i) => {
+      out.push({ kind: 'post', post });
+      if (onboarding && i === 2) out.push({ kind: 'onboarding' });
+      // uma notícia a cada 4 posts
+      if ((i + 1) % 4 === 0 && k < news.length) out.push({ kind: 'news', item: news[k++] });
+    });
+    if (onboarding && filteredPosts.length < 3) out.push({ kind: 'onboarding' });
+    // feed curto: completa com mais algumas notícias
+    const extra = filteredPosts.length < 12 ? 6 : 2;
+    for (let n = 0; n < extra && k < news.length; n++) out.push({ kind: 'news', item: news[k++] });
+    return out;
+  }, [filteredPosts, forYouNews.items, mixNews, showNewsOnboarding]);
+
   const carouselMembers = useMemo(() => {
     return filteredProfiles;
   }, [filteredProfiles]);
@@ -373,6 +411,22 @@ function CommunityHomeFeed() {
               {tabSwitching && activeTab === 'for_you' && <AsteriskLoader size="xs" />}
               <span>Para você</span>
               {activeTab === 'for_you' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectTab('news')}
+              className={`py-3 relative transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === 'news'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
+              }`}
+            >
+              {tabSwitching && activeTab === 'news' && <AsteriskLoader size="xs" />}
+              <span>Notícias</span>
+              {activeTab === 'news' && (
                 <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
               )}
             </button>
@@ -512,7 +566,7 @@ function CommunityHomeFeed() {
       )}
 
       {/* 3. PÍLULAS DE HASHTAGS EM ALTA */}
-      {activeTab !== 'members' && trendingTags.length > 0 && (
+      {activeTab !== 'members' && activeTab !== 'news' && trendingTags.length > 0 && (
         <div
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           className="px-4 sm:px-6 py-2 border-b border-border flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
@@ -560,6 +614,8 @@ function CommunityHomeFeed() {
           size="md"
           label={loading ? 'Sincronizando comunidade...' : undefined}
         />
+      ) : activeTab === 'news' ? (
+        <NewsFeed profileId={loggedProfile?.id ?? null} />
       ) : activeTab === 'members' ? (
         <div className="divide-y divide-border">
           {filteredProfiles.length === 0 ? (
@@ -756,7 +812,7 @@ function CommunityHomeFeed() {
             </section>
           )}
 
-          {filteredPosts.length === 0 ? (
+          {filteredPosts.length === 0 && !mixNews ? (
             <div className="py-16 px-6 text-center space-y-2">
               <p className="text-sm font-bold text-primary">
                 {activeTab === 'following'
@@ -771,7 +827,31 @@ function CommunityHomeFeed() {
             </div>
           ) : (
             <div>
-              {filteredPosts.map((post) => {
+              {mixedFeed.map((entry) => {
+                if (entry.kind === 'news') {
+                  return (
+                    <NewsCard
+                      key={`news-${entry.item.id}`}
+                      item={entry.item}
+                      onPatch={forYouNews.patch}
+                      follows={newsFollows.follows}
+                      onToggleFollow={(t) => void newsFollows.toggle(t)}
+                    />
+                  );
+                }
+                if (entry.kind === 'onboarding') {
+                  return (
+                    <div key="news-onboarding" className="px-4 sm:px-6 py-5 border-b border-border bg-gradient-to-br from-accent/10 via-transparent to-transparent">
+                      <NewsTopicPicker
+                        follows={newsFollows.follows}
+                        onToggle={(t) => void newsFollows.toggle(t)}
+                        title="Notícias no seu Para você"
+                        hint="Siga temas e as melhores notícias deles aparecem aqui, entre os posts. Na aba Notícias tem de tudo."
+                      />
+                    </div>
+                  );
+                }
+                const post = entry.post;
                 const ownerId = post.profile_id || post.author_id;
                 const postAuthor = profilesMap[ownerId] || profiles[0];
                 if (!postAuthor) return null;

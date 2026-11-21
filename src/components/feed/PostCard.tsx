@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle } from '@/lib/grid';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
+import { PostTime } from './PostTime';
 import { PostComposer } from './PostComposer';
 import { SharePostModal } from './SharePostModal';
 import {
@@ -496,12 +497,6 @@ export function PostCard({
 
   const displayedRepliesCount = repliesCountOverride ?? repliesCount;
 
-  const formattedDate = new Date(post.created_at).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-
   const authorProfileHref = getProfileHref(author.id, author.username);
 
   return (
@@ -561,9 +556,7 @@ export function PostCard({
                 <CosmeticTag profile={author} />
               </span>
             </div>
-            <time className="text-[11px] sm:text-xs text-muted block">
-              {formattedDate}
-            </time>
+            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
           </div>
         </Link>
 

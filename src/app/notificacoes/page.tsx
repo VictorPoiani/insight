@@ -19,10 +19,13 @@ import {
   LogIn,
   ShieldCheck,
   Trash2,
+  Settings2,
+  BarChart3,
 } from 'lucide-react';
+import { NotificationSettings } from '@/components/notifications/NotificationSettings';
 
 type MainBoxTab = 'inbox' | 'official';
-type InteractionFilter = 'all' | 'like' | 'reply' | 'follow' | 'repost' | 'new_post';
+type InteractionFilter = 'all' | 'like' | 'reply' | 'poll_vote' | 'follow' | 'repost' | 'new_post';
 
 interface NotificationItem {
   id: string;
@@ -67,6 +70,7 @@ export default function NotificationsPage() {
 
   const [mainTab, setMainTab] = useState<MainBoxTab>('inbox');
   const [typeFilter, setTypeFilter] = useState<InteractionFilter>('all');
+  const [showSettings, setShowSettings] = useState(false);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [officialUpdates, setOfficialUpdates] = useState<OfficialUpdateRow[]>([]);
@@ -273,6 +277,12 @@ export default function NotificationsPage() {
           iconClass: 'text-accent',
           actionText: 'respondeu ao seu insight',
         };
+      case 'poll_vote':
+        return {
+          icon: BarChart3,
+          iconClass: 'text-amber-400',
+          actionText: 'votou na sua enquete',
+        };
       case 'follow':
         return {
           icon: UserPlus,
@@ -304,6 +314,7 @@ export default function NotificationsPage() {
     { id: 'all', label: 'Todas' },
     { id: 'like', label: 'Curtidas' },
     { id: 'reply', label: 'Respostas' },
+    { id: 'poll_vote', label: 'Enquetes' },
     { id: 'follow', label: 'Seguidores' },
     { id: 'repost', label: 'Reposts' },
     { id: 'new_post', label: 'Novas Postagens' },
@@ -333,6 +344,21 @@ export default function NotificationsPage() {
                 <CheckCheck className="w-3.5 h-3.5 text-accent" />
                 <span className="hidden sm:inline">Marcar todas como lidas</span>
                 <span className="sm:hidden">Ler tudo</span>
+              </button>
+            )}
+
+            {myProfile && (
+              <button
+                type="button"
+                onClick={() => setShowSettings((v) => !v)}
+                title="Escolher o que aparece aqui"
+                aria-label="Configurar notificações"
+                aria-pressed={showSettings}
+                className={`p-2 rounded-full transition-colors ${
+                  showSettings ? 'text-accent bg-surface' : 'text-muted hover:text-primary hover:bg-surface'
+                }`}
+              >
+                <Settings2 className="w-4 h-4" />
               </button>
             )}
 
@@ -389,6 +415,8 @@ export default function NotificationsPage() {
           </button>
         </div>
       </header>
+
+      {showSettings && myProfile && <NotificationSettings profileId={myProfile.id} />}
 
       {/* 2. BARRA DE FILTROS POR TIPO (Apenas em Minha Caixa) */}
       {mainTab === 'inbox' && myProfile && (

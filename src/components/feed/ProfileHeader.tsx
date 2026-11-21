@@ -1,6 +1,7 @@
 'use client';
 
 import { ShareProfileModal } from '@/components/feed/SharePostModal';
+import { FollowListModal, type FollowTab } from '@/components/feed/FollowListModal';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -525,6 +526,7 @@ export function ProfileHeader({
   const [isFollowingProfile, setIsFollowingProfile] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followingCount, setFollowingCount] = useState(0);
+  const [followList, setFollowList] = useState<FollowTab | null>(null);
 
   // Estados de Status do Utilizador
   const [statusId, setStatusId] = useState<string>(
@@ -1483,13 +1485,13 @@ export function ProfileHeader({
 
           <div className="flex items-center gap-2.5 sm:gap-3 ml-auto shrink-0">
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-secondary whitespace-nowrap">
-              <span>
+              <button type="button" onClick={() => setFollowList('following')} className="hover:underline underline-offset-2" title="Ver quem este perfil segue">
                 <b className="text-primary font-bold">{followingCount}</b> Seguindo
-              </span>
-              <span>
+              </button>
+              <button type="button" onClick={() => setFollowList('followers')} className="hover:underline underline-offset-2" title="Ver seguidores">
                 <b className="text-primary font-bold">{followersCount}</b>{' '}
                 Seguidores
-              </span>
+              </button>
               <span>
                 <b className="text-primary font-bold">{postsCount}</b> Posts
               </span>
@@ -1521,6 +1523,16 @@ export function ProfileHeader({
               <Share2 className="w-3.5 h-3.5" />
             </button>
             <ShareProfileModal isOpen={shareProfileOpen} onClose={() => setShareProfileOpen(false)} profile={profile} />
+            {followList && (
+              <FollowListModal
+                profileId={profile.id}
+                profileName={profile.display_name || profile.full_name || profile.username}
+                viewerId={loggedUserProfile?.id ?? null}
+                initialTab={followList}
+                onClose={() => setFollowList(null)}
+                onViewerFollowChange={() => void refreshTotalFollowersCount()}
+              />
+            )}
 
             {isOwnProfile && (
               <Link

@@ -7,7 +7,8 @@ import { Profile } from '@/types/database';
 import { ReplyComposer, ReplySubmitPayload } from './ReplyComposer';
 import { ReplyBlocks } from './ReplyBlocks';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
-import { ReplyNode, formatRelativeTime, getReplyAuthorHref } from './utils';
+import { ReplyNode, getReplyAuthorHref } from './utils';
+import { PostTime } from '@/components/feed/PostTime';
 
 /** A partir desta profundidade não indentamos mais (evita "escadinha" no mobile). */
 const MAX_INDENT_DEPTH = 4;
@@ -134,13 +135,7 @@ function ReplyItem({
             <span className="text-muted truncate">@{node.author_handle || 'membro'}</span>
             <CosmeticTag profile={authorProfile} className="shrink-0" />
             <span className="text-muted">·</span>
-            <time
-              dateTime={node.created_at}
-              title={new Date(node.created_at).toLocaleString('pt-BR')}
-              className="text-muted shrink-0"
-            >
-              {formatRelativeTime(node.created_at)}
-            </time>
+            <PostTime iso={node.created_at} className="text-muted shrink-0 truncate" />
           </div>
 
           {showReplyingTo && (

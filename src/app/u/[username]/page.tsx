@@ -15,6 +15,7 @@ import {
 } from '@/components/feed/TopicTabsManager';
 import { PostComposer } from '@/components/feed/PostComposer';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
+import { ProfileReposts } from '@/components/feed/ProfileReposts';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
 import {
   ShieldAlert,
@@ -422,7 +423,7 @@ function UserProfileContent() {
       />
 
       {/* 3. Filtro de Visibilidade (Todos / Públicos / Privados) para o Dono do Perfil */}
-      {canManageProfile && (
+      {canManageProfile && activeTab.id !== 'reposts' && (
         <div className="px-4 sm:px-6 py-2.5 border-b border-border bg-surface/30 flex flex-wrap items-center justify-between gap-2">
           <span className="text-[11px] font-bold text-secondary uppercase tracking-wider">
             Visibilidade do Mural
@@ -491,7 +492,7 @@ function UserProfileContent() {
       )}
 
       {/* 4. Editor de Blocos (Exibido para o dono do perfil) */}
-      {canManageProfile && (
+      {canManageProfile && activeTab.id !== 'reposts' && (
         <PostComposer
           authorId={profile.id}
           isAdmin={canManageProfile}
@@ -501,7 +502,13 @@ function UserProfileContent() {
       )}
 
       {/* 5. Lista de Publicações com Animação do Asterisco na Troca de Aba */}
-      {tabSwitching ? (
+      {activeTab.id === 'reposts' && !tabSwitching ? (
+        <ProfileReposts
+          profile={profile}
+          viewerIsOwner={isOwner}
+          renderLoader={() => <ProfileAsteriskLoader size="md" color={activeTab.color} />}
+        />
+      ) : tabSwitching ? (
         <ProfileAsteriskLoader size="md" color={activeTab.color} />
       ) : visiblePosts.length === 0 ? (
         <div className="py-16 text-center text-xs text-muted">

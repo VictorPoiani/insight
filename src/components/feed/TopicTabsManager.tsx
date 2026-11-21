@@ -107,17 +107,14 @@ export interface FeedTabItem {
   inDevelopment?: boolean;
 }
 
+/** Abas padrão de todo perfil: Principal · Coleção (em desenvolvimento) · Reposts. */
 export const DEFAULT_TABS: FeedTabItem[] = [
   { id: 'principal', label: 'Principal', tag: null, color: '#2563eb', isDefault: true },
-  { id: 'professional', label: 'Professional', tag: 'professional', color: '#71717a', isDefault: true, inDevelopment: true },
-  { id: 'jardim', label: 'Jardim', tag: 'jardim', color: '#71717a', isDefault: true, inDevelopment: true },
-  { id: 'reposts', label: 'Reposts', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
+  { id: 'colecao', label: 'Coleção', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
+  { id: 'reposts', label: 'Reposts', tag: null, color: '#1DB954', isDefault: true },
 ];
 
-export const GENERIC_USER_DEFAULT_TABS: FeedTabItem[] = [
-  { id: 'principal', label: 'Principal', tag: null, color: '#2563eb', isDefault: true },
-  { id: 'reposts', label: 'Reposts', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
-];
+export const GENERIC_USER_DEFAULT_TABS: FeedTabItem[] = DEFAULT_TABS;
 
 const TOPIC_COLORS = [
   '#2563eb',
@@ -820,7 +817,7 @@ export function TopicTabsManager({
 
                   {isDev && (
                     <span className="px-1.5 py-0.2 rounded bg-elevated border border-border text-[9px] font-mono font-medium text-muted">
-                      Em breve
+                      Em desenvolvimento
                     </span>
                   )}
 

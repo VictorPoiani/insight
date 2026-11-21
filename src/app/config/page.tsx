@@ -129,8 +129,6 @@ const NEWSLETTER_TAGS = [
   'rock',
   'musica',
   'artigue',
-  'professional',
-  'jardim',
 ];
 
 const DEFAULT_PREFS: UserPreferences = {

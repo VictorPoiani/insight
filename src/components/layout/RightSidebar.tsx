@@ -41,7 +41,6 @@ const DEFAULT_TOPICS = [
   'rock',
   'musica',
   'artigue',
-  'jardim',
 ];
 
 type NewsCategoryId = 'tech' | 'games' | 'science' | 'music' | 'sports' | 'world';
@@ -450,7 +449,7 @@ export function RightSidebar() {
   }
 
   const displayedTopics = showAllTopics
-    ? [...DEFAULT_TOPICS, 'professional', 'python', 'nextjs']
+    ? [...DEFAULT_TOPICS, 'python', 'nextjs']
     : DEFAULT_TOPICS;
 
   const currentNews =

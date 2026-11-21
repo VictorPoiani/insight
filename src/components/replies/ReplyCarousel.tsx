@@ -1,8 +1,9 @@
 'use client';
+import { PostTime } from '@/components/feed/PostTime';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Heart, MessageCircle, Music, Flame } from 'lucide-react';
-import { ReplyNode, formatRelativeTime } from './utils';
+import { ReplyNode } from './utils';
 import { CosmeticAvatar, CosmeticName } from '@/components/nitro/Cosmetics';
 import type { AuthorProfiles } from './ReplyThread';
 
@@ -109,7 +110,7 @@ export function ReplyCarousel({ replies, likedIds, onSelect, onToggleLike, autho
                     </CosmeticName>
                   </p>
                   <p className="text-[11px] text-muted truncate">
-                    @{reply.author_handle || 'membro'} · {formatRelativeTime(reply.created_at)}
+                    @{reply.author_handle || 'membro'} · <PostTime iso={reply.created_at} />
                   </p>
                 </div>
               </div>

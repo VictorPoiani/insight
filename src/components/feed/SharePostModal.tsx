@@ -1,20 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Download, Link2, Lock, Share2, X } from 'lucide-react';
 import { Post, Profile } from '@/types/database';
-import {
-  X,
-  Link2,
-  Check,
-  Copy,
-  Share2,
-  Sparkles,
-  ShieldCheck,
-  MessageCircle,
-  Send,
-  Quote,
-  Smartphone,
-} from 'lucide-react';
+import { SHARE_THEMES, ShareFormat } from '@/lib/share/themes';
 
 interface SharePostModalProps {
   isOpen: boolean;
@@ -23,687 +12,363 @@ interface SharePostModalProps {
   author: Profile;
 }
 
-type CardThemeId = 'obsidian' | 'blueprint' | 'editorial';
+const FORMATS: { id: ShareFormat; label: string; hint: string }[] = [
+  { id: 'story', label: 'Stories', hint: '9:16 · Instagram, WhatsApp, Facebook' },
+  { id: 'square', label: 'Quadrado', hint: '1:1 · feed, Threads, X' },
+  { id: 'og', label: 'Link', hint: 'Prévia que aparece ao colar o link' },
+];
 
-interface CardThemeConfig {
-  id: CardThemeId;
-  label: string;
-  bgStart: string;
-  bgEnd: string;
-  border: string;
-  textPrimary: string;
-  textSecondary: string;
-  textMuted: string;
-  accent: string;
-  badgeBg: string;
-}
-
-const CARD_THEMES: Record<CardThemeId, CardThemeConfig> = {
-  obsidian: {
-    id: 'obsidian',
-    label: 'Obsidian',
-    bgStart: '#111318',
-    bgEnd: '#09090b',
-    border: '#27272a',
-    textPrimary: '#f4f4f5',
-    textSecondary: '#d4d4d8',
-    textMuted: '#71717a',
-    accent: '#3898ec',
-    badgeBg: 'rgba(56, 152, 236, 0.14)',
+/** Ícones das redes (desenhados aqui, sem depender de marcas no lucide). */
+const NETWORKS: { id: string; label: string; color: string; path: string; href: (url: string, text: string) => string }[] = [
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    color: '#25D366',
+    path: 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.6-.1 1.1Z',
+    href: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
-  blueprint: {
-    id: 'blueprint',
-    label: 'Blueprint *',
-    bgStart: '#0c192c',
-    bgEnd: '#070b14',
-    border: '#1e3a5f',
-    textPrimary: '#f8fafc',
-    textSecondary: '#cbd5e1',
-    textMuted: '#64748b',
-    accent: '#38bdf8',
-    badgeBg: 'rgba(56, 189, 248, 0.16)',
+  {
+    id: 'telegram',
+    label: 'Telegram',
+    color: '#29A9EB',
+    path: 'M21.8 4.3 18.6 19.5c-.2 1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13.2l-4.8-1.5c-1-.3-1-1 .2-1.5l18.8-7.2c.9-.3 1.6.2 1.4 1.3Z',
+    href: (url, text) => `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
   },
-  editorial: {
-    id: 'editorial',
-    label: 'Editorial',
-    bgStart: '#ffffff',
-    bgEnd: '#f4f7fb',
-    border: '#cbd5e1',
-    textPrimary: '#0f172a',
-    textSecondary: '#334155',
-    textMuted: '#64748b',
-    accent: '#2563eb',
-    badgeBg: 'rgba(37, 99, 235, 0.10)',
+  {
+    id: 'x',
+    label: 'X',
+    color: '#e7e9ea',
+    path: 'M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L1.8 3h6.4l4.4 5.8L17.8 3Zm-1.1 16.2h1.7L7.3 4.7H5.5l11.2 14.5Z',
+    href: (url, text) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
   },
-};
+  {
+    id: 'threads',
+    label: 'Threads',
+    color: '#ffffff',
+    path: 'M16.7 11.1c-.1 0-.2-.1-.3-.1-.2-3-1.8-4.7-4.6-4.7-1.6 0-3 .7-3.8 2l1.5 1c.6-.9 1.6-1.1 2.3-1.1 1 0 1.7.3 2.2.9.3.4.5 1 .6 1.7-.8-.1-1.6-.2-2.5-.1-2.5.1-4.1 1.6-4 3.6.1 1 .6 1.9 1.4 2.4.7.5 1.6.7 2.6.6 1.3-.1 2.3-.6 3-1.5.5-.7.9-1.6 1-2.7.6.4 1.1.9 1.3 1.5.4 1 .4 2.6-.9 3.9-1.1 1.1-2.5 1.6-4.6 1.6-2.3 0-4.1-.8-5.2-2.2-1.1-1.4-1.6-3.3-1.7-5.8 0-2.5.6-4.4 1.7-5.8 1.1-1.4 2.9-2.2 5.2-2.2 2.4 0 4.2.8 5.3 2.2.6.7 1 1.6 1.3 2.6l1.8-.5c-.4-1.3-.9-2.4-1.7-3.3-1.5-1.8-3.7-2.8-6.7-2.8-2.9 0-5.2 1-6.7 2.9C4.3 7.8 3.6 10.1 3.6 13s.7 5.2 2.1 6.9C7.2 21.8 9.5 22.8 12.4 22.8c2.6 0 4.4-.7 5.9-2.2 2-2 1.9-4.4 1.3-5.9-.5-1.1-1.5-2.1-2.9-2.7v-.9Zm-4.4 4.6c-1.1.1-2.2-.4-2.2-1.4-.1-.7.5-1.6 2.3-1.7h.6c.6 0 1.1.1 1.6.2-.2 2.4-1.3 2.9-2.3 2.9Z',
+    href: (url, text) => `https://www.threads.net/intent/post?text=${encodeURIComponent(`${text} ${url}`)}`,
+  },
+  {
+    id: 'facebook',
+    label: 'Facebook',
+    color: '#1877F2',
+    path: 'M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7A10 10 0 0 0 22 12Z',
+    href: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    color: '#0A66C2',
+    path: 'M20.4 2H3.6A1.6 1.6 0 0 0 2 3.6v16.8A1.6 1.6 0 0 0 3.6 22h16.8a1.6 1.6 0 0 0 1.6-1.6V3.6A1.6 1.6 0 0 0 20.4 2ZM8 19H5V9.5h3V19ZM6.5 8.2a1.7 1.7 0 1 1 0-3.5 1.7 1.7 0 0 1 0 3.5ZM19 19h-3v-4.6c0-1.1 0-2.5-1.5-2.5S12.7 13 12.7 14.3V19h-3V9.5h2.8v1.3h.1a3.1 3.1 0 0 1 2.8-1.5c3 0 3.6 2 3.6 4.6V19Z',
+    href: (url) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+  },
+];
 
-function stripHtmlToCleanText(html?: string | null): string {
-  if (!html) return '';
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim();
+function plainText(post: Post) {
+  const raw =
+    post.content?.trim() ||
+    (Array.isArray(post.blocks) ? post.blocks.map((b) => (b.html || '').replace(/<[^>]+>/g, ' ')).join(' ') : '');
+  return raw.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function loadCorsImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
+export function SharePostModal({ isOpen, onClose, post, author }: SharePostModalProps) {
+  const [format, setFormat] = useState<ShareFormat>('story');
+  const [themeId, setThemeId] = useState(SHARE_THEMES[0].id);
+  const [imgState, setImgState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [copied, setCopied] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const blobRef = useRef<Blob | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
-function wrapStickerText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines = 7
-): number {
-  const paragraphs = text.split('\n');
-  let currentY = y;
-  let linesDrawn = 0;
+  const isPrivate = post.visibility === 'private' || post.is_draft;
+  const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}/post/${post.id}`;
+  const imageUrl = `/api/share/${post.id}?format=${format}&theme=${themeId}`;
+  const name = author.display_name || author.full_name || author.username;
 
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(' ');
-    let line = '';
+  const shareText = useMemo(() => {
+    const t = plainText(post);
+    const quote = t ? `“${t.length > 120 ? `${t.slice(0, 117)}…` : t}”` : '';
+    return `${quote} — ${name} no Insight*`.trim();
+  }, [post, name]);
 
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && n > 0) {
-        linesDrawn++;
-        if (linesDrawn >= maxLines) {
-          ctx.fillText(line.trim() + '...', x, currentY);
-          return currentY + lineHeight;
-        }
-        ctx.fillText(line.trim(), x, currentY);
-        line = words[n] + ' ';
-        currentY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    if (line.trim()) {
-      linesDrawn++;
-      if (linesDrawn >= maxLines) {
-        ctx.fillText(line.trim(), x, currentY);
-        return currentY + lineHeight;
-      }
-      ctx.fillText(line.trim(), x, currentY);
-      currentY += lineHeight;
-    }
-  }
-  return currentY;
-}
+  // Baixa a imagem assim que a prévia muda: no clique o compartilhamento é
+  // imediato (o navegador só abre a gaveta de compartilhar logo após um toque).
+  useEffect(() => {
+    if (!isOpen || isPrivate) return;
+    let active = true;
+    blobRef.current = null;
+    setImgState('loading');
+    fetch(imageUrl)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((b) => {
+        if (!active) return;
+        blobRef.current = b;
+        setPreviewSrc((old) => {
+          if (old) URL.revokeObjectURL(old);
+          return URL.createObjectURL(b);
+        });
+        setImgState('ready');
+      })
+      .catch(() => active && setImgState('error'));
+    return () => {
+      active = false;
+    };
+  }, [imageUrl, isOpen, isPrivate]);
 
-export function SharePostModal({
-  isOpen,
-  onClose,
-  post,
-  author,
-}: SharePostModalProps) {
-  const [cardTheme, setCardTheme] = useState<CardThemeId>('blueprint');
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedSticker, setCopiedSticker] = useState(false);
-  const [copiedQuote, setCopiedQuote] = useState(false);
-  const [sharingNative, setSharingNative] = useState(false);
-
-  const activeTheme = CARD_THEMES[cardTheme];
-
-  // Extrai texto limpo mesmo quando o post usa blocos ricos estilo Notion
-  const cleanSummary = useMemo(() => {
-    if (post.content && post.content.trim()) {
-      return post.content.trim();
-    }
-    if (Array.isArray(post.blocks) && post.blocks.length > 0) {
-      return post.blocks
-        .map((b) => stripHtmlToCleanText(b.html))
-        .filter(Boolean)
-        .join('\n\n');
-    }
-    return 'Confira esta publicação no Insight*';
-  }, [post]);
-
-  const shareUrl = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    return `${window.location.origin}/post/${post.id}`;
-  }, [post.id]);
-
-  const formattedDate = useMemo(() => {
-    const d = new Date(post.created_at);
-    return d.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  }, [post.created_at]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  /**
-   * Gera em memória um Sticker de alta definição com cantos externos 100% transparentes
-   * (pronto para ser colado como figurinha nos Stories ou enviado via navigator.share)
-   */
-  async function generateStickerBlob(): Promise<Blob | null> {
-    const canvas = document.createElement('canvas');
-    const width = 960;
-    const height = 620;
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    // Fundo externo 100% transparente para funcionar como Sticker nos Stories
-    ctx.clearRect(0, 0, width, height);
-
-    const pad = 24;
-    const cardW = width - pad * 2;
-    const cardH = height - pad * 2;
-
-    // Sombra suave do adesivo
-    ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    ctx.shadowBlur = 32;
-    ctx.shadowOffsetY = 12;
-
-    const grad = ctx.createLinearGradient(pad, pad, width - pad, height - pad);
-    grad.addColorStop(0, activeTheme.bgStart);
-    grad.addColorStop(1, activeTheme.bgEnd);
-    ctx.fillStyle = grad;
-
-    ctx.beginPath();
-    ctx.roundRect(pad, pad, cardW, cardH, 40);
-    ctx.fill();
-    ctx.restore();
-
-    // Borda fina do Sticker
-    ctx.save();
-    ctx.strokeStyle = activeTheme.border;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.roundRect(pad, pad, cardW, cardH, 40);
-    ctx.stroke();
-    ctx.restore();
-
-    // Marca d'água geométrica do Asterisco de 8 pontas (*) no canto direito
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(pad, pad, cardW, cardH, 40);
-    ctx.clip();
-    ctx.translate(width - 130, pad + 135);
-    ctx.rotate(0.28);
-    ctx.fillStyle = activeTheme.accent;
-    ctx.globalAlpha = cardTheme === 'editorial' ? 0.08 : 0.11;
-    for (const angle of [0, 45, 90, 135]) {
-      ctx.save();
-      ctx.rotate((angle * Math.PI) / 180);
-      ctx.beginPath();
-      ctx.roundRect(-18, -110, 36, 220, 8);
-      ctx.fill();
-      ctx.restore();
-    }
-    ctx.restore();
-
-    // Avatar do autor
-    const innerX = pad + 52;
-    const innerY = pad + 48;
-    try {
-      const avatarImg = await loadCorsImage(
-        author.avatar_url || '/assets/net/default-perfil'
-      );
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(innerX + 38, innerY + 38, 38, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(avatarImg, innerX, innerY, 76, 76);
-      ctx.restore();
-    } catch {
-      ctx.fillStyle = activeTheme.accent;
-      ctx.beginPath();
-      ctx.arc(innerX + 38, innerY + 38, 38, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Nome + @username
-    ctx.fillStyle = activeTheme.textPrimary;
-    ctx.font = '800 30px Inter, system-ui, sans-serif';
-    ctx.fillText(
-      author.display_name || author.full_name || author.username,
-      innerX + 94,
-      innerY + 34
-    );
-
-    ctx.fillStyle = activeTheme.textMuted;
-    ctx.font = '500 23px Inter, system-ui, sans-serif';
-    ctx.fillText(
-      `@${author.username}${author.nickname ? ` · ${author.nickname}` : ''}`,
-      innerX + 94,
-      innerY + 66
-    );
-
-    // Selo Insight* no topo direito
-    ctx.fillStyle = activeTheme.textPrimary;
-    ctx.font = '900 32px Inter, system-ui, sans-serif';
-    ctx.fillText('Insight', width - pad - 165, innerY + 42);
-    ctx.fillStyle = activeTheme.accent;
-    ctx.fillText('*', width - pad - 60, innerY + 42);
-
-    // Texto principal do Post
-    ctx.fillStyle = activeTheme.textPrimary;
-    ctx.font = '500 30px Inter, system-ui, sans-serif';
-    const excerpt =
-      cleanSummary.length > 260
-        ? cleanSummary.slice(0, 260) + '...'
-        : cleanSummary;
-
-    const afterTextY = wrapStickerText(
-      ctx,
-      excerpt,
-      innerX,
-      innerY + 132,
-      cardW - 104,
-      43,
-      6
-    );
-
-    // Hashtags
-    if (Array.isArray(post.tags) && post.tags.length > 0) {
-      ctx.fillStyle = activeTheme.accent;
-      ctx.font = '700 22px monospace';
-      ctx.fillText(
-        post.tags
-          .slice(0, 4)
-          .map((t) => `#${t}`)
-          .join('   '),
-        innerX,
-        Math.min(afterTextY + 14, height - pad - 88)
-      );
-    }
-
-    // Rodapé do Sticker com endereço do perfil
-    const footerY = height - pad - 38;
-    ctx.fillStyle = activeTheme.textMuted;
-    ctx.font = '600 20px Inter, system-ui, sans-serif';
-    ctx.fillText(`${formattedDate}`, innerX, footerY);
-
-    ctx.fillStyle = activeTheme.accent;
-    ctx.font = '700 20px monospace';
-    const domainTag = `insight · /u/${author.username}`;
-    const domainWidth = ctx.measureText(domainTag).width;
-    ctx.fillText(domainTag, width - pad - 52 - domainWidth, footerY);
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), 'image/png');
-    });
+  function flash(msg: string) {
+    setNotice(msg);
+    setTimeout(() => setNotice(null), 3200);
   }
 
-  function handleCopyLink() {
-    navigator.clipboard.writeText(shareUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2200);
-  }
-
-  async function handleCopyStickerToClipboard() {
+  async function copyLink(silent = false) {
     try {
-      const blob = await generateStickerBlob();
-      if (blob && typeof ClipboardItem !== 'undefined') {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
-        setCopiedSticker(true);
-        setTimeout(() => setCopiedSticker(false), 2800);
-        return;
+      await navigator.clipboard.writeText(shareUrl);
+      if (!silent) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       }
-      handleCopyLink();
+      return true;
     } catch {
-      handleCopyLink();
+      if (!silent) prompt('Copie o link:', shareUrl);
+      return false;
     }
   }
 
-  async function handleNativeShare() {
-    setSharingNative(true);
+  function download(blob: Blob) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `insight-${format}-${post.id.slice(0, 8)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  async function shareImage() {
+    const blob = blobRef.current;
+    if (!blob) return;
+    setBusy(true);
+    // o link vai junto na área de transferência para a figurinha "Link" dos Stories
+    // (sem await: no iPhone a gaveta de compartilhar precisa abrir no mesmo toque)
+    let linkCopied = false;
+    navigator.clipboard?.writeText(shareUrl).then(() => (linkCopied = true)).catch(() => {});
+    const file = new File([blob], `insight-${format}.png`, { type: 'image/png' });
     try {
-      const shareText = `"${cleanSummary.slice(0, 140)}${
-        cleanSummary.length > 140 ? '...' : ''
-      }" — @${author.username} no Insight*`;
-
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        const blob = await generateStickerBlob();
-        if (blob) {
-          const file = new File([blob], 'insight-card.png', {
-            type: 'image/png',
-          });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              title: `${author.display_name || author.full_name} no Insight*`,
-              text: shareText,
-              url: shareUrl,
-              files: [file],
-            });
-            setSharingNative(false);
-            return;
-          }
-        }
-
-        await navigator.share({
-          title: `${author.display_name || author.full_name} no Insight*`,
-          text: shareText,
-          url: shareUrl,
-        });
+      if (navigator.canShare?.({ files: [file] })) {
+        // só o arquivo: com texto/link juntos, o Instagram não oferece "Stories"
+        await navigator.share({ files: [file] });
+        if (linkCopied) flash('Link copiado — nos Stories, use a figurinha “Link” e cole.');
       } else {
-        await handleCopyStickerToClipboard();
+        download(blob);
+        flash('Imagem baixada — o link do post foi copiado.');
       }
-    } catch {
-      // Usuário cancelou a gaveta nativa
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        download(blob);
+        flash('Imagem baixada.');
+      }
     } finally {
-      setSharingNative(false);
+      setBusy(false);
     }
   }
 
-  function handleCopyMarkdownQuote() {
-    const md = `> "${cleanSummary.replace(/\n/g, ' ')}"\n> — **${
-      author.display_name || author.full_name
-    }** (@${author.username}) no [Insight*](${shareUrl})`;
-    navigator.clipboard.writeText(md);
-    setCopiedQuote(true);
-    setTimeout(() => setCopiedQuote(false), 2200);
+  async function shareLinkNative() {
+    try {
+      if (navigator.share) await navigator.share({ title: `${name} no Insight*`, text: shareText, url: shareUrl });
+      else await copyLink();
+    } catch {
+      // cancelado
+    }
   }
 
-  const encodedText = encodeURIComponent(
-    `"${cleanSummary.slice(0, 160)}${
-      cleanSummary.length > 160 ? '...' : ''
-    }" — @${author.username} no Insight*`
-  );
-  const encodedUrl = encodeURIComponent(shareUrl);
+  const aspect = format === 'story' ? 'h-[min(46vh,520px)] aspect-[9/16]' : format === 'square' ? 'h-[min(36vh,380px)] aspect-square' : 'w-full aspect-[1200/630]';
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Compartilhar publicação"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-surface border border-border text-primary shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-surface border border-border text-primary shadow-2xl overflow-hidden flex flex-col max-h-[94vh]"
       >
-        {/* Cabeçalho do Share Studio */}
-        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span className="text-xs font-extrabold uppercase tracking-wider text-primary">
-              Insight* Share Studio
-            </span>
-          </div>
-
-          {/* Seletor de Estilo do Adesivo */}
-          <div className="flex items-center gap-1 bg-elevated p-1 rounded-full border border-border">
-            {(Object.keys(CARD_THEMES) as CardThemeId[]).map((tKey) => {
-              const t = CARD_THEMES[tKey];
-              const active = cardTheme === tKey;
-              return (
-                <button
-                  key={tKey}
-                  type="button"
-                  onClick={() => setCardTheme(tKey)}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                    active
-                      ? 'bg-accent text-white shadow-sm'
-                      : 'text-secondary hover:text-primary'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full text-muted hover:text-primary hover:bg-elevated transition-colors"
-          >
+        <div className="px-5 pt-3 pb-2 flex items-center justify-between">
+          <span className="sm:hidden absolute left-1/2 -translate-x-1/2 top-2 h-1 w-10 rounded-full bg-border" aria-hidden />
+          <h2 className="text-base font-extrabold">Compartilhar</h2>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="p-1.5 rounded-full text-muted hover:text-primary hover:bg-elevated">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Corpo do Modal */}
-        <div className="p-5 space-y-4 overflow-y-auto">
-          {/* 1. PRÉVIA AO VIVO DO STICKER / CARD */}
-          <div className="relative rounded-2xl p-4 sm:p-5 bg-elevated/40 border border-border flex items-center justify-center overflow-hidden">
-            <div
-              style={{
-                background: `linear-gradient(135deg, ${activeTheme.bgStart}, ${activeTheme.bgEnd})`,
-                borderColor: activeTheme.border,
-                color: activeTheme.textPrimary,
-              }}
-              className="relative w-full rounded-2xl p-5 border shadow-xl overflow-hidden transition-all duration-300"
-            >
-              {/* Marca d'água geométrica do * de 8 pontas */}
-              <svg
-                viewBox="0 0 200 200"
-                style={{ color: activeTheme.accent }}
-                className="w-36 h-36 absolute -right-8 -top-8 opacity-10 pointer-events-none rotate-12"
-              >
-                <g transform="translate(100,100)" fill="currentColor">
-                  {[0, 45, 90, 135].map((a) => (
-                    <rect
-                      key={a}
-                      x="-16"
-                      y="-85"
-                      width="32"
-                      height="170"
-                      rx="6"
-                      transform={`rotate(${a})`}
+        <div className="px-5 pb-5 space-y-4 overflow-y-auto">
+          {isPrivate ? (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-elevated border border-border text-xs text-secondary">
+              <Lock className="w-4 h-4 shrink-0 text-muted" />
+              Esta publicação é privada: só o link funciona, e só para você.
+            </div>
+          ) : (
+            <>
+              {/* formato */}
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-elevated border border-border" role="tablist">
+                {FORMATS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={format === f.id}
+                    onClick={() => setFormat(f.id)}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      format === f.id ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-primary'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* prévia */}
+              <div className="flex flex-col items-center gap-2">
+                <div className={`relative ${aspect} rounded-2xl overflow-hidden border border-border bg-elevated shadow-lg`}>
+                  {previewSrc && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewSrc}
+                      alt="Prévia da imagem de compartilhamento"
+                      className={`w-full h-full object-contain transition-opacity duration-300 ${imgState === 'ready' ? 'opacity-100' : 'opacity-40'}`}
                     />
-                  ))}
-                </g>
-              </svg>
-
-              {/* Topo do Card */}
-              <div className="relative z-10 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <img
-                    src={author.avatar_url || '/assets/net/default-perfil'}
-                    alt={author.full_name}
-                    className="w-10 h-10 rounded-full object-cover border border-white/15 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs sm:text-sm font-extrabold truncate">
-                        {author.display_name || author.full_name}
-                      </span>
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#00ccff] shrink-0" />
+                  )}
+                  {imgState === 'loading' && (
+                    <div className="absolute inset-0 flex items-center justify-center animate-pulse bg-gradient-to-b from-elevated to-surface">
+                      <span className="text-[11px] font-semibold text-muted">Gerando imagem…</span>
                     </div>
-                    <p
-                      style={{ color: activeTheme.textMuted }}
-                      className="text-[11px] truncate"
-                    >
-                      @{author.username}
-                      {author.nickname ? ` · ${author.nickname}` : ''}
-                    </p>
-                  </div>
+                  )}
+                  {imgState === 'error' && (
+                    <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-muted">
+                      Não foi possível gerar a imagem agora.
+                    </div>
+                  )}
                 </div>
-
-                <span className="text-sm font-black tracking-tight shrink-0">
-                  Insight<span style={{ color: activeTheme.accent }}>*</span>
-                </span>
+                <p className="text-[11px] text-muted">{FORMATS.find((f) => f.id === format)?.hint}</p>
               </div>
 
-              {/* Conteúdo da Publicação */}
-              <p className="relative z-10 mt-3.5 text-xs sm:text-sm leading-relaxed whitespace-pre-line line-clamp-5">
-                {cleanSummary}
-              </p>
-
-              {post.image_url && (
-                <div className="relative z-10 mt-3 rounded-xl overflow-hidden border border-white/10 max-h-36">
-                  <img
-                    src={post.image_url}
-                    alt="Mídia"
-                    className="w-full h-full object-cover max-h-36"
+              {/* estilo */}
+              <div className="flex items-center justify-center gap-2" role="radiogroup" aria-label="Estilo da imagem">
+                {SHARE_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={themeId === t.id}
+                    title={t.label}
+                    aria-label={t.label}
+                    onClick={() => setThemeId(t.id)}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform ${themeId === t.id ? 'border-accent scale-110' : 'border-border'}`}
+                    style={{ background: `linear-gradient(135deg, ${t.swatch[0]}, ${t.swatch[1]})` }}
                   />
-                </div>
-              )}
-
-              {/* Tags */}
-              {Array.isArray(post.tags) && post.tags.length > 0 && (
-                <div className="relative z-10 mt-3 flex flex-wrap gap-1.5">
-                  {post.tags.slice(0, 4).map((t) => (
-                    <span
-                      key={t}
-                      style={{
-                        backgroundColor: activeTheme.badgeBg,
-                        color: activeTheme.accent,
-                      }}
-                      className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Rodapé do Card */}
-              <div
-                style={{
-                  borderColor: activeTheme.border,
-                  color: activeTheme.textMuted,
-                }}
-                className="relative z-10 mt-4 pt-2.5 border-t flex items-center justify-between text-[10px] font-mono"
-              >
-                <span>{formattedDate}</span>
-                <span style={{ color: activeTheme.accent }} className="font-bold">
-                  /u/{author.username}
-                </span>
+                ))}
               </div>
-            </div>
-          </div>
 
-          {/* 2. AÇÕES PRINCIPAIS: COLAR ADESIVO NOS STORIES OU ENVIAR NATIVO */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={handleCopyStickerToClipboard}
-              className="p-3 rounded-2xl bg-accent hover:bg-accent-hover text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
-            >
-              {copiedSticker ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Adesivo Copiado! Só Colar</span>
-                </>
+              {/* ações principais */}
+              {format !== 'og' ? (
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <button
+                    type="button"
+                    onClick={shareImage}
+                    disabled={imgState !== 'ready' || busy}
+                    className="flex items-center justify-center gap-2 py-3 rounded-full text-white text-sm font-extrabold disabled:opacity-50 bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] shadow-md"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    {format === 'story' ? 'Compartilhar nos Stories' : 'Compartilhar imagem'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => blobRef.current && download(blobRef.current)}
+                    disabled={imgState !== 'ready'}
+                    aria-label="Baixar imagem"
+                    title="Baixar imagem"
+                    className="px-4 rounded-full border border-border text-secondary hover:text-primary disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
               ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copiar Adesivo (Story / Chat)</span>
-                </>
+                <button
+                  type="button"
+                  onClick={shareLinkNative}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-accent hover:bg-accent-hover text-white text-sm font-extrabold"
+                >
+                  <Share2 className="w-4 h-4" /> Compartilhar link
+                </button>
               )}
-            </button>
+              {format === 'story' && (
+                <p className="text-[11px] text-muted text-center leading-snug">
+                  No celular, escolha <strong className="text-secondary">Instagram → Stories</strong>. O link do post já vai
+                  copiado: adicione a figurinha <strong className="text-secondary">“Link”</strong> e cole.
+                </p>
+              )}
+            </>
+          )}
 
-            <button
-              type="button"
-              onClick={handleNativeShare}
-              disabled={sharingNative}
-              className="p-3 rounded-2xl bg-elevated hover:bg-elevated/80 border border-border hover:border-accent text-primary font-bold text-xs flex items-center justify-center gap-2 transition-all"
-            >
-              <Smartphone className="w-4 h-4 text-accent" />
-              <span>
-                {sharingNative ? 'Abrindo Apps...' : 'Enviar para Apps / Stories'}
-              </span>
-            </button>
-          </div>
+          {/* link + redes */}
+          <button
+            type="button"
+            onClick={() => copyLink()}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-elevated border border-border text-left"
+          >
+            <Link2 className="w-4 h-4 text-accent shrink-0" />
+            <span className="flex-1 min-w-0 truncate text-xs font-mono text-secondary">{shareUrl}</span>
+            <span className={`text-xs font-bold shrink-0 ${copied ? 'text-emerald-400' : 'text-accent'}`}>
+              {copied ? (
+                <span className="inline-flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> Copiado
+                </span>
+              ) : (
+                'Copiar'
+              )}
+            </span>
+          </button>
 
-          <p className="text-[11px] text-muted text-center">
-            Dica: Ao clicar em <b className="text-secondary">Copiar Adesivo</b>, basta abrir o Instagram Stories, WhatsApp ou Discord e tocar em <b className="text-secondary">Colar</b>.
-          </p>
-
-          {/* 3. ATALHOS RÁPIDOS DE REDES & LINK DIRETO */}
-          <div className="pt-2 border-t border-border space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-elevated border border-border rounded-xl px-3 py-2 text-[11px] font-mono text-secondary truncate">
-                {shareUrl}
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="px-3.5 py-2 rounded-xl bg-surface border border-border hover:border-accent text-xs font-bold text-primary flex items-center gap-1.5 shrink-0 transition-colors"
-              >
-                {copiedLink ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Link2 className="w-3.5 h-3.5 text-accent" />
-                    <span>Copiar Link</span>
-                  </>
-                )}
-              </button>
+          {!isPrivate && (
+            <div className="grid grid-cols-6 gap-1">
+              {NETWORKS.map((n) => (
+                <a
+                  key={n.id}
+                  href={n.href(shareUrl, shareText)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center gap-1 py-1.5 rounded-xl hover:bg-elevated transition-colors"
+                >
+                  <span className="w-10 h-10 rounded-full flex items-center justify-center bg-black/80 border border-border">
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                      <path d={n.path} fill={n.color} />
+                    </svg>
+                  </span>
+                  <span className="text-[10px] text-secondary">{n.label}</span>
+                </a>
+              ))}
             </div>
+          )}
 
-            <div className="grid grid-cols-4 gap-2 pt-1">
-              <a
-                href={`https://wa.me/?text=${encodedText}%20${encodedUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2.5 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-[#25D366]/60 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-secondary hover:text-primary transition-all"
-              >
-                <MessageCircle className="w-4 h-4 text-[#25D366]" />
-                <span>WhatsApp</span>
-              </a>
-
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2.5 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-accent/60 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-secondary hover:text-primary transition-all"
-              >
-                <Share2 className="w-4 h-4 text-primary" />
-                <span>Postar no X</span>
-              </a>
-
-              <a
-                href={`https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2.5 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-[#38bdf8]/60 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-secondary hover:text-primary transition-all"
-              >
-                <Send className="w-4 h-4 text-[#38bdf8]" />
-                <span>Telegram</span>
-              </a>
-
-              <button
-                type="button"
-                onClick={handleCopyMarkdownQuote}
-                className="p-2.5 rounded-xl bg-elevated/70 hover:bg-elevated border border-border hover:border-accent/60 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-secondary hover:text-primary transition-all"
-              >
-                {copiedQuote ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-400">Citado!</span>
-                  </>
-                ) : (
-                  <>
-                    <Quote className="w-4 h-4 text-accent" />
-                    <span>Citar</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+          {notice && (
+            <p role="status" className="text-xs text-center font-semibold text-emerald-400">
+              {notice}
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-//teste pagina temporaria

@@ -35,16 +35,33 @@ import { NitroSettingsPanel } from '@/components/nitro/NitroSettingsPanel';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
 import { ThemeMiniature } from '@/components/nitro/ThemeMiniature';
 import { createClient } from '@/lib/supabase/client';
-import { NITRO_PRICE_BRL, NITRO_PUBLIC, describeNitroSource } from '@/lib/nitro/entitlement';
+import { NITRO_PUBLIC, describeNitroSource } from '@/lib/nitro/entitlement';
 import type { LockReason } from '@/lib/nitro/access';
 import { useNitroBilling } from '@/lib/nitro/useNitroBilling';
 
-const PRICE_LABEL = `R$ ${NITRO_PRICE_BRL.toFixed(2).replace('.', ',')}/mês`;
 
 /** Status do Nitro + convite do grupo VIP (só vem do banco para quem tem acesso). */
 function NitroStatusCard() {
-  const { entitlement } = useNitro();
+  const { entitlement, viewer } = useNitro();
   const [vip, setVip] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const subscribed =
+    entitlement.source === 'subscription' && (viewer?.nitro_status === 'active' || viewer?.nitro_status === 'past_due');
+
+  async function cancel() {
+    if (!confirm('Cancelar a assinatura do Nitro? Você continua com tudo até o fim do período já pago.')) return;
+    setCanceling(true);
+    const res = await fetch('/api/nitro/cancel', { method: 'POST' }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setCanceling(false);
+    setCancelMsg(
+      res?.ok
+        ? `Assinatura cancelada. O Nitro segue ativo${entitlement.expiresAt ? ` até ${entitlement.expiresAt.toLocaleDateString('pt-BR')}` : ' até o fim do período pago'}.`
+        : data.error || 'Não foi possível cancelar agora.'
+    );
+    if (res?.ok) setTimeout(() => window.location.reload(), 1800);
+  }
 
   useEffect(() => {
     let active = true;
@@ -68,7 +85,18 @@ function NitroStatusCard() {
         <p className="text-[10px] text-muted mt-0.5">
           Só cosméticos e comunidade VIP. Limites de upload, tópicos e comunidades vêm do seu Nível de Contribuinte.
         </p>
+        {cancelMsg && <p className="text-[11px] text-amber-400 mt-1">{cancelMsg}</p>}
       </div>
+      {subscribed && (
+        <button
+          type="button"
+          onClick={() => void cancel()}
+          disabled={canceling}
+          className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-secondary hover:text-danger hover:border-danger/50 disabled:opacity-50"
+        >
+          {canceling ? 'Cancelando…' : 'Cancelar assinatura'}
+        </button>
+      )}
       {vip && (
         <a
           href={vip}
@@ -219,9 +247,11 @@ function NitroGallery() {
           </h1>
           <p className="text-[11px] text-muted">Galeria de personalização de perfil</p>
         </div>
-        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-          <Lock className="w-3 h-3" /> {!NITRO_PUBLIC ? (hasAccess ? 'Beta fechada · admin' : 'Em breve') : billing.enabled ? PRICE_LABEL : 'Assinatura em breve'}
-        </span>
+        {(!NITRO_PUBLIC || !billing.enabled) && (
+          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+            <Lock className="w-3 h-3" /> {!NITRO_PUBLIC ? (hasAccess ? 'Beta fechada · admin' : 'Em breve') : 'Assinatura em breve'}
+          </span>
+        )}
         <Link
           href="/nitro/assinar"
           className="nx-cta-mini inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-bold"
@@ -240,7 +270,7 @@ function NitroGallery() {
                 className="nx-cta-banner block rounded-2xl p-4 text-white"
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">
-                  {billing.enabled ? `Nitro por ${PRICE_LABEL}` : 'Assinatura em breve'}
+                  {billing.enabled ? 'Insight Nitro' : 'Assinatura em breve'}
                 </p>
                 <p className="text-base font-extrabold">Seu perfil, em outro nível.</p>
                 <p className="text-xs opacity-90">
@@ -667,7 +697,8 @@ function BundleShelf({
 }) {
   return (
     <div className="space-y-3">
-      {NITRO_BUNDLES.map((b) => {
+      {/* por enquanto só o Super Pacote; novos pacotes em destaque virão depois */}
+      {NITRO_BUNDLES.filter((b) => b.featured).map((b) => {
         const frame = getNitroItem(b.items.frame, 'frame');
         const title = getNitroItem(b.items.title, 'title');
         const font = getNitroItem(b.items.font, 'font');

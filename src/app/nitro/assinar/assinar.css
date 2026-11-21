@@ -605,3 +605,7 @@ html[data-reduce-motion='true'] .na-reveal { opacity: 1; transform: none; }
 .na-bundle-list span { color: var(--na-muted); }
 .na-bundle-list strong { color: var(--na-ink); }
 .na-bundle-theme { display: flex; justify-content: center; }
+
+.na-plan-counts b { font-weight: 900; font-size: 1.15em; background: linear-gradient(90deg, #f0abfc, #a5b4fc); -webkit-background-clip: text; background-clip: text; color: transparent; margin-right: 2px; }
+.na-plan-soon--ok { border-style: solid; color: #86efac; border-color: rgba(134, 239, 172, 0.5); }
+.na-plan-btn { margin-top: 16px; width: 100%; justify-content: center; }

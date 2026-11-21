@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { NITRO_PRICE_BRL, resolveNitroEntitlement } from '@/lib/nitro/entitlement';
+import { NITRO_PRICE_BRL, NITRO_LIFETIME_LEVEL } from '@/lib/nitro/entitlement';
+import { findNitroPreapprovals } from '@/lib/nitro/mercadopago';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * Checkout do Insight Nitro — assinatura recorrente (Mercado Pago preapproval):
@@ -47,18 +49,37 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, contributor_level, has_lifetime_nitro, nitro_status, nitro_expires_at')
+    .select('id, role, contributor_level, has_lifetime_nitro, nitro_status, nitro_expires_at, nitro_subscription_id')
     .or(`user_id.eq.${user.id},id.eq.${user.id}`)
     .maybeSingle();
   if (!profile) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
 
-  const ent = resolveNitroEntitlement({ ...profile, role: null });
-  if (ent.lifetime) {
-    return NextResponse.json({ error: 'Você já tem Nitro vitalício pelo Nível 5.' }, { status: 409 });
+  // Vitalício (fundador / Nível 5) nunca assina
+  if (profile.role === 'admin' || profile.has_lifetime_nitro || (profile.contributor_level ?? 0) >= NITRO_LIFETIME_LEVEL) {
+    return NextResponse.json({ error: 'Você já tem o Nitro vitalício.' }, { status: 409 });
   }
-  if (ent.source === 'subscription' && profile.nitro_status === 'active') {
-    return NextResponse.json({ error: 'Sua assinatura já está ativa.' }, { status: 409 });
+  // Uma assinatura por vez: só assina de novo quem cancelou
+  if (profile.nitro_status === 'active' || profile.nitro_status === 'past_due') {
+    return NextResponse.json({ error: 'Você já tem uma assinatura do Nitro. Para trocar, cancele a atual primeiro.' }, { status: 409 });
   }
+
+  // Confere no próprio Mercado Pago (o webhook pode não ter chegado ainda)
+  const existing = await findNitroPreapprovals(accessToken, profile.id);
+  const live = existing.find((p) => p.status === 'authorized' || p.status === 'paused');
+  if (live) {
+    try {
+      await createAdminClient()
+        .from('profiles')
+        .update({ nitro_status: live.status === 'authorized' ? 'active' : 'past_due', nitro_subscription_id: String(live.id) })
+        .eq('id', profile.id);
+    } catch {
+      /* o webhook sincroniza depois */
+    }
+    return NextResponse.json({ error: 'Você já tem uma assinatura do Nitro ativa.' }, { status: 409 });
+  }
+  // checkout já aberto e não pago: reaproveita em vez de criar outra assinatura
+  const pending = existing.find((p) => p.status === 'pending' && p.init_point);
+  if (pending?.init_point) return NextResponse.json({ checkoutUrl: pending.init_point, reused: true });
 
   const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://insight.app';
   const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
@@ -66,7 +87,7 @@ export async function POST(req: NextRequest) {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
-      'X-Idempotency-Key': `nitro-${profile.id}-${new Date().toISOString().slice(0, 13)}`,
+      'X-Idempotency-Key': `nitro-${profile.id}-${new Date().toISOString().slice(0, 13)}-${profile.nitro_subscription_id || 'novo'}`,
     },
     body: JSON.stringify({
       reason: 'Insight Nitro — assinatura mensal',

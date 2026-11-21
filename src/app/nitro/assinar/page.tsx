@@ -113,12 +113,29 @@ function Perk({
 
 const AVATAR = '/assets/net/default-perfil';
 
+type PlanState = 'open' | 'subscribed' | 'lifetime';
+
+/** Botão do card do Nitro: assinar só aparece sem assinatura viva (ou depois de cancelar). */
+function PlanCta({ state, billing, starting, onSubscribe }: { state: PlanState; billing: boolean; starting: boolean; onSubscribe: () => void }) {
+  if (state === 'lifetime') return <span className="na-plan-soon na-plan-soon--ok">Vitalício ativo</span>;
+  if (state === 'subscribed') return <span className="na-plan-soon na-plan-soon--ok">Assinatura ativa</span>;
+  if (!billing) return <span className="na-plan-soon">Em breve</span>;
+  return (
+    <button type="button" className="na-btn na-btn--primary na-plan-btn" disabled={starting} onClick={onSubscribe}>
+      {starting ? 'Abrindo…' : 'Assinar agora'}
+    </button>
+  );
+}
+
 export default function NitroCheckoutPage() {
   const { viewer, hasAccess, entitlement } = useNitro();
   const [testing, setTesting] = useState<IntroItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const billing = useNitroBilling();
+  const lifetime = entitlement.lifetime || viewer?.role === 'admin' || Boolean(viewer?.has_lifetime_nitro);
+  const subscribed = viewer?.nitro_status === 'active' || viewer?.nitro_status === 'past_due';
+  const planState: PlanState = lifetime ? 'lifetime' : subscribed ? 'subscribed' : 'open';
 
   // volta do Mercado Pago: a ativação chega pelo webhook em alguns segundos
   useEffect(() => {
@@ -227,7 +244,7 @@ export default function NitroCheckoutPage() {
             <p className="na-price-note">Cancele quando quiser · grátis para sempre no Nível 5 (Grão-Mestre)</p>
 
             <div className="na-ctas">
-              {hasAccess ? (
+              {planState !== 'open' ? (
                 <Link href="/nitro" className="na-btn na-btn--primary">
                   Abrir minha galeria
                 </Link>
@@ -240,7 +257,13 @@ export default function NitroCheckoutPage() {
                   onClick={() => void subscribe()}
                 >
                   <span className="na-btn-glint" aria-hidden />
-                  {starting ? 'Abrindo o Mercado Pago…' : billing.enabled ? `Assinar Nitro · R$ ${PRICE}/mês` : 'Assinar Nitro · em breve'}
+                  {starting
+                    ? 'Abrindo o Mercado Pago…'
+                    : !billing.enabled
+                      ? 'Assinar Nitro · em breve'
+                      : viewer?.nitro_status === 'canceled' && hasAccess
+                        ? 'Assinar de novo'
+                        : `Assinar Nitro · R$ ${PRICE}/mês`}
                 </button>
               )}
               <Link href="/nitro" className="na-btn na-btn--ghost">
@@ -515,10 +538,12 @@ export default function NitroCheckoutPage() {
           <div className="na-plans">
             <Reveal className="na-plan">
               <p className="na-plan-name">Gratuito</p>
-              <p className="na-plan-price">R$ 0</p>
+              <p className="na-plan-price">Insight*</p>
               <ul>
-                <li>Galeria e provador liberados</li>
-                <li>Molduras de patente do seu nível</li>
+                <li>Cosméticos padrões do Insight</li>
+                <li>Personalizáveis de nível: moldura e tag da sua patente</li>
+                <li>Abertura animada de patente nos Níveis 4 e 5</li>
+                <li>Galeria e provador para experimentar tudo</li>
                 <li className="is-off">Itens Nitro no perfil</li>
                 <li className="is-off">Selo, Rainbow e grupo VIP</li>
               </ul>
@@ -532,15 +557,17 @@ export default function NitroCheckoutPage() {
                 R$ {PRICE}
                 <small>/mês</small>
               </p>
-              <ul>
-                <li>Galeria completa de cosméticos</li>
+              <ul className="na-plan-counts">
+                <li><b>{FRAMES.length}</b> molduras ilustradas e animadas</li>
+                <li><b>{INTROS.length}</b> aberturas de perfil</li>
+                <li><b>{TAGS.length}</b> tags, muitas ilustradas</li>
+                <li><b>{TITLES.length}</b> estilos de título</li>
+                <li><b>{THEMES.length}</b> temas de app</li>
+                <li><b>{FONTS.length}</b> estilos de nome</li>
                 <li>Super Pacote com título e tag exclusivos</li>
-                <li>{THEMES.length} temas de app e {FONTS.length} estilos de nome</li>
-                <li>Selo Nitro e Rainbow</li>
-                <li>Grupo VIP no WhatsApp</li>
-                <li>Mais IA (em breve)</li>
+                <li>Selo Nitro, Rainbow e grupo VIP no WhatsApp</li>
               </ul>
-              <span className="na-plan-soon">Em breve</span>
+              <PlanCta state={planState} billing={billing.enabled} starting={starting} onSubscribe={() => void subscribe()} />
             </Reveal>
             <Reveal delay={160} className="na-plan na-plan--gold">
               <p className="na-plan-name">Nível 5 · Grão-Mestre</p>
@@ -548,9 +575,10 @@ export default function NitroCheckoutPage() {
                 Vitalício<small> · grátis</small>
               </p>
               <ul>
-                <li>Tudo do Nitro, para sempre</li>
-                <li>2 GB de anexos por post</li>
-                <li>Moldura singularity e abertura de patente</li>
+                <li>Todos os benefícios de um contribuinte Nível 5</li>
+                <li>+ Insight Nitro vitalício, com tudo liberado</li>
+                <li>Moldura Grão-Mestre e abertura de patente exclusivas</li>
+                <li>Assinante que chega ao Nível 5 recebe a mensalidade de volta</li>
               </ul>
               <Link href="/apoie" className="na-plan-link">
                 Ver níveis de contribuinte →

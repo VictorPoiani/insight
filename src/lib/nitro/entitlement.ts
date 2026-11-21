@@ -86,8 +86,9 @@ export function resolveNitroEntitlement(
 export function describeNitroSource(e: NitroEntitlement): string {
   switch (e.source) {
     case 'lifetime-level':
-    case 'lifetime-flag':
       return 'Vitalício · Nível 5 Grão-Mestre';
+    case 'lifetime-flag':
+      return 'Nitro vitalício';
     case 'subscription':
       return e.expiresAt
         ? `Assinatura ativa até ${e.expiresAt.toLocaleDateString('pt-BR')}`

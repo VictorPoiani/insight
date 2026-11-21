@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { processLevel5Refunds } from '@/lib/nitro/mercadopago';
 
 function verifyMercadoPagoSignature(
     request: Request,
@@ -124,7 +125,9 @@ export async function POST(request: Request) {
                 if (!preapprovalId) return NextResponse.json({ received: true, ignored: true });
             }
             const result = await syncNitroPreapproval(preapprovalId, accessToken);
-            return NextResponse.json({ received: true, nitro: result });
+            // Nível 5 com assinatura ativa: cancela e reembolsa (vitalício)
+            const refunds = await processLevel5Refunds(createAdminClient(), accessToken).catch(() => []);
+            return NextResponse.json({ received: true, nitro: result, level5Refunds: refunds.length });
         }
 
         // Ignora eventos que não sejam de pagamento (mas devolve 200 pro MP não reenviar)
@@ -235,7 +238,9 @@ export async function POST(request: Request) {
                 // Ignora erro caso a tabela notifications tenha alguma restrição de tipo
             }
         }
-        return NextResponse.json({ received: true, approved: true });
+        // A doação pode ter levado ao Nível 5: assinatura Nitro vira vitalício (reembolso)
+        const refunds = await processLevel5Refunds(supabaseAdmin, accessToken).catch(() => []);
+        return NextResponse.json({ received: true, approved: true, level5Refunds: refunds.length });
     } catch (err: any) {
         return NextResponse.json(
             { error: err?.message || 'Erro ao processar webhook' },

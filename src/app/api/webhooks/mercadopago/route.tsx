@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { processLevel5Refunds } from '@/lib/nitro/mercadopago';
+import { processLevel5Refunds, profileFieldsFromPreapproval } from '@/lib/nitro/mercadopago';
 
 function verifyMercadoPagoSignature(
     request: Request,
@@ -41,8 +41,6 @@ function verifyMercadoPagoSignature(
     return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
-/** Prazo de tolerância após a data da próxima cobrança. */
-const NITRO_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * Sincroniza uma assinatura do Insight Nitro (preapproval) com o perfil.
@@ -60,23 +58,9 @@ async function syncNitroPreapproval(preapprovalId: string, accessToken: string) 
     if (!ref.startsWith('nitro:')) return { synced: false, reason: 'not_nitro' };
     const profileId = ref.slice('nitro:'.length);
 
-    const statusMap: Record<string, string> = {
-        authorized: 'active',
-        paused: 'past_due',
-        cancelled: 'canceled',
-    };
-    const nitroStatus = statusMap[pre.status];
-    if (!nitroStatus) return { synced: false, reason: `status_${pre.status}` };
-
-    const update: Record<string, unknown> = {
-        nitro_status: nitroStatus,
-        nitro_subscription_id: String(pre.id),
-    };
-    if (nitroStatus === 'active' && pre.next_payment_date) {
-        update.nitro_expires_at = new Date(
-            new Date(pre.next_payment_date).getTime() + NITRO_GRACE_MS
-        ).toISOString();
-    }
+    const update = profileFieldsFromPreapproval(pre);
+    if (!update) return { synced: false, reason: `status_${pre.status}` };
+    const nitroStatus = String(update.nitro_status);
     // cancelada/pausada: mantém nitro_expires_at — vale até o fim do período pago
 
     const supabaseAdmin = createAdminClient();

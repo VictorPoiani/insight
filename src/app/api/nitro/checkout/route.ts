@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { NITRO_PRICE_BRL, NITRO_LIFETIME_LEVEL } from '@/lib/nitro/entitlement';
-import { findNitroPreapprovals } from '@/lib/nitro/mercadopago';
+import { findNitroPreapprovals, syncNitroForProfile } from '@/lib/nitro/mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -67,15 +67,13 @@ export async function POST(req: NextRequest) {
   const existing = await findNitroPreapprovals(accessToken, profile.id);
   const live = existing.find((p) => p.status === 'authorized' || p.status === 'paused');
   if (live) {
+    // o webhook não chegou: sincroniza aqui (com a validade) e não cria outra
     try {
-      await createAdminClient()
-        .from('profiles')
-        .update({ nitro_status: live.status === 'authorized' ? 'active' : 'past_due', nitro_subscription_id: String(live.id) })
-        .eq('id', profile.id);
+      await syncNitroForProfile(createAdminClient(), accessToken, profile.id);
     } catch {
       /* o webhook sincroniza depois */
     }
-    return NextResponse.json({ error: 'Você já tem uma assinatura do Nitro ativa.' }, { status: 409 });
+    return NextResponse.json({ error: 'Você já tem uma assinatura do Nitro ativa. Recarregue a página.', synced: true }, { status: 409 });
   }
   // checkout já aberto e não pago: reaproveita em vez de criar outra assinatura
   const pending = existing.find((p) => p.status === 'pending' && p.init_point);

@@ -143,6 +143,40 @@ export function NitroProvider({ children }: { children: React.ReactNode }) {
   const entitlement = useMemo(() => resolveNitroEntitlement(viewer), [viewer]);
   const hasAccess = entitlement.active;
 
+  // Rede de segurança do pagamento: se o webhook do Mercado Pago não chegou,
+  // confere a assinatura direto lá (uma vez por sessão) e atualiza o perfil.
+  useEffect(() => {
+    if (!viewer || entitlement.active || NITRO_KILL_SWITCH) return;
+    const halfDone = viewer.nitro_status === 'active' || viewer.nitro_status === 'past_due';
+    const onNitroPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/nitro');
+    if (!halfDone && !onNitroPage) return;
+    const key = `insight-nitro-sync:${viewer.id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* sem sessionStorage: tenta mesmo assim */
+    }
+    fetch('/api/nitro/sync', { method: 'POST' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (res) => {
+        if (!res?.synced || res.status !== 'active') {
+          // pagamento ainda processando: deixa tentar de novo daqui a 1 minuto
+          setTimeout(() => {
+            try {
+              sessionStorage.removeItem(key);
+            } catch {
+              /* ignora */
+            }
+          }, 60000);
+          if (!res?.synced) return;
+        }
+        const { data } = await supabase.from('profiles').select('*').eq('id', viewer.id).maybeSingle();
+        if (data) setViewer(data as Profile);
+      })
+      .catch(() => {});
+  }, [viewer, entitlement.active, supabase]);
+
   // Rainbow (benefício Nitro): logo e asteriscos de carregamento em espectro.
   const ownCosmetics = viewer ? (viewer.id in overrides ? overrides[viewer.id] : viewer.cosmetics) : null;
   const rainbowOn = hasAccess && ownCosmetics?.rainbow !== false;

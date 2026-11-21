@@ -39,6 +39,39 @@ export async function findNitroPreapprovals(token: string, profileId: string): P
     .sort((a, b) => String(b.date_created || '').localeCompare(String(a.date_created || '')));
 }
 
+/** Tolerância depois da data da próxima cobrança. */
+export const NITRO_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Campos do perfil a partir de uma assinatura do Mercado Pago (sempre com validade). */
+export function profileFieldsFromPreapproval(pre: MpPreapproval): Record<string, unknown> | null {
+  const map: Record<string, string> = { authorized: 'active', paused: 'past_due', cancelled: 'canceled' };
+  const status = map[pre.status];
+  if (!status) return null;
+  const out: Record<string, unknown> = { nitro_status: status, nitro_subscription_id: String(pre.id) };
+  if (status === 'active') {
+    const next = pre.next_payment_date ? new Date(pre.next_payment_date).getTime() : NaN;
+    // sem data da próxima cobrança: 1 mês a partir de agora (o webhook corrige depois)
+    const base = Number.isFinite(next) && next > Date.now() ? next : Date.now() + 30 * 24 * 60 * 60 * 1000;
+    out.nitro_expires_at = new Date(base + NITRO_GRACE_MS).toISOString();
+  }
+  return out;
+}
+
+/**
+ * Sincroniza o Nitro de um perfil consultando o Mercado Pago direto
+ * (não depende do webhook). Usa a assinatura viva mais recente.
+ */
+export async function syncNitroForProfile(admin: SupabaseClient, token: string, profileId: string) {
+  const subs = await findNitroPreapprovals(token, profileId);
+  const pick = subs.find((p) => p.status === 'authorized') || subs.find((p) => p.status === 'paused') || subs.find((p) => p.status === 'cancelled');
+  if (!pick) return { synced: false as const, status: 'none' };
+  const fields = profileFieldsFromPreapproval(pick);
+  if (!fields) return { synced: false as const, status: pick.status };
+  // cancelada: não apaga a validade do período já pago
+  await admin.from('profiles').update(fields).eq('id', profileId);
+  return { synced: true as const, status: String(fields.nitro_status) };
+}
+
 export async function cancelPreapproval(token: string, id: string): Promise<boolean> {
   const res = await fetch(`${MP}/preapproval/${encodeURIComponent(id)}`, {
     method: 'PUT',

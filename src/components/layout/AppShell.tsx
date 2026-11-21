@@ -10,8 +10,10 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { NitroMenuItem } from '@/components/nitro/NitroMenuItem';
 import { Menu, X, Heart, Info, FileText, Shield } from 'lucide-react';
+import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
-const FULLSCREEN_ROUTES = ['/login'];
+// rotas com layout próprio (sem as barras do site)
+const FULLSCREEN_ROUTES = ['/login', '/notebook'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -67,6 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {menuOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-surface/95 backdrop-blur-xl border border-border shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               <NitroMenuItem onNavigate={() => setMenuOpen(false)} />
+              <NotebookNavItem variant="menu" onNavigate={() => setMenuOpen(false)} />
               <div className="my-1 border-t border-border/70" />
               <Link
                 href="/apoie"

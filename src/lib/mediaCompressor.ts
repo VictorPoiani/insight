@@ -468,7 +468,7 @@ async function apiR2(body: Record<string, unknown>) {
 /** Envia um arquivo JÁ comprimido. O servidor registra o tamanho e assina Content-Length. */
 export async function uploadFileToR2(
   file: File,
-  meta: { isGif?: boolean; originalSize?: number },
+  meta: { isGif?: boolean; originalSize?: number; scope?: 'posts' | 'notebook' },
   onStatus?: StatusFn
 ): Promise<{ publicUrl: string; r2Key: string | null }> {
   const contentType = file.type || 'application/octet-stream';
@@ -482,6 +482,7 @@ export async function uploadFileToR2(
     compressedSize: file.size,
     originalSize: meta.originalSize ?? file.size,
     isGif: Boolean(meta.isGif),
+    scope: meta.scope ?? 'posts',
   });
 
   if (res.ok && data.fallbackToSupabase) {
@@ -558,9 +559,9 @@ export async function uploadFileToR2(
  */
 export async function uploadMediaToInsight(
   rawFile: File,
-  opts: { budgetBytes: number; forceGifLoop?: boolean; asImage?: boolean; asFile?: boolean; onStatus?: StatusFn }
+  opts: { budgetBytes: number; forceGifLoop?: boolean; asImage?: boolean; asFile?: boolean; onStatus?: StatusFn; scope?: 'posts' | 'notebook' }
 ): Promise<UploadR2Result> {
-  const { budgetBytes, forceGifLoop = false, asImage = false, asFile = false, onStatus } = opts;
+  const { budgetBytes, forceGifLoop = false, asImage = false, asFile = false, onStatus, scope = 'posts' } = opts;
   const t = rawFile.type.toLowerCase();
 
   let compressed: CompressedMediaResult;
@@ -581,7 +582,7 @@ export async function uploadMediaToInsight(
   }
 
   onStatus?.('Conectando à Cloudflare R2...', 95);
-  const up = await uploadFileToR2(compressed.file, { isGif: compressed.isGif, originalSize: compressed.originalSize }, onStatus);
+  const up = await uploadFileToR2(compressed.file, { isGif: compressed.isGif, originalSize: compressed.originalSize, scope }, onStatus);
   onStatus?.('Concluído!', 100);
 
   return {

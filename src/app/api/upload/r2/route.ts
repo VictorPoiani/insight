@@ -138,6 +138,14 @@ export async function POST(req: NextRequest) {
 
     // ------------------------------------------------ novo upload
     const { fileName, contentType, isGif } = body;
+    // My Notebook: pasta própria no bucket, só para quem tem acesso ao notebook
+    const scope = body.scope === 'notebook' ? 'notebook' : 'posts';
+    if (scope === 'notebook') {
+      const { data: allowed } = await supabase.rpc('notebook_has_access');
+      if (!allowed) {
+        return NextResponse.json({ error: 'O My Notebook ainda não está liberado para a sua conta.' }, { status: 403 });
+      }
+    }
     const size = Math.floor(Number(body.compressedSize));
     const originalSize = Math.floor(Number(body.originalSize)) || null;
 
@@ -171,7 +179,7 @@ export async function POST(req: NextRequest) {
           : 'files';
     const yearMonth = new Date().toISOString().slice(0, 7);
     const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
-    const r2Key = `users/${user.id}/${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
+    const r2Key = `users/${user.id}/${scope === 'notebook' ? 'notebook/' : ''}${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
 
     // registra ANTES de assinar: o banco valida o limite de novo e guarda o tamanho exato
     const { error: regError } = await supabase.rpc('register_media_upload', {

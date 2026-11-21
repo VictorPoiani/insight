@@ -24,6 +24,7 @@ import {
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
+import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
 const navItems = [
   { name: 'Início', href: '/', icon: House },
@@ -385,6 +386,9 @@ export function LeftSidebar() {
               </>
             )}
           </Link>
+
+          {/* My Notebook — beta fechada: só admin entra; os demais veem bloqueado */}
+          <NotebookNavItem variant="sidebar" collapsed={isCollapsed} isAdmin={currentUser?.role === 'admin'} active={pathname.startsWith('/notebook')} />
         </nav>
       </div>
 

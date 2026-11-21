@@ -63,6 +63,8 @@ interface TopicWorkspaceViewProps {
   descriptionBlocks?: PostBlock[] | null;
   isAdmin: boolean;
   onWorkspaceUpdated?: (nextData: TopicWorkspaceData) => void;
+  /** Salva em outro lugar (ex.: My Notebook) em vez de custom_topics. */
+  persistOverride?: (nextData: TopicWorkspaceData) => Promise<void> | void;
 }
 
 const NODE_COLORS = [
@@ -95,6 +97,7 @@ export function TopicWorkspaceView({
   descriptionBlocks,
   isAdmin,
   onWorkspaceUpdated,
+  persistOverride,
 }: TopicWorkspaceViewProps) {
   const [data, setData] = useState<TopicWorkspaceData>(initialData || {});
   const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -137,6 +140,13 @@ export function TopicWorkspaceView({
     if (!isAdmin) return;
 
     setSavingStatus('saving');
+
+    if (persistOverride) {
+      await persistOverride(nextData);
+      setSavingStatus('saved');
+      setTimeout(() => setSavingStatus('idle'), 1800);
+      return;
+    }
 
     const updatedBlocks = Array.isArray(descriptionBlocks)
       ? descriptionBlocks.map((b, idx) =>

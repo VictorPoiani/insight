@@ -81,6 +81,17 @@ interface PostComposerProps {
   editingPost?: Post | null;
   onCancelEdit?: () => void;
   onPostUpdated?: (updatedPost: Post) => void;
+  /**
+   * My Notebook: o compositor vira editor de blocos de uma nota (sem tópicos,
+   * tags, visibilidade nem botão de publicar). Cada mudança chama onBlocksChange.
+   */
+  embedded?: { initialBlocks: PostBlock[]; onBlocksChange: (blocks: PostBlock[]) => void };
+  /** Abre o compositor já preenchido (ex.: publicar um capítulo do notebook). */
+  prefillBlocks?: PostBlock[] | null;
+  /** Escopo próprio do rascunho na nuvem (evita misturar com o rascunho do feed). */
+  draftScopeOverride?: string;
+  /** Chamado com o id do post criado. */
+  onPublished?: (postId: string) => void;
 }
 
 interface WritingIssue {
@@ -512,12 +523,35 @@ export function PostComposer({
   editingPost = null,
   onCancelEdit,
   onPostUpdated,
+  embedded,
+  prefillBlocks,
+  draftScopeOverride,
+  onPublished,
 }: PostComposerProps) {
   const isEditMode = Boolean(editingPost);
+  const isEmbedded = Boolean(embedded);
+  const uploadScope: 'posts' | 'notebook' = isEmbedded ? 'notebook' : 'posts';
 
   const [blocks, setBlocks] = useState<PostBlock[]>(() =>
-    buildInitialBlocksFromPost(editingPost)
+    embedded?.initialBlocks?.length
+      ? embedded.initialBlocks
+      : prefillBlocks?.length
+        ? prefillBlocks
+        : buildInitialBlocksFromPost(editingPost)
   );
+
+  // modo notebook: repassa cada mudança para a nota
+  const embeddedChangeRef = useRef(embedded?.onBlocksChange);
+  embeddedChangeRef.current = embedded?.onBlocksChange;
+  const embeddedFirst = useRef(true);
+  useEffect(() => {
+    if (!isEmbedded) return;
+    if (embeddedFirst.current) {
+      embeddedFirst.current = false;
+      return;
+    }
+    embeddedChangeRef.current?.(blocks);
+  }, [blocks, isEmbedded]);
   const [activeBlockId, setActiveBlockId] = useState<string>('');
   const [menuOpenForBlockId, setMenuOpenForBlockId] = useState<string | null>(null);
   const [cellConfigOpenForId, setCellConfigOpenForId] = useState<string | null>(null);
@@ -605,10 +639,12 @@ export function PostComposer({
     visibility: PostVisibility;
     isPinned: boolean;
   };
-  const draftScope = editingPost
-    ? `post:edit:${editingPost.id}`
-    : `post:new${defaultTag ? `:${defaultTag}` : ''}`;
-  const draft = useCloudDraft<PostDraft>(isAdmin ? draftScope : null, authorId, (d) =>
+  const draftScope = draftScopeOverride
+    ? draftScopeOverride
+    : editingPost
+      ? `post:edit:${editingPost.id}`
+      : `post:new${defaultTag ? `:${defaultTag}` : ''}`;
+  const draft = useCloudDraft<PostDraft>(isAdmin && !isEmbedded ? draftScope : null, authorId, (d) =>
     !d.blocks.some(
       (b) =>
         (b.html && b.html.replace(/<[^>]*>|&nbsp;/g, '').trim()) ||
@@ -1173,6 +1209,7 @@ export function PostComposer({
     try {
       const result = await uploadMediaToInsight(file, {
         budgetBytes: remainingBytes,
+        scope: uploadScope,
         asImage: true,
         onStatus: onUploadStatus,
       });
@@ -1211,6 +1248,7 @@ export function PostComposer({
     try {
       const result = await uploadMediaToInsight(file, {
         budgetBytes: remainingBytes,
+        scope: uploadScope,
         forceGifLoop: isGifBlock,
         onStatus: onUploadStatus,
       });
@@ -1243,6 +1281,7 @@ export function PostComposer({
       const isMotion = file.type.startsWith('video/') || file.type === 'image/gif';
       const res = await uploadMediaToInsight(file, {
         budgetBytes: remainingBytes,
+        scope: uploadScope,
         forceGifLoop: file.type === 'image/gif',
         asImage: !isMotion,
         onStatus: onUploadStatus,
@@ -1297,6 +1336,7 @@ export function PostComposer({
     try {
       const res = await uploadMediaToInsight(file, {
         budgetBytes: remainingBytes,
+        scope: uploadScope,
         asFile: true,
         onStatus: onUploadStatus,
       });
@@ -1425,6 +1465,10 @@ export function PostComposer({
   }
 
   async function handleSubmit(e: React.FormEvent) {
+    if (isEmbedded) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     if (!isAdmin || isSubmitting) return;
     if (overQuota) {
@@ -1564,6 +1608,7 @@ export function PostComposer({
       setIsPinned(false);
       setWritingIssues([]);
       setCompressionBadges({});
+      if (createdPost?.id) onPublished?.(createdPost.id);
       onPostCreated?.();
     } else {
       alert('Erro ao publicar insight: ' + error.message);
@@ -1601,7 +1646,9 @@ export function PostComposer({
     <form
       onSubmit={handleSubmit}
       className={`${
-        isEditMode
+        isEmbedded
+          ? 'nb-blocks-editor space-y-4'
+          : isEditMode
           ? 'p-4 rounded-2xl bg-surface/80 border border-accent/40 space-y-4'
           : 'border-b border-border bg-surface/40 p-5 sm:p-6 space-y-4'
       }`}
@@ -3649,6 +3696,7 @@ export function PostComposer({
         </button>
       </div>
 
+      {!isEmbedded && (<>
       {/* SELETOR DE TÓPICOS */}
       <div className="p-3 rounded-xl bg-elevated/60 border border-border space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3717,6 +3765,8 @@ export function PostComposer({
         </p>
       )}
 
+      </>)}
+
       {/* COTA DE ANEXOS DO POST (peso comprimido no R2) */}
       {usedBytes > 0 && (
         <div className="space-y-1" aria-live="polite">
@@ -3744,6 +3794,7 @@ export function PostComposer({
         </div>
       )}
 
+      {!isEmbedded && (<>
       {/* RODAPÉ DO COMPOSITOR */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
         <div className="flex items-center gap-2 flex-1 min-w-[180px]">
@@ -3831,6 +3882,7 @@ export function PostComposer({
           </button>
         </div>
       </div>
+      </>)}
 
       {/* MODAL DE PESQUISA DE MÚSICAS PARA O BLOCO SPOTIFY DO POST */}
       <SpotifySearchModal

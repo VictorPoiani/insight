@@ -165,7 +165,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isR2Configured()) {
-      return NextResponse.json({ fallbackToSupabase: true }, { status: 200 });
+      console.error('[upload] Cloudflare R2 não configurado (variáveis R2_* ausentes)');
+      return NextResponse.json({ error: 'Armazenamento indisponível no momento. Tente de novo mais tarde.' }, { status: 503 });
     }
 
     const type = String(contentType).toLowerCase();

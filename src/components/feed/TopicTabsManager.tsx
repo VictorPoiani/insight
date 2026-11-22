@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getTopicLimit } from '@/lib/contributorLevels';
@@ -566,47 +567,12 @@ export function TopicTabsManager({
 
     setUploadingBanner(true);
     try {
-      const presignRes = await fetch('/api/upload/r2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type || 'image/jpeg',
-          originalSize: file.size,
-          compressedSize: file.size,
-          isGif: file.type === 'image/gif',
-        }),
-      });
-
-      const presignData = await presignRes.json();
-
-      if (presignRes.ok && presignData.uploadUrl) {
-        const putRes = await fetch(presignData.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type || 'image/jpeg' },
-          body: file,
-        });
-
-        if (putRes.ok) {
-          setBannerUrl(presignData.publicUrl);
-          setBannerR2Key(presignData.r2Key || null);
-          setUploadingBanner(false);
-          return;
-        }
-      }
-
-      const ext = file.name.split('.').pop() || 'jpg';
-      const fileName = `topics/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-      let bucket = 'cover';
-      const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-      if (error) {
-        bucket = 'posts';
-        await supabase.storage.from(bucket).upload(fileName, file);
-      }
-      const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-      setBannerUrl(data.publicUrl);
-    } catch {
-      alert('Erro ao enviar imagem de capa.');
+      // Sempre no Cloudflare R2
+      const res = await uploadMediaToInsight(file, { budgetBytes: 50 * 1024 * 1024, asImage: file.type !== 'image/gif' });
+      setBannerUrl(res.publicUrl);
+      setBannerR2Key(res.r2Key || null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem de capa.');
     } finally {
       setUploadingBanner(false);
     }

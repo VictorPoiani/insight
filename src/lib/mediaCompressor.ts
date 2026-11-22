@@ -485,16 +485,7 @@ export async function uploadFileToR2(
     scope: meta.scope ?? 'posts',
   });
 
-  if (res.ok && data.fallbackToSupabase) {
-    // R2 não configurado (ambiente local): Storage do Supabase
-    const supabase = createClient();
-    const { data: auth } = await supabase.auth.getUser();
-    const ext = file.name.split('.').pop() || 'bin';
-    const path = `${auth.user?.id ?? 'anon'}/media/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-    const { error } = await supabase.storage.from('posts').upload(path, file);
-    if (error) throw new Error('Erro ao salvar arquivo: ' + error.message);
-    return { publicUrl: supabase.storage.from('posts').getPublicUrl(path).data.publicUrl, r2Key: null };
-  }
+  // Todo arquivo vai para o Cloudflare R2; não existe mais plano B no Supabase Storage.
   if (!res.ok) throw new Error(data?.error || 'Erro ao gerar link de upload na Cloudflare.');
 
   if (data.mode === 'single') {

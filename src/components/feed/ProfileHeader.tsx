@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Profile } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
+import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
@@ -1027,63 +1028,14 @@ export function ProfileHeader({
     if (bucket === 'cover') setCoverUrl(preview);
     else setAvatarUrl(preview);
 
+    // Sempre no Cloudflare R2 (imagem comprimida no navegador antes do envio)
     let finalPublicUrl = '';
-
-    // 1. Tenta enviar via Cloudflare R2 CDN primeiro
     try {
-      const presignRes = await fetch('/api/upload/r2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: `${bucket}-${profile.id}-${file.name}`,
-          contentType: file.type || 'image/jpeg',
-          originalSize: file.size,
-          compressedSize: file.size,
-          isGif: file.type === 'image/gif',
-        }),
-      });
-
-      const presignData = await presignRes.json();
-      if (presignRes.ok && presignData.uploadUrl) {
-        const putRes = await fetch(presignData.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type || 'image/jpeg' },
-          body: file,
-        });
-        if (putRes.ok && presignData.publicUrl) {
-          finalPublicUrl = presignData.publicUrl;
-        }
-      }
-    } catch {
-      // Continua para o fallback do Supabase Storage
-    }
-
-    // 2. Fallback para Supabase Storage caso necessário
-    if (!finalPublicUrl) {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-
-      let targetBucket: string = bucket;
-      const { error: uploadError } = await supabase.storage
-        .from(targetBucket)
-        .upload(fileName, file);
-
-      if (uploadError) {
-        targetBucket = 'posts';
-        const { error: retryError } = await supabase.storage
-          .from(targetBucket)
-          .upload(fileName, file);
-
-        if (retryError) {
-          alert(`Erro ao enviar imagem: ${retryError.message}`);
-          return;
-        }
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from(targetBucket)
-        .getPublicUrl(fileName);
-      finalPublicUrl = publicUrlData.publicUrl;
+      const res = await uploadMediaToInsight(file, { budgetBytes: 50 * 1024 * 1024, asImage: file.type !== 'image/gif' });
+      finalPublicUrl = res.publicUrl;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
+      return;
     }
 
     const updatePayload =

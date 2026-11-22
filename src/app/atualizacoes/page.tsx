@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
-import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
+import { uploadCompressedMediaToR2, uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { CustomSpotifyPlayer } from '@/components/feed/CustomSpotifyPlayer';
 import {
   PostBlock,
@@ -689,18 +689,15 @@ export default function NotificacoesPage() {
     }
 
     setUploadingBlockId(blockId);
-    const ext = file.name.split('.').pop();
-    const fileName = `updates/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-    const { error } = await supabase.storage.from('posts').upload(fileName, file);
-    setUploadingBlockId(null);
-
-    if (error) {
-      alert('Erro ao enviar imagem: ' + error.message);
-      return;
+    try {
+      // Sempre no Cloudflare R2
+      const res = await uploadMediaToInsight(file, { budgetBytes: MAX_FILE_SIZE_BYTES, asImage: file.type !== 'image/gif' });
+      updateBlock(blockId, { imageUrl: res.publicUrl });
+    } catch (err) {
+      alert('Erro ao enviar imagem: ' + (err instanceof Error ? err.message : 'tente de novo'));
+    } finally {
+      setUploadingBlockId(null);
     }
-
-    const { data: pubData } = supabase.storage.from('posts').getPublicUrl(fileName);
-    updateBlock(blockId, { imageUrl: pubData.publicUrl });
   }
 
   async function handleBlockVideoUpload(
@@ -742,26 +739,20 @@ export default function NotificacoesPage() {
 
     setUploadingBlockId(blockId);
     const ext = file.name.split('.').pop() || 'bin';
-    const safeStorageName = `updates/files/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from('posts')
-      .upload(safeStorageName, file);
-    setUploadingBlockId(null);
-
-    if (error) {
-      alert('Erro ao anexar arquivo: ' + error.message);
-      return;
+    try {
+      // Sempre no Cloudflare R2
+      const res = await uploadMediaToInsight(file, { budgetBytes: MAX_FILE_SIZE_BYTES, asFile: true });
+      updateBlock(blockId, {
+        fileUrl: res.publicUrl,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: ext.toUpperCase(),
+      });
+    } catch (err) {
+      alert('Erro ao anexar arquivo: ' + (err instanceof Error ? err.message : 'tente de novo'));
+    } finally {
+      setUploadingBlockId(null);
     }
-
-    const { data: pubData } = supabase.storage
-      .from('posts')
-      .getPublicUrl(safeStorageName);
-    updateBlock(blockId, {
-      fileUrl: pubData.publicUrl,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: ext.toUpperCase(),
-    });
   }
 
   async function handleSaveUpdate(e: React.FormEvent) {

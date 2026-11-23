@@ -78,7 +78,8 @@ export type PostBlockType =
   | 'roadmap';
 
 export type FontStyleType = 'sans' | 'serif' | 'mono';
-export type ImageWidthType = '25%' | '50%' | '75%' | '100%';
+/** Largura da imagem no card, em % (atalhos 25/50/75/100 ou valor livre). */
+export type ImageWidthType = `${number}%`;
 export type ImageAlignType = 'left' | 'center' | 'right';
 export type PostVisibility = 'public' | 'private';
 export type PostVisibilityType = PostVisibility;

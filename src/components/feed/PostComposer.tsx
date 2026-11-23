@@ -579,6 +579,8 @@ export function PostComposer({
 
   const mindMapCanvasRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [blockMoreMenuId, setBlockMoreMenuId] = useState<string | null>(null);
+  const [resizingImageId, setResizingImageId] = useState<string | null>(null);
+  const imageFrameRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draggingMindNode, setDraggingMindNode] = useState<{
     blockId: string;
     nodeId: string;
@@ -2323,17 +2325,84 @@ export function PostComposer({
                           </div>
                         </div>
 
+                        <div className="flex items-center gap-2 px-0.5">
+                          <span className="text-[10px] font-semibold text-muted shrink-0">Tamanho</span>
+                          <input
+                            type="range"
+                            min={15}
+                            max={100}
+                            step={5}
+                            value={parseInt(block.imageWidth || '100%', 10) || 100}
+                            onChange={(e) => updateBlock(block.id, { imageWidth: `${Number(e.target.value)}%` })}
+                            aria-label="Largura da imagem no card"
+                            className="flex-1 min-w-0 accent-[var(--accent)] h-1 cursor-pointer"
+                          />
+                          <span className="w-9 text-right text-[10px] font-mono font-bold text-primary tabular-nums">
+                            {block.imageWidth || '100%'}
+                          </span>
+                        </div>
+
+                        <div
+                          ref={(el) => {
+                            imageFrameRefs.current[block.id] = el;
+                          }}
+                          className="w-full"
+                        >
                         <div
                           style={{ width: block.imageWidth || '100%' }}
                           className={`${getImageAlignClass(
                             block.imageAlign
-                          )} transition-all duration-200 space-y-1 max-w-full`}
+                          )} ${resizingImageId === block.id ? '' : 'transition-[width] duration-200'} space-y-1 max-w-full relative group/img`}
                         >
+                          <div className="relative">
                           <img
                             src={block.imageUrl}
                             alt={block.imageCaption || 'Imagem do post'}
+                            draggable={false}
                             className="w-full h-auto rounded-xl border border-border object-cover"
                           />
+                          {/* alça de redimensionar (arraste o canto) */}
+                          <span
+                            role="slider"
+                            aria-label="Arraste para redimensionar a imagem"
+                            aria-valuenow={parseInt(block.imageWidth || '100%', 10) || 100}
+                            aria-valuemin={15}
+                            aria-valuemax={100}
+                            title="Arraste para redimensionar"
+                            style={{ touchAction: 'none' }}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                              setResizingImageId(block.id);
+                            }}
+                            onPointerMove={(e) => {
+                              if (resizingImageId !== block.id) return;
+                              const frame = imageFrameRefs.current[block.id];
+                              if (!frame) return;
+                              const r = frame.getBoundingClientRect();
+                              const align = block.imageAlign || 'center';
+                              // largura em px a partir da borda fixa (esq., dir. ou centro)
+                              const px =
+                                align === 'left'
+                                  ? e.clientX - r.left
+                                  : align === 'right'
+                                    ? r.right - e.clientX
+                                    : Math.abs(e.clientX - (r.left + r.width / 2)) * 2;
+                              const pct = Math.max(15, Math.min(100, Math.round(((px / r.width) * 100) / 5) * 5));
+                              if (`${pct}%` !== block.imageWidth) updateBlock(block.id, { imageWidth: `${pct}%` });
+                            }}
+                            onPointerUp={() => setResizingImageId(null)}
+                            onPointerCancel={() => setResizingImageId(null)}
+                            className={`absolute ${
+                              (block.imageAlign || 'center') === 'right' ? 'left-1 cursor-nesw-resize' : 'right-1 cursor-nwse-resize'
+                            } bottom-1 w-6 h-6 rounded-full bg-accent text-white shadow-lg ring-2 ring-white/80 grid place-items-center opacity-90 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity`}
+                          >
+                            <svg viewBox="0 0 10 10" className="w-3 h-3" aria-hidden>
+                              <path d="M9 1 1 9M9 5 5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </span>
+                          </div>
                           <input
                             type="text"
                             value={block.imageCaption || ''}
@@ -2343,6 +2412,7 @@ export function PostComposer({
                             placeholder="Legenda (opcional)..."
                             className="w-full bg-transparent text-center text-[11px] text-secondary placeholder:text-muted focus:outline-none truncate"
                           />
+                        </div>
                         </div>
                       </div>
                     )}
@@ -3681,6 +3751,8 @@ export function PostComposer({
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           type="button"
+          title="Adicionar texto"
+          aria-label="Adicionar texto"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'paragraph')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3689,6 +3761,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar imagem"
+          aria-label="Adicionar imagem"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'image')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3697,6 +3771,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar vídeo"
+          aria-label="Adicionar vídeo"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'video')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3705,6 +3781,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar GIF"
+          aria-label="Adicionar GIF"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'gif')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3713,6 +3791,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar mapa mental 2D"
+          aria-label="Adicionar mapa mental 2D"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'mindmap')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3721,6 +3801,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar roadmap"
+          aria-label="Adicionar roadmap"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'roadmap')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3729,6 +3811,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar gráfico"
+          aria-label="Adicionar gráfico"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'chart')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3737,6 +3821,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar enquete"
+          aria-label="Adicionar enquete"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'poll')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3745,6 +3831,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar tabela"
+          aria-label="Adicionar tabela"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'table')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >

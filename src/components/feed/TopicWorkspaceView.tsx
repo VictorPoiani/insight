@@ -1,5 +1,6 @@
 'use client';
 
+import { usePanZoom, PanZoomControls, boundsFromPercent } from '@/components/canvas/PanZoom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
@@ -114,10 +115,13 @@ export function TopicWorkspaceView({
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [uploadingNodeMediaId, setUploadingNodeMediaId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState<boolean>(false);
-  const panStartRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const boardBounds = useMemo(
+    () => boundsFromPercent(initialData?.mindMapNodes || [], VIRTUAL_BOARD_WIDTH, VIRTUAL_BOARD_HEIGHT, 200, 140),
+    // enquadra pelo conteúdo inicial; depois o usuário controla a câmera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const pz = usePanZoom({ worldWidth: VIRTUAL_BOARD_WIDTH, worldHeight: VIRTUAL_BOARD_HEIGHT, wheel: 'free', initialBounds: boardBounds });
 
   // Estados de Visualização e Filtros dos Demais Modelos
   const [roadmapViewMode, setRoadmapViewMode] = useState<'kanban' | 'timeline'>('kanban');
@@ -196,7 +200,7 @@ export function TopicWorkspaceView({
   useEffect(() => {
     if (!draggingNodeId || !isAdmin) return;
 
-    function handleMouseMove(e: MouseEvent) {
+    function handleMouseMove(e: PointerEvent) {
       if (!boardRef.current || !draggingNodeId) return;
       const rect = boardRef.current.getBoundingClientRect();
       const relX = ((e.clientX - rect.left) / rect.width) * 100;
@@ -221,40 +225,14 @@ export function TopicWorkspaceView({
       });
     }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
     };
   }, [draggingNodeId, isAdmin]);
 
-  // Arraste da Câmara (Pan) no Brainstorm
-  useEffect(() => {
-    if (!isPanning) return;
-
-    function handleMouseMove(e: MouseEvent) {
-      if (!panStartRef.current) return;
-      const dx = e.clientX - panStartRef.current.startX;
-      const dy = e.clientY - panStartRef.current.startY;
-      setPan({
-        x: Math.max(-700, Math.min(700, panStartRef.current.origX + dx)),
-        y: Math.max(-500, Math.min(500, panStartRef.current.origY + dy)),
-      });
-    }
-
-    function handleMouseUp() {
-      setIsPanning(false);
-      panStartRef.current = null;
-    }
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isPanning]);
 
   function addBrainstormCard(nodeType: MindMapNodeType) {
     if (!isAdmin) return;
@@ -764,39 +742,29 @@ export function TopicWorkspaceView({
           )}
 
           <div
-            onMouseDown={(e) => {
-              if (
-                e.target === e.currentTarget ||
-                (e.target as HTMLElement).dataset.canvasBg === 'true'
-              ) {
+            {...pz.viewportProps}
+            onPointerDownCapture={(e) => {
+              const t = e.target as HTMLElement;
+              if (t === e.currentTarget || t.dataset.canvasBg === 'true') {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);
                 setConnectingFromId(null);
-                setIsPanning(true);
-                panStartRef.current = {
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  origX: pan.x,
-                  origY: pan.y,
-                };
               }
             }}
-            className={`relative w-full rounded-2xl bg-[#09090b] border border-border overflow-hidden select-none ${
+            style={{
+              touchAction: 'none',
+              backgroundImage: 'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
+              backgroundSize: `${22 * pz.view.k}px ${22 * pz.view.k}px`,
+              backgroundPosition: `${pz.view.x}px ${pz.view.y}px`,
+            }}
+            className={`relative w-full rounded-2xl bg-[#09090b] border border-border overflow-hidden select-none outline-none ${
               isFullScreen ? 'flex-1 min-h-[520px]' : 'h-[72vh] min-h-[560px]'
-            } ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+            } ${pz.panning ? 'cursor-grabbing' : 'cursor-grab'}`}
           >
             <div
               ref={boardRef}
               data-canvas-bg="true"
-              style={{
-                width: `${VIRTUAL_BOARD_WIDTH}px`,
-                height: `${VIRTUAL_BOARD_HEIGHT}px`,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: '0 0',
-                backgroundImage:
-                  'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                backgroundSize: '22px 22px',
-              }}
+              style={pz.worldStyle}
               className="relative"
             >
               {/* ZONAS DE FUNDO */}
@@ -824,7 +792,8 @@ export function TopicWorkspaceView({
                       className="absolute z-0 rounded-2xl border-2 border-dashed p-3 flex flex-col justify-between transition-colors"
                     >
                       <div
-                        onMouseDown={(e) => {
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => {
                           if (!isAdmin) return;
                           e.stopPropagation();
                           setSelectedNodeId(zone.id);
@@ -1043,12 +1012,14 @@ export function TopicWorkspaceView({
                         transform: 'translate(-50%, -50%)',
                         borderColor: isSelected ? '#ffffff' : '#27272a',
                       }}
+                      data-pz-stop
                       className={`absolute z-20 p-3.5 rounded-xl bg-[#121215]/95 backdrop-blur border shadow-2xl transition-shadow ${
                         isSelected ? 'ring-2 ring-accent/40' : ''
                       }`}
                     >
                       <div
-                        onMouseDown={(e) => {
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => {
                           if (!isAdmin) return;
                           e.stopPropagation();
                           setSelectedNodeId(node.id);
@@ -1358,48 +1329,13 @@ export function TopicWorkspaceView({
                 })}
             </div>
 
-            <div className="absolute bottom-3.5 right-3.5 z-30 flex items-center gap-1 p-1.5 rounded-xl bg-[#141417]/90 backdrop-blur border border-border shadow-xl text-xs">
-              <button
-                type="button"
-                onClick={() =>
-                  setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))
-                }
-                title="Diminuir Zoom"
-                className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-
-              <span className="px-2 font-mono text-[11px] font-bold text-primary">
-                {Math.round(zoom * 100)}%
-              </span>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setZoom((z) => Math.min(1.6, Math.round((z + 0.1) * 10) / 10))
-                }
-                title="Aumentar Zoom"
-                className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-
-              <div className="h-3.5 w-px bg-border mx-0.5" />
-
-              <button
-                type="button"
-                onClick={() => {
-                  setZoom(1);
-                  setPan({ x: 0, y: 0 });
-                }}
-                title="Centralizar quadro"
-                className="px-2 py-1 rounded-lg text-[10px] font-mono font-semibold text-secondary hover:text-primary hover:bg-elevated flex items-center gap-1"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
-              </button>
-            </div>
+            <PanZoomControls
+              k={pz.view.k}
+              onZoomIn={pz.zoomIn}
+              onZoomOut={pz.zoomOut}
+              onFit={() => pz.fit(boundsFromPercent(data.mindMapNodes || [], VIRTUAL_BOARD_WIDTH, VIRTUAL_BOARD_HEIGHT, 200, 140))}
+              className="absolute bottom-3.5 right-3.5 z-30"
+            />
           </div>
         </div>
       )}

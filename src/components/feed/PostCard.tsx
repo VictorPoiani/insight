@@ -1,6 +1,7 @@
 'use client';
 
 import { VideoPlayer } from '@/components/media/VideoPlayer';
+import { MindMapViewer } from '@/components/canvas/MindMapViewer';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useRef } from 'react';
@@ -798,90 +799,16 @@ export function PostCard({
             }
 
             if (b.type === 'mindmap' && Array.isArray(b.mindMapNodes)) {
-              const edges = Array.isArray(b.mindMapEdges) ? b.mindMapEdges : [];
               return (
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-3 sm:p-3.5 rounded-xl bg-elevated border border-border space-y-2.5"
+                  className="p-3 sm:p-3.5 rounded-xl bg-elevated border border-border"
                 >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <Network className="w-3.5 h-3.5 text-[#a855f7]" />
-                      <span>Arquitetura & Brainstorm 2D</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-muted">
-                      {b.mindMapNodes.length} nós
-                    </span>
-                  </div>
-
-                  {/* Wrapper com rolagem lateral suave no celular */}
-                  <div className="w-full overflow-x-auto rounded-xl border border-border">
-                    <div
-                      style={{
-                        backgroundImage:
-                          'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                        backgroundSize: '18px 18px',
-                      }}
-                      className="relative w-full min-w-[560px] h-[340px] sm:h-[380px] bg-[#09090b] overflow-hidden"
-                    >
-                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                        {edges.map((edge) => {
-                          const fromNode = b.mindMapNodes?.find(
-                            (n) => n.id === edge.fromId
-                          );
-                          const toNode = b.mindMapNodes?.find(
-                            (n) => n.id === edge.toId
-                          );
-                          if (!fromNode || !toNode) return null;
-
-                          return (
-                            <line
-                              key={edge.id}
-                              x1={`${fromNode.x}%`}
-                              y1={`${fromNode.y}%`}
-                              x2={`${toNode.x}%`}
-                              y2={`${toNode.y}%`}
-                              stroke={fromNode.color || '#52525b'}
-                              strokeWidth="1.5"
-                              strokeDasharray="4 3"
-                              opacity="0.75"
-                            />
-                          );
-                        })}
-                      </svg>
-
-                      {b.mindMapNodes.map((node, nIdx) => (
-                        <div
-                          key={node.id}
-                          style={{
-                            left: `${node.x}%`,
-                            top: `${node.y}%`,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                          className="absolute z-10 w-44 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border border-zinc-800 shadow-xl space-y-1"
-                        >
-                          <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-800/80">
-                            <span
-                              style={{ backgroundColor: node.color || '#2563eb' }}
-                              className="w-2 h-2 rounded-full shrink-0"
-                            />
-                            <span className="text-[9px] font-mono font-semibold text-zinc-400">
-                              NÓ · {String(nIdx).padStart(2, '0')}
-                            </span>
-                          </div>
-                          <p className="text-xs font-bold text-zinc-100 leading-snug">
-                            {node.label}
-                          </p>
-                          {node.note && (
-                            <p className="text-[10px] text-zinc-400 leading-tight">
-                              {node.note}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <MindMapViewer
+                    nodes={b.mindMapNodes.map((n) => ({ ...n, mediaUrl: n.mediaUrl || undefined }))}
+                    edges={Array.isArray(b.mindMapEdges) ? b.mindMapEdges : []}
+                  />
                 </div>
               );
             }

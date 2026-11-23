@@ -1,5 +1,7 @@
 'use client';
 
+import { PanZoomSurface, boundsFromPercent } from '@/components/canvas/PanZoom';
+import { MINDMAP_WORLD } from '@/components/canvas/MindMapViewer';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
@@ -771,7 +773,7 @@ export function PostComposer({
   useEffect(() => {
     if (!draggingMindNode) return;
 
-    function handleMouseMove(e: MouseEvent) {
+    function handleMouseMove(e: PointerEvent) {
       if (!draggingMindNode) return;
       const canvasEl = mindMapCanvasRefs.current[draggingMindNode.blockId];
       if (!canvasEl) return;
@@ -780,8 +782,8 @@ export function PostComposer({
       const relX = ((e.clientX - rect.left) / rect.width) * 100;
       const relY = ((e.clientY - rect.top) / rect.height) * 100;
 
-      const clampedX = Math.max(10, Math.min(90, Math.round(relX * 10) / 10));
-      const clampedY = Math.max(12, Math.min(88, Math.round(relY * 10) / 10));
+      const clampedX = Math.max(4, Math.min(96, Math.round(relX * 10) / 10));
+      const clampedY = Math.max(5, Math.min(95, Math.round(relY * 10) / 10));
 
       setBlocks((prev) =>
         prev.map((blk) => {
@@ -802,11 +804,13 @@ export function PostComposer({
       setDraggingMindNode(null);
     }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
     };
   }, [draggingMindNode]);
 
@@ -2692,20 +2696,18 @@ export function PostComposer({
                       </div>
                     </div>
 
-                    <div
-                      ref={(el) => {
+                    <PanZoomSurface
+                      worldWidth={MINDMAP_WORLD.width}
+                      worldHeight={MINDMAP_WORLD.height}
+                      bounds={boundsFromPercent(block.mindMapNodes || [], MINDMAP_WORLD.width, MINDMAP_WORLD.height)}
+                      heightClass="h-[360px] sm:h-[420px]"
+                      worldRef={(el) => {
                         mindMapCanvasRefs.current[block.id] = el;
                       }}
-                      onClick={() => {
+                      onBackgroundClick={() => {
                         setSelectedMindNode(null);
                         setConnectingMindNodeFrom(null);
                       }}
-                      style={{
-                        backgroundImage:
-                          'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                        backgroundSize: '18px 18px',
-                      }}
-                      className="relative w-full h-[360px] rounded-xl bg-[#09090b] border border-border overflow-hidden select-none"
                     >
                       <svg className="absolute inset-0 w-full h-full pointer-events-none">
                         {(block.mindMapEdges || []).map((edge) => {
@@ -2785,12 +2787,14 @@ export function PostComposer({
                               transform: 'translate(-50%, -50%)',
                               borderColor: isSelected ? '#ffffff' : '#27272a',
                             }}
+                            data-pz-stop
                             className={`absolute z-10 w-40 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border shadow-xl ${
                               isSelected ? 'ring-2 ring-accent/40' : ''
                             }`}
                           >
                             <div
-                              onMouseDown={(e) => {
+                              style={{ touchAction: 'none' }}
+                              onPointerDown={(e) => {
                                 e.stopPropagation();
                                 setSelectedMindNode({
                                   blockId: block.id,
@@ -2906,7 +2910,7 @@ export function PostComposer({
                           </div>
                         );
                       })}
-                    </div>
+                    </PanZoomSurface>
                   </div>
                 )}
 

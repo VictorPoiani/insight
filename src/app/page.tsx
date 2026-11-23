@@ -9,7 +9,7 @@ import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
-import { useNewsFeed, useNewsFollows, type NewsItem } from '@/components/news/useNews';
+import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/components/news/useNews';
 import { PostComposer } from '@/components/feed/PostComposer';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
@@ -24,6 +24,7 @@ import {
   PenSquare,
   ChevronLeft,
   ChevronRight,
+  Newspaper,
 } from 'lucide-react';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
@@ -362,6 +363,9 @@ function CommunityHomeFeed() {
   // ---------------------------------------------------- notícias no Para você
   // Só temas que a pessoa segue; a aba Notícias mostra todos.
   const newsFollows = useNewsFollows(loggedProfile?.id ?? null);
+  const searchNews = useNewsSearch(activeTab === 'members' ? '' : search, 8);
+  const [showAllSearchNews, setShowAllSearchNews] = useState(false);
+  useEffect(() => setShowAllSearchNews(false), [search]);
   const mixNews = activeTab === 'for_you' && !selectedTag && !search.trim() && Boolean(loggedProfile);
   const followsKey = Array.from(newsFollows.follows).sort().join(',');
   const forYouNews = useNewsFeed('for_you', {
@@ -827,6 +831,24 @@ function CommunityHomeFeed() {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {search.trim().length >= 2 && searchNews.items.length > 0 && (
+            <section className="border-b border-border" aria-label="Notícias relacionadas à busca">
+              <div className="px-4 sm:px-6 pt-3 pb-1 flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                  <Newspaper className="w-3.5 h-3.5 text-sky-400" /> Notícias sobre &ldquo;{search.trim()}&rdquo;
+                </span>
+                {searchNews.items.length > 3 && (
+                  <button type="button" onClick={() => setShowAllSearchNews((v) => !v)} className="text-[11px] font-semibold text-accent hover:underline">
+                    {showAllSearchNews ? 'Ver menos' : `Ver todas (${searchNews.items.length})`}
+                  </button>
+                )}
+              </div>
+              {(showAllSearchNews ? searchNews.items : searchNews.items.slice(0, 3)).map((item) => (
+                <NewsCard key={`sn-${item.id}`} item={item} onPatch={searchNews.patch} compact />
+              ))}
             </section>
           )}
 

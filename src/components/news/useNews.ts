@@ -137,3 +137,35 @@ export function useNewsFollows(profileId: string | null) {
 
   return { follows, ready, toggle };
 }
+
+/** Notícias relacionadas a um termo de busca (com espera de 350 ms ao digitar). */
+export function useNewsSearch(query: string, limit = 8) {
+  const supabase = useMemo(() => createClient(), []);
+  const [items, setItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const reqId = useRef(0);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    const id = ++reqId.current;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('search_news', { p_q: q.replace(/^#/, ''), p_limit: limit });
+      if (id !== reqId.current) return;
+      setItems(Array.isArray(data) ? (data as NewsItem[]) : []);
+      setLoading(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [query, limit, supabase]);
+
+  const patch = useCallback((id: string, p: Partial<NewsItem> | null) => {
+    setItems((prev) => (p === null ? prev.filter((x) => x.id !== id) : prev.map((x) => (x.id === id ? { ...x, ...p } : x))));
+  }, []);
+
+  return { items, loading, patch };
+}

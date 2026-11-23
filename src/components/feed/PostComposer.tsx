@@ -66,6 +66,8 @@ import {
   SlidersHorizontal,
   SpellCheck,
   Check,
+  EyeOff,
+  MoreHorizontal,
   Move,
   Globe,
   Lock,
@@ -576,6 +578,7 @@ export function PostComposer({
   } | null>(null);
 
   const mindMapCanvasRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [blockMoreMenuId, setBlockMoreMenuId] = useState<string | null>(null);
   const [draggingMindNode, setDraggingMindNode] = useState<{
     blockId: string;
     nodeId: string;
@@ -1972,6 +1975,49 @@ export function PostComposer({
                 </div>
 
                 <div className="flex items-center gap-0.5 shrink-0">
+                  {block.spoiler && (
+                    <span className="mr-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[9px] font-bold">
+                      <EyeOff className="w-2.5 h-2.5" /> Spoiler
+                    </span>
+                  )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setBlockMoreMenuId(blockMoreMenuId === block.id ? null : block.id)}
+                      title="Mais opções do bloco"
+                      aria-label="Mais opções do bloco"
+                      aria-expanded={blockMoreMenuId === block.id}
+                      className="p-1 rounded hover:bg-elevated text-muted hover:text-primary"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+                    {blockMoreMenuId === block.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setBlockMoreMenuId(null)} />
+                        <div role="menu" className="absolute right-0 top-full mt-1 z-50 w-56 py-1 rounded-xl bg-surface border border-border shadow-2xl text-xs normal-case">
+                          <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={Boolean(block.spoiler)}
+                            onClick={() => {
+                              updateBlock(block.id, { spoiler: !block.spoiler });
+                              setBlockMoreMenuId(null);
+                            }}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-primary hover:bg-elevated"
+                          >
+                            <span className="flex items-center gap-2">
+                              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                              <span>
+                                <span className="block font-semibold">Contém spoiler</span>
+                                <span className="block text-[10px] text-muted">Desfoca este bloco para os leitores</span>
+                              </span>
+                            </span>
+                            {block.spoiler && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => moveBlockStep(block.id, 'up')}

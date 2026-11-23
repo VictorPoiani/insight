@@ -275,6 +275,8 @@ export interface PostBlock {
   mindMapNodes?: MindMapNodeItem[];
   mindMapEdges?: MindMapEdgeItem[];
   roadmapSteps?: RoadmapStepItem[];
+  /** Marcado pelo autor: aparece desfocado até o leitor tocar. */
+  spoiler?: boolean;
 }
 
 export interface Post {

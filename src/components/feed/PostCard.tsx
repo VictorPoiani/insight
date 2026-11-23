@@ -3,6 +3,7 @@
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { MindMapViewer } from '@/components/canvas/MindMapViewer';
 import { QuotedPostCard, QuoteComposerModal } from './QuotedPost';
+import { SpoilerBlock } from './SpoilerBlock';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useRef } from 'react';
@@ -504,148 +505,8 @@ export function PostCard({
 
   const authorProfileHref = getProfileHref(author.id, author.username);
 
-  return (
-    <article
-      ref={articleRef}
-      id={`post-${post.id}`}
-      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
-        isHighlightedFromUrl
-          ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
-          : postVisibility === 'private'
-          ? 'bg-elevated/25 hover:bg-elevated/40'
-          : 'hover:bg-surface/30'
-      }`}
-    >
-      {/* Indicadores Superiores: Fixado / Privado */}
-      {(isPostPinned || postVisibility === 'private') && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {isPostPinned && (
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
-              <Pin className="w-3.5 h-3.5" />
-              <span>Insight Fixado</span>
-            </div>
-          )}
-
-          {postVisibility === 'private' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary font-mono text-[10px] font-semibold uppercase tracking-wider">
-              <Lock className="w-3 h-3" />
-              <span>Privado · Só para mim</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Cabeçalho do Post */}
-      <div className="flex items-center justify-between gap-2 sm:gap-3">
-        <Link
-          href={authorProfileHref}
-          className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
-        >
-          <CosmeticAvatar profile={author} size={40}>
-            <img
-              src={author.avatar_url || '/assets/net/default-perfil'}
-              alt={author.full_name}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
-            />
-          </CosmeticAvatar>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
-              <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
-                <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
-              </span>
-              {author.email_verified_at && <VerifiedBadge size={14} />}
-              <span className="text-xs text-muted truncate">
-                @{author.username || 'insight'}
-              </span>
-              <span className="hidden sm:inline-flex shrink-0">
-                <CosmeticTag profile={author} />
-              </span>
-            </div>
-            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
-          </div>
-        </Link>
-
-        {isAdmin && (
-          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleVisibility}
-              title={
-                postVisibility === 'private'
-                  ? 'Privado (Só para mim) — Clique para tornar Público'
-                  : 'Público — Clique para trancar (Só para mim)'
-              }
-              className={`p-1.5 rounded-lg transition-colors ${
-                postVisibility === 'private'
-                  ? 'text-primary bg-elevated border border-border'
-                  : 'text-muted hover:text-primary hover:bg-elevated'
-              }`}
-            >
-              {postVisibility === 'private' ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Globe className="w-4 h-4" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsEditing(!isEditing)}
-              title={isEditing ? 'Fechar editor' : 'Editar Insight'}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isEditing
-                  ? 'text-accent bg-accent/10'
-                  : 'text-muted hover:text-accent hover:bg-elevated'
-              }`}
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              title="Excluir Insight"
-              className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Editor Inline ou Conteúdo Renderizado */}
-      {isEditing && isAdmin ? (
-        <div className="mt-4">
-          <PostComposer
-            authorId={author.id}
-            isAdmin={isAdmin}
-            editingPost={{
-              ...post,
-              content: postContent,
-              blocks: blocksState,
-              tags: postTags,
-              is_pinned: isPostPinned,
-              visibility: postVisibility,
-              image_url: postImageUrl,
-              spotify_track_id: postSpotifyId,
-            }}
-            onCancelEdit={() => setIsEditing(false)}
-            onPostUpdated={(updated) => {
-              const nextBlocks = updated.blocks || [];
-              setPostContent(updated.content);
-              setBlocksState(nextBlocks);
-              setPostTags(updated.tags || []);
-              setIsPostPinned(Boolean(updated.is_pinned));
-              setPostVisibility(resolvePostVisibility(updated, nextBlocks));
-              setPostImageUrl(updated.image_url);
-              setPostSpotifyId(updated.spotify_track_id || null);
-              setIsEditing(false);
-            }}
-          />
-        </div>
-      ) : hasRichBlocks ? (
-        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
-          {blocksState.map((b, idx) => {
+  // Renderiza um bloco rico do post (usado no grid e dentro do aviso de spoiler)
+  const renderBlock = (b: PostBlock, idx: number): React.ReactNode => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
             const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
@@ -1102,6 +963,159 @@ export function PostCard({
                 className={`${fontCls} leading-relaxed`}
                 dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
               />
+            );
+  };
+
+  return (
+    <article
+      ref={articleRef}
+      id={`post-${post.id}`}
+      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
+        isHighlightedFromUrl
+          ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
+          : postVisibility === 'private'
+          ? 'bg-elevated/25 hover:bg-elevated/40'
+          : 'hover:bg-surface/30'
+      }`}
+    >
+      {/* Indicadores Superiores: Fixado / Privado */}
+      {(isPostPinned || postVisibility === 'private') && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {isPostPinned && (
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
+              <Pin className="w-3.5 h-3.5" />
+              <span>Insight Fixado</span>
+            </div>
+          )}
+
+          {postVisibility === 'private' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary font-mono text-[10px] font-semibold uppercase tracking-wider">
+              <Lock className="w-3 h-3" />
+              <span>Privado · Só para mim</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Cabeçalho do Post */}
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <Link
+          href={authorProfileHref}
+          className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
+        >
+          <CosmeticAvatar profile={author} size={40}>
+            <img
+              src={author.avatar_url || '/assets/net/default-perfil'}
+              alt={author.full_name}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
+            />
+          </CosmeticAvatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
+                <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
+              </span>
+              {author.email_verified_at && <VerifiedBadge size={14} />}
+              <span className="text-xs text-muted truncate">
+                @{author.username || 'insight'}
+              </span>
+              <span className="hidden sm:inline-flex shrink-0">
+                <CosmeticTag profile={author} />
+              </span>
+            </div>
+            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
+          </div>
+        </Link>
+
+        {isAdmin && (
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleToggleVisibility}
+              title={
+                postVisibility === 'private'
+                  ? 'Privado (Só para mim) — Clique para tornar Público'
+                  : 'Público — Clique para trancar (Só para mim)'
+              }
+              className={`p-1.5 rounded-lg transition-colors ${
+                postVisibility === 'private'
+                  ? 'text-primary bg-elevated border border-border'
+                  : 'text-muted hover:text-primary hover:bg-elevated'
+              }`}
+            >
+              {postVisibility === 'private' ? (
+                <Lock className="w-4 h-4" />
+              ) : (
+                <Globe className="w-4 h-4" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              title={isEditing ? 'Fechar editor' : 'Editar Insight'}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isEditing
+                  ? 'text-accent bg-accent/10'
+                  : 'text-muted hover:text-accent hover:bg-elevated'
+              }`}
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              title="Excluir Insight"
+              className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Editor Inline ou Conteúdo Renderizado */}
+      {isEditing && isAdmin ? (
+        <div className="mt-4">
+          <PostComposer
+            authorId={author.id}
+            isAdmin={isAdmin}
+            editingPost={{
+              ...post,
+              content: postContent,
+              blocks: blocksState,
+              tags: postTags,
+              is_pinned: isPostPinned,
+              visibility: postVisibility,
+              image_url: postImageUrl,
+              spotify_track_id: postSpotifyId,
+            }}
+            onCancelEdit={() => setIsEditing(false)}
+            onPostUpdated={(updated) => {
+              const nextBlocks = updated.blocks || [];
+              setPostContent(updated.content);
+              setBlocksState(nextBlocks);
+              setPostTags(updated.tags || []);
+              setIsPostPinned(Boolean(updated.is_pinned));
+              setPostVisibility(resolvePostVisibility(updated, nextBlocks));
+              setPostImageUrl(updated.image_url);
+              setPostSpotifyId(updated.spotify_track_id || null);
+              setIsEditing(false);
+            }}
+          />
+        </div>
+      ) : hasRichBlocks ? (
+        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
+          {blocksState.map((b, idx) => {
+            const rendered = renderBlock(b, idx);
+            // o wrapper assume a célula do grid; dentro dele a posição do bloco é ignorada
+            return b.spoiler && rendered ? (
+              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart)}>
+                {rendered}
+              </SpoilerBlock>
+            ) : (
+              rendered
             );
           })}
         </div>

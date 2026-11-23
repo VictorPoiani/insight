@@ -1,5 +1,7 @@
 'use client';
 
+import { DietPlanner } from './DietPlanner';
+import { usePanZoom, PanZoomControls, boundsFromPercent } from '@/components/canvas/PanZoom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { uploadCompressedMediaToR2 } from '@/lib/mediaCompressor';
@@ -114,10 +116,13 @@ export function TopicWorkspaceView({
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [uploadingNodeMediaId, setUploadingNodeMediaId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState<boolean>(false);
-  const panStartRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const boardBounds = useMemo(
+    () => boundsFromPercent(initialData?.mindMapNodes || [], VIRTUAL_BOARD_WIDTH, VIRTUAL_BOARD_HEIGHT, 200, 140),
+    // enquadra pelo conteúdo inicial; depois o usuário controla a câmera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const pz = usePanZoom({ worldWidth: VIRTUAL_BOARD_WIDTH, worldHeight: VIRTUAL_BOARD_HEIGHT, wheel: 'free', initialBounds: boardBounds });
 
   // Estados de Visualização e Filtros dos Demais Modelos
   const [roadmapViewMode, setRoadmapViewMode] = useState<'kanban' | 'timeline'>('kanban');
@@ -196,7 +201,7 @@ export function TopicWorkspaceView({
   useEffect(() => {
     if (!draggingNodeId || !isAdmin) return;
 
-    function handleMouseMove(e: MouseEvent) {
+    function handleMouseMove(e: PointerEvent) {
       if (!boardRef.current || !draggingNodeId) return;
       const rect = boardRef.current.getBoundingClientRect();
       const relX = ((e.clientX - rect.left) / rect.width) * 100;
@@ -221,40 +226,14 @@ export function TopicWorkspaceView({
       });
     }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
     };
   }, [draggingNodeId, isAdmin]);
 
-  // Arraste da Câmara (Pan) no Brainstorm
-  useEffect(() => {
-    if (!isPanning) return;
-
-    function handleMouseMove(e: MouseEvent) {
-      if (!panStartRef.current) return;
-      const dx = e.clientX - panStartRef.current.startX;
-      const dy = e.clientY - panStartRef.current.startY;
-      setPan({
-        x: Math.max(-700, Math.min(700, panStartRef.current.origX + dx)),
-        y: Math.max(-500, Math.min(500, panStartRef.current.origY + dy)),
-      });
-    }
-
-    function handleMouseUp() {
-      setIsPanning(false);
-      panStartRef.current = null;
-    }
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isPanning]);
 
   function addBrainstormCard(nodeType: MindMapNodeType) {
     if (!isAdmin) return;
@@ -764,39 +743,29 @@ export function TopicWorkspaceView({
           )}
 
           <div
-            onMouseDown={(e) => {
-              if (
-                e.target === e.currentTarget ||
-                (e.target as HTMLElement).dataset.canvasBg === 'true'
-              ) {
+            {...pz.viewportProps}
+            onPointerDownCapture={(e) => {
+              const t = e.target as HTMLElement;
+              if (t === e.currentTarget || t.dataset.canvasBg === 'true') {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);
                 setConnectingFromId(null);
-                setIsPanning(true);
-                panStartRef.current = {
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  origX: pan.x,
-                  origY: pan.y,
-                };
               }
             }}
-            className={`relative w-full rounded-2xl bg-[#09090b] border border-border overflow-hidden select-none ${
+            style={{
+              touchAction: 'none',
+              backgroundImage: 'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
+              backgroundSize: `${22 * pz.view.k}px ${22 * pz.view.k}px`,
+              backgroundPosition: `${pz.view.x}px ${pz.view.y}px`,
+            }}
+            className={`relative w-full rounded-2xl bg-[#09090b] border border-border overflow-hidden select-none outline-none ${
               isFullScreen ? 'flex-1 min-h-[520px]' : 'h-[72vh] min-h-[560px]'
-            } ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+            } ${pz.panning ? 'cursor-grabbing' : 'cursor-grab'}`}
           >
             <div
               ref={boardRef}
               data-canvas-bg="true"
-              style={{
-                width: `${VIRTUAL_BOARD_WIDTH}px`,
-                height: `${VIRTUAL_BOARD_HEIGHT}px`,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: '0 0',
-                backgroundImage:
-                  'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                backgroundSize: '22px 22px',
-              }}
+              style={pz.worldStyle}
               className="relative"
             >
               {/* ZONAS DE FUNDO */}
@@ -824,7 +793,8 @@ export function TopicWorkspaceView({
                       className="absolute z-0 rounded-2xl border-2 border-dashed p-3 flex flex-col justify-between transition-colors"
                     >
                       <div
-                        onMouseDown={(e) => {
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => {
                           if (!isAdmin) return;
                           e.stopPropagation();
                           setSelectedNodeId(zone.id);
@@ -1043,12 +1013,14 @@ export function TopicWorkspaceView({
                         transform: 'translate(-50%, -50%)',
                         borderColor: isSelected ? '#ffffff' : '#27272a',
                       }}
+                      data-pz-stop
                       className={`absolute z-20 p-3.5 rounded-xl bg-[#121215]/95 backdrop-blur border shadow-2xl transition-shadow ${
                         isSelected ? 'ring-2 ring-accent/40' : ''
                       }`}
                     >
                       <div
-                        onMouseDown={(e) => {
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => {
                           if (!isAdmin) return;
                           e.stopPropagation();
                           setSelectedNodeId(node.id);
@@ -1358,48 +1330,13 @@ export function TopicWorkspaceView({
                 })}
             </div>
 
-            <div className="absolute bottom-3.5 right-3.5 z-30 flex items-center gap-1 p-1.5 rounded-xl bg-[#141417]/90 backdrop-blur border border-border shadow-xl text-xs">
-              <button
-                type="button"
-                onClick={() =>
-                  setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))
-                }
-                title="Diminuir Zoom"
-                className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-
-              <span className="px-2 font-mono text-[11px] font-bold text-primary">
-                {Math.round(zoom * 100)}%
-              </span>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setZoom((z) => Math.min(1.6, Math.round((z + 0.1) * 10) / 10))
-                }
-                title="Aumentar Zoom"
-                className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-
-              <div className="h-3.5 w-px bg-border mx-0.5" />
-
-              <button
-                type="button"
-                onClick={() => {
-                  setZoom(1);
-                  setPan({ x: 0, y: 0 });
-                }}
-                title="Centralizar quadro"
-                className="px-2 py-1 rounded-lg text-[10px] font-mono font-semibold text-secondary hover:text-primary hover:bg-elevated flex items-center gap-1"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
-              </button>
-            </div>
+            <PanZoomControls
+              k={pz.view.k}
+              onZoomIn={pz.zoomIn}
+              onZoomOut={pz.zoomOut}
+              onFit={() => pz.fit(boundsFromPercent(data.mindMapNodes || [], VIRTUAL_BOARD_WIDTH, VIRTUAL_BOARD_HEIGHT, 200, 140))}
+              className="absolute bottom-3.5 right-3.5 z-30"
+            />
           </div>
         </div>
       )}
@@ -2602,296 +2539,7 @@ export function TopicWorkspaceView({
       {/* =====================================================================
           6. PLANO NUTRICIONAL & MACRONUTRIENTES (DIET)
          ===================================================================== */}
-      {templateType === 'diet' && (
-        <div className="flex-1 flex flex-col gap-5">
-          {(() => {
-            const meals = data.dietMeals || [];
-            const totalKcal = meals.reduce(
-              (acc, m) => acc + (Number(m.calories) || 0),
-              0
-            );
-            const consumedKcal = meals
-              .filter((m) => m.completed)
-              .reduce((acc, m) => acc + (Number(m.calories) || 0), 0);
-            const totalProt = meals.reduce(
-              (acc, m) => acc + (Number(m.proteinGrams) || 0),
-              0
-            );
-            const consumedProt = meals
-              .filter((m) => m.completed)
-              .reduce((acc, m) => acc + (Number(m.proteinGrams) || 0), 0);
-            const calGoal = data.calorieGoal || 2200;
-            const protGoal = data.proteinGoal || 150;
-            const waterGlasses = data.waterGlasses || 0;
-            const waterGoal = data.waterGoal || 8;
-
-            return (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                  <div className="p-4 rounded-xl bg-elevated border border-border space-y-2">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-muted uppercase">
-                      <span>Energia (Consumido / Meta)</span>
-                      {isAdmin && (
-                        <input
-                          type="number"
-                          value={calGoal}
-                          onChange={(e) =>
-                            persistWorkspace({
-                              ...data,
-                              calorieGoal: Number(e.target.value) || 2000,
-                            })
-                          }
-                          className="w-16 bg-surface border border-border rounded px-1 text-right text-primary"
-                        />
-                      )}
-                    </div>
-                    <p className="text-lg font-bold font-mono text-primary">
-                      {consumedKcal} / {calGoal} kcal{' '}
-                      <span className="text-xs font-normal text-muted">
-                        (Planeado: {totalKcal})
-                      </span>
-                    </p>
-                    <div className="w-full h-1.5 rounded-full bg-surface overflow-hidden">
-                      <div
-                        style={{
-                          width: `${Math.min(100, Math.round((consumedKcal / calGoal) * 100))}%`,
-                        }}
-                        className="h-full bg-amber-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-elevated border border-border space-y-2">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-muted uppercase">
-                      <span>Proteínas (Consumido / Meta)</span>
-                      {isAdmin && (
-                        <input
-                          type="number"
-                          value={protGoal}
-                          onChange={(e) =>
-                            persistWorkspace({
-                              ...data,
-                              proteinGoal: Number(e.target.value) || 150,
-                            })
-                          }
-                          className="w-14 bg-surface border border-border rounded px-1 text-right text-emerald-400"
-                        />
-                      )}
-                    </div>
-                    <p className="text-lg font-bold font-mono text-emerald-400">
-                      {consumedProt}g / {protGoal}g{' '}
-                      <span className="text-xs font-normal text-muted">
-                        (Planeado: {totalProt}g)
-                      </span>
-                    </p>
-                    <div className="w-full h-1.5 rounded-full bg-surface overflow-hidden">
-                      <div
-                        style={{
-                          width: `${Math.min(100, Math.round((consumedProt / protGoal) * 100))}%`,
-                        }}
-                        className="h-full bg-emerald-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-elevated border border-border flex flex-col justify-between gap-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-mono text-muted uppercase block">
-                          Hidratação ({waterGlasses * 250} ml)
-                        </span>
-                        <p className="text-lg font-bold font-mono text-sky-400 mt-0.5 flex items-center gap-1.5">
-                          <Droplets className="w-4 h-4" />
-                          <span>
-                            {waterGlasses} / {waterGoal} copos
-                          </span>
-                        </p>
-                      </div>
-                      {isAdmin && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              persistWorkspace({
-                                ...data,
-                                waterGlasses: Math.max(0, waterGlasses - 1),
-                              })
-                            }
-                            className="px-2.5 py-1 rounded bg-surface border border-border text-xs font-mono"
-                          >
-                            -
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              persistWorkspace({
-                                ...data,
-                                waterGlasses: waterGlasses + 1,
-                              })
-                            }
-                            className="px-2.5 py-1 rounded bg-surface border border-border hover:border-sky-500 text-sky-400 text-xs font-mono"
-                          >
-                            +1
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-surface overflow-hidden">
-                      <div
-                        style={{
-                          width: `${Math.min(100, Math.round((waterGlasses / waterGoal) * 100))}%`,
-                        }}
-                        className="h-full bg-sky-400 transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  {meals.map((meal) => (
-                    <div
-                      key={meal.id}
-                      className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-elevated border border-border"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-[220px]">
-                        <button
-                          type="button"
-                          disabled={!isAdmin}
-                          onClick={() => {
-                            const next = meals.map((m) =>
-                              m.id === meal.id
-                                ? { ...m, completed: !m.completed }
-                                : m
-                            );
-                            persistWorkspace({ ...data, dietMeals: next });
-                          }}
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                            meal.completed
-                              ? 'bg-emerald-500 border-emerald-500 text-white'
-                              : 'border-border bg-surface'
-                          }`}
-                        >
-                          {meal.completed && <Check className="w-3.5 h-3.5" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <input
-                            type="text"
-                            disabled={!isAdmin}
-                            value={meal.time}
-                            onChange={(e) => {
-                              const next = meals.map((m) =>
-                                m.id === meal.id
-                                  ? { ...m, time: e.target.value }
-                                  : m
-                              );
-                              persistWorkspace({ ...data, dietMeals: next });
-                            }}
-                            className="w-full bg-transparent text-xs font-bold text-primary focus:outline-none"
-                          />
-                          <input
-                            type="text"
-                            disabled={!isAdmin}
-                            value={meal.foods}
-                            onChange={(e) => {
-                              const next = meals.map((m) =>
-                                m.id === meal.id
-                                  ? { ...m, foods: e.target.value }
-                                  : m
-                              );
-                              persistWorkspace({ ...data, dietMeals: next });
-                            }}
-                            className="w-full bg-transparent text-xs text-secondary focus:outline-none mt-0.5"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs font-mono">
-                        <div className="flex items-center gap-1 bg-surface px-2.5 py-1 rounded-lg border border-border">
-                          <input
-                            type="number"
-                            disabled={!isAdmin}
-                            value={meal.calories}
-                            onChange={(e) => {
-                              const next = meals.map((m) =>
-                                m.id === meal.id
-                                  ? {
-                                      ...m,
-                                      calories: Number(e.target.value) || 0,
-                                    }
-                                  : m
-                              );
-                              persistWorkspace({ ...data, dietMeals: next });
-                            }}
-                            className="w-12 bg-transparent text-right text-primary focus:outline-none"
-                          />
-                          <span className="text-[10px] text-muted">kcal</span>
-                        </div>
-
-                        <div className="flex items-center gap-1 bg-surface px-2.5 py-1 rounded-lg border border-border">
-                          <input
-                            type="number"
-                            disabled={!isAdmin}
-                            value={meal.proteinGrams}
-                            onChange={(e) => {
-                              const next = meals.map((m) =>
-                                m.id === meal.id
-                                  ? {
-                                      ...m,
-                                      proteinGrams: Number(e.target.value) || 0,
-                                    }
-                                  : m
-                              );
-                              persistWorkspace({ ...data, dietMeals: next });
-                            }}
-                            className="w-10 bg-transparent text-right text-emerald-400 focus:outline-none"
-                          />
-                          <span className="text-[10px] text-muted">g P</span>
-                        </div>
-
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = meals.filter((m) => m.id !== meal.id);
-                              persistWorkspace({ ...data, dietMeals: next });
-                            }}
-                            className="p-1 text-muted hover:text-danger"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next: DietMealItem[] = [
-                          ...meals,
-                          {
-                            id: `meal-${Date.now()}`,
-                            time: 'Nova Refeição',
-                            foods: 'Especificar alimentos',
-                            calories: 350,
-                            proteinGrams: 25,
-                            completed: false,
-                          },
-                        ];
-                        persistWorkspace({ ...data, dietMeals: next });
-                      }}
-                      className="px-3.5 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold inline-flex items-center gap-1.5"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Adicionar Refeição
-                    </button>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
+      {templateType === 'diet' && <DietPlanner data={data} isAdmin={isAdmin} persist={persistWorkspace} />}
 
       {/* =====================================================================
           7. AGENDA TÉCNICA & CRONOGRAMA (AGENDA)

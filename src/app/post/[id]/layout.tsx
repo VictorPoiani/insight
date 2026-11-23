@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
     const name = author?.display_name || author?.full_name || author?.username || 'Insight*';
     const text = String(post.content || '').replace(/\s+/g, ' ').trim();
-    const description = text.length > 180 ? `${text.slice(0, 177)}…` : text || 'Confira esta publicação no Insight*';
+    const description = text.length > 180 ? `${text.slice(0, 177)}…` : text || 'Confira este Insight';
     const title = `${name} no Insight*`;
     const image = `${base}/api/share/${id}?format=og`;
     const url = `${base}/post/${id}`;

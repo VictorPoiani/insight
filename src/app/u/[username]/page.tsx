@@ -13,7 +13,10 @@ import {
   DEFAULT_TABS,
   FeedTabItem,
 } from '@/components/feed/TopicTabsManager';
-import { PostComposer } from '@/components/feed/PostComposer';
+import dynamic from 'next/dynamic';
+import { useProgressiveList } from '@/lib/useProgressiveList';
+// o editor (pesado) só é baixado por quem pode publicar neste perfil
+const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { ProfileReposts } from '@/components/feed/ProfileReposts';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
@@ -187,11 +190,18 @@ function UserProfileContent() {
     // 3. Busca as publicações deste perfil (incluindo posts legados caso seja o perfil fundador)
     const isFounder = typedProfile.id === FOUNDER_PROFILE_ID;
 
+    // só os posts deste perfil (antes vinham TODOS os posts da plataforma e o
+    // filtro rodava no aparelho — o maior custo do perfil no celular)
+    const ownerFilter = isFounder
+      ? `profile_id.eq.${typedProfile.id},author_id.eq.${typedProfile.id},and(profile_id.is.null,author_id.is.null)`
+      : `profile_id.eq.${typedProfile.id},author_id.eq.${typedProfile.id}`;
     const { data: allPostsData } = await supabase
       .from('posts')
       .select('*')
+      .or(ownerFilter)
       .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (allPostsData) {
       const belongingToThisProfile = (allPostsData as Post[]).filter((p) => {
@@ -304,6 +314,7 @@ function UserProfileContent() {
       },
     };
   }, [posts, canManageProfile, activeTab.tag, tagParam, queryFilter, adminVisibilityFilter]);
+  const progressive = useProgressiveList(visiblePosts, 6, 6, `${activeTab.id}|${queryFilter}|${tagParam}|${adminVisibilityFilter}`);
 
   if (loading) {
     return (
@@ -516,7 +527,7 @@ function UserProfileContent() {
         </div>
       ) : (
         <div>
-          {visiblePosts.map((post) => (
+          {progressive.visible.map((post) => (
             <PostCard
               key={post.id}
               post={post}
@@ -527,6 +538,7 @@ function UserProfileContent() {
               }
             />
           ))}
+          {progressive.hasMore && <div ref={progressive.sentinelRef} className="h-24" aria-hidden />}
         </div>
       )}
     </div>

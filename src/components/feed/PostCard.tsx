@@ -1,9 +1,15 @@
 'use client';
 
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { getPostFlags, setPostFlag } from '@/lib/postFlags';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
+import { MindMapViewer } from '@/components/canvas/MindMapViewer';
+import { QuotedPostCard, QuoteComposerModal } from './QuotedPost';
+import { SpoilerBlock } from './SpoilerBlock';
+import { ImageLightbox } from '@/components/media/ImageLightbox';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Post,
@@ -142,6 +148,8 @@ export function PostCard({
   const [hasLiked, setHasLiked] = useState(false);
   const [reposts, setReposts] = useState(post.reposts_count || 0);
   const [hasReposted, setHasReposted] = useState(false);
+  const [repostMenu, setRepostMenu] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [repliesCount, setRepliesCount] = useState(post.replies_count || 0);
 
   // UI & Modais
@@ -180,72 +188,26 @@ export function PostCard({
     setRepliesCount(post.replies_count || 0);
   }, [post]);
 
-  // Sincroniza usuário logado e estado de curtida
+  // Usuário logado vem do provedor global (uma consulta para o site todo) e
+  // curtida/repost são buscados em lote com os outros cartões da tela.
+  const { viewer } = useNitro();
   useEffect(() => {
     let active = true;
-
-    async function syncLoggedUser() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!active) return;
-
-      if (!session?.user) {
-        setLoggedUserProfile(null);
-        setHasLiked(false);
-        return;
-      }
-
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
-        .maybeSingle();
-
-      if (!active) return;
-
-      if (prof) {
-        const typedProf = prof as Profile;
-        setLoggedUserProfile(typedProf);
-
-        const { data: existingLike } = await supabase
-          .from('post_likes')
-          .select('post_id')
-          .eq('post_id', post.id)
-          .eq('profile_id', typedProf.id)
-          .maybeSingle();
-
-        if (active) setHasLiked(Boolean(existingLike));
-
-        const { data: existingRepost } = await supabase
-          .from('post_reposts')
-          .select('post_id')
-          .eq('post_id', post.id)
-          .eq('profile_id', typedProf.id)
-          .maybeSingle();
-
-        if (active) setHasReposted(Boolean(existingRepost));
-      } else {
-        setLoggedUserProfile(null);
-        setHasLiked(false);
-        setHasReposted(false);
-      }
+    setLoggedUserProfile(viewer);
+    if (!viewer) {
+      setHasLiked(false);
+      setHasReposted(false);
+      return;
     }
-
-    syncLoggedUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      syncLoggedUser();
+    getPostFlags(post.id, viewer.id).then((f) => {
+      if (!active) return;
+      setHasLiked(f.liked);
+      setHasReposted(f.reposted);
     });
-
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
-  }, [post.id, supabase]);
+  }, [post.id, viewer]);
 
   // Carrega votos locais em enquetes
   useEffect(() => {
@@ -391,6 +353,7 @@ export function PostCard({
     if (!error && data) {
       setHasLiked(Boolean((data as any).liked));
       setLikes(Number((data as any).likes_count) || 0);
+      setPostFlag(post.id, loggedUserProfile.id, { liked: Boolean((data as any).liked) });
     } else if (error) {
       // Reverte o otimista: a curtida só é gravada pela RPC toggle_post_like
       setHasLiked(!nextLiked);
@@ -421,6 +384,7 @@ export function PostCard({
 
     const repostResult = repostData as { reposted: boolean; reposts_count: number };
     setHasReposted(Boolean(repostResult.reposted));
+    setPostFlag(post.id, loggedUserProfile.id, { reposted: Boolean(repostResult.reposted) });
     setReposts(Number(repostResult.reposts_count) || 0);
 
     if (repostResult.reposted && author.id !== loggedUserProfile.id) {
@@ -431,7 +395,7 @@ export function PostCard({
         type: 'repost',
         post_id: post.id,
         content_preview: snippet,
-        message: snippet || 'repostou sua publicação',
+        message: snippet || 'repostou seu Insight',
       });
     }
   }
@@ -463,7 +427,7 @@ export function PostCard({
 
   async function handleDelete() {
     if (!isAdmin) return;
-    if (!confirm('Excluir esta publicação? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Excluir este Insight? Esta ação não pode ser desfeita.')) return;
 
     for (const blk of blocksState) {
       if (blk.r2Key) {
@@ -492,6 +456,18 @@ export function PostCard({
     }
   }
 
+  // Imagens do post em tela cheia (na ordem em que aparecem)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxImages = useMemo(() => {
+    const list = blocksState.filter((x) => x.type === 'image' && x.imageUrl).map((x) => ({ src: x.imageUrl!, alt: x.imageCaption || '' }));
+    if (!list.length && postImageUrl) list.push({ src: postImageUrl, alt: '' });
+    return list;
+  }, [blocksState, postImageUrl]);
+  const openLightbox = (src: string) => {
+    const i = lightboxImages.findIndex((x) => x.src === src);
+    setLightboxIndex(i >= 0 ? i : 0);
+  };
+
   if (!isAdmin && postVisibility === 'private') {
     return null;
   }
@@ -500,148 +476,8 @@ export function PostCard({
 
   const authorProfileHref = getProfileHref(author.id, author.username);
 
-  return (
-    <article
-      ref={articleRef}
-      id={`post-${post.id}`}
-      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
-        isHighlightedFromUrl
-          ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
-          : postVisibility === 'private'
-          ? 'bg-elevated/25 hover:bg-elevated/40'
-          : 'hover:bg-surface/30'
-      }`}
-    >
-      {/* Indicadores Superiores: Fixado / Privado */}
-      {(isPostPinned || postVisibility === 'private') && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {isPostPinned && (
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
-              <Pin className="w-3.5 h-3.5" />
-              <span>Insight Fixado</span>
-            </div>
-          )}
-
-          {postVisibility === 'private' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary font-mono text-[10px] font-semibold uppercase tracking-wider">
-              <Lock className="w-3 h-3" />
-              <span>Privado · Só para mim</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Cabeçalho do Post */}
-      <div className="flex items-center justify-between gap-2 sm:gap-3">
-        <Link
-          href={authorProfileHref}
-          className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
-        >
-          <CosmeticAvatar profile={author} size={40}>
-            <img
-              src={author.avatar_url || '/assets/net/default-perfil'}
-              alt={author.full_name}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
-            />
-          </CosmeticAvatar>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
-              <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
-                <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
-              </span>
-              {author.email_verified_at && <VerifiedBadge size={14} />}
-              <span className="text-xs text-muted truncate">
-                @{author.username || 'insight'}
-              </span>
-              <span className="hidden sm:inline-flex shrink-0">
-                <CosmeticTag profile={author} />
-              </span>
-            </div>
-            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
-          </div>
-        </Link>
-
-        {isAdmin && (
-          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleVisibility}
-              title={
-                postVisibility === 'private'
-                  ? 'Privado (Só para mim) — Clique para tornar Público'
-                  : 'Público — Clique para trancar (Só para mim)'
-              }
-              className={`p-1.5 rounded-lg transition-colors ${
-                postVisibility === 'private'
-                  ? 'text-primary bg-elevated border border-border'
-                  : 'text-muted hover:text-primary hover:bg-elevated'
-              }`}
-            >
-              {postVisibility === 'private' ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Globe className="w-4 h-4" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsEditing(!isEditing)}
-              title={isEditing ? 'Fechar editor' : 'Editar publicação'}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isEditing
-                  ? 'text-accent bg-accent/10'
-                  : 'text-muted hover:text-accent hover:bg-elevated'
-              }`}
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              title="Excluir publicação"
-              className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Editor Inline ou Conteúdo Renderizado */}
-      {isEditing && isAdmin ? (
-        <div className="mt-4">
-          <PostComposer
-            authorId={author.id}
-            isAdmin={isAdmin}
-            editingPost={{
-              ...post,
-              content: postContent,
-              blocks: blocksState,
-              tags: postTags,
-              is_pinned: isPostPinned,
-              visibility: postVisibility,
-              image_url: postImageUrl,
-              spotify_track_id: postSpotifyId,
-            }}
-            onCancelEdit={() => setIsEditing(false)}
-            onPostUpdated={(updated) => {
-              const nextBlocks = updated.blocks || [];
-              setPostContent(updated.content);
-              setBlocksState(nextBlocks);
-              setPostTags(updated.tags || []);
-              setIsPostPinned(Boolean(updated.is_pinned));
-              setPostVisibility(resolvePostVisibility(updated, nextBlocks));
-              setPostImageUrl(updated.image_url);
-              setPostSpotifyId(updated.spotify_track_id || null);
-              setIsEditing(false);
-            }}
-          />
-        </div>
-      ) : hasRichBlocks ? (
-        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
-          {blocksState.map((b, idx) => {
+  // Renderiza um bloco rico do post (usado no grid e dentro do aviso de spoiler)
+  const renderBlock = (b: PostBlock, idx: number): React.ReactNode => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
             const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
@@ -742,8 +578,12 @@ export function PostCard({
                     <img
                       src={b.imageUrl}
                       alt={b.imageCaption || 'Imagem do post'}
-                      className="w-full h-auto rounded-xl border border-border object-cover"
+                      className="w-full h-auto rounded-xl border border-border object-cover cursor-zoom-in"
                       loading="lazy"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLightbox(b.imageUrl!);
+                      }}
                     />
                     {b.imageCaption && (
                       <figcaption className="text-xs text-muted text-center">
@@ -798,90 +638,16 @@ export function PostCard({
             }
 
             if (b.type === 'mindmap' && Array.isArray(b.mindMapNodes)) {
-              const edges = Array.isArray(b.mindMapEdges) ? b.mindMapEdges : [];
               return (
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-3 sm:p-3.5 rounded-xl bg-elevated border border-border space-y-2.5"
+                  className="p-3 sm:p-3.5 rounded-xl bg-elevated border border-border"
                 >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <Network className="w-3.5 h-3.5 text-[#a855f7]" />
-                      <span>Arquitetura & Brainstorm 2D</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-muted">
-                      {b.mindMapNodes.length} nós
-                    </span>
-                  </div>
-
-                  {/* Wrapper com rolagem lateral suave no celular */}
-                  <div className="w-full overflow-x-auto rounded-xl border border-border">
-                    <div
-                      style={{
-                        backgroundImage:
-                          'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                        backgroundSize: '18px 18px',
-                      }}
-                      className="relative w-full min-w-[560px] h-[340px] sm:h-[380px] bg-[#09090b] overflow-hidden"
-                    >
-                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                        {edges.map((edge) => {
-                          const fromNode = b.mindMapNodes?.find(
-                            (n) => n.id === edge.fromId
-                          );
-                          const toNode = b.mindMapNodes?.find(
-                            (n) => n.id === edge.toId
-                          );
-                          if (!fromNode || !toNode) return null;
-
-                          return (
-                            <line
-                              key={edge.id}
-                              x1={`${fromNode.x}%`}
-                              y1={`${fromNode.y}%`}
-                              x2={`${toNode.x}%`}
-                              y2={`${toNode.y}%`}
-                              stroke={fromNode.color || '#52525b'}
-                              strokeWidth="1.5"
-                              strokeDasharray="4 3"
-                              opacity="0.75"
-                            />
-                          );
-                        })}
-                      </svg>
-
-                      {b.mindMapNodes.map((node, nIdx) => (
-                        <div
-                          key={node.id}
-                          style={{
-                            left: `${node.x}%`,
-                            top: `${node.y}%`,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                          className="absolute z-10 w-44 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border border-zinc-800 shadow-xl space-y-1"
-                        >
-                          <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-800/80">
-                            <span
-                              style={{ backgroundColor: node.color || '#2563eb' }}
-                              className="w-2 h-2 rounded-full shrink-0"
-                            />
-                            <span className="text-[9px] font-mono font-semibold text-zinc-400">
-                              NÓ · {String(nIdx).padStart(2, '0')}
-                            </span>
-                          </div>
-                          <p className="text-xs font-bold text-zinc-100 leading-snug">
-                            {node.label}
-                          </p>
-                          {node.note && (
-                            <p className="text-[10px] text-zinc-400 leading-tight">
-                              {node.note}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <MindMapViewer
+                    nodes={b.mindMapNodes.map((n) => ({ ...n, mediaUrl: n.mediaUrl || undefined }))}
+                    edges={Array.isArray(b.mindMapEdges) ? b.mindMapEdges : []}
+                  />
                 </div>
               );
             }
@@ -1173,6 +939,159 @@ export function PostCard({
                 dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
               />
             );
+  };
+
+  return (
+    <article
+      ref={articleRef}
+      id={`post-${post.id}`}
+      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
+        isHighlightedFromUrl
+          ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
+          : postVisibility === 'private'
+          ? 'bg-elevated/25 hover:bg-elevated/40'
+          : 'hover:bg-surface/30'
+      }`}
+    >
+      {/* Indicadores Superiores: Fixado / Privado */}
+      {(isPostPinned || postVisibility === 'private') && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {isPostPinned && (
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
+              <Pin className="w-3.5 h-3.5" />
+              <span>Insight Fixado</span>
+            </div>
+          )}
+
+          {postVisibility === 'private' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-elevated border border-border text-secondary font-mono text-[10px] font-semibold uppercase tracking-wider">
+              <Lock className="w-3 h-3" />
+              <span>Privado · Só para mim</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Cabeçalho do Post */}
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <Link
+          href={authorProfileHref}
+          className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
+        >
+          <CosmeticAvatar profile={author} size={40}>
+            <img
+              src={author.avatar_url || '/assets/net/default-perfil'}
+              alt={author.full_name}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-border bg-elevated shrink-0 group-hover/author:border-accent transition-colors"
+            />
+          </CosmeticAvatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="text-sm font-bold text-primary group-hover/author:text-accent transition-colors truncate">
+                <CosmeticName profile={author}>{author.display_name || author.full_name}</CosmeticName>
+              </span>
+              {author.email_verified_at && <VerifiedBadge size={14} />}
+              <span className="text-xs text-muted truncate">
+                @{author.username || 'insight'}
+              </span>
+              <span className="hidden sm:inline-flex shrink-0">
+                <CosmeticTag profile={author} />
+              </span>
+            </div>
+            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
+          </div>
+        </Link>
+
+        {isAdmin && (
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleToggleVisibility}
+              title={
+                postVisibility === 'private'
+                  ? 'Privado (Só para mim) — Clique para tornar Público'
+                  : 'Público — Clique para trancar (Só para mim)'
+              }
+              className={`p-1.5 rounded-lg transition-colors ${
+                postVisibility === 'private'
+                  ? 'text-primary bg-elevated border border-border'
+                  : 'text-muted hover:text-primary hover:bg-elevated'
+              }`}
+            >
+              {postVisibility === 'private' ? (
+                <Lock className="w-4 h-4" />
+              ) : (
+                <Globe className="w-4 h-4" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              title={isEditing ? 'Fechar editor' : 'Editar Insight'}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isEditing
+                  ? 'text-accent bg-accent/10'
+                  : 'text-muted hover:text-accent hover:bg-elevated'
+              }`}
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              title="Excluir Insight"
+              className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Editor Inline ou Conteúdo Renderizado */}
+      {isEditing && isAdmin ? (
+        <div className="mt-4">
+          <PostComposer
+            authorId={author.id}
+            isAdmin={isAdmin}
+            editingPost={{
+              ...post,
+              content: postContent,
+              blocks: blocksState,
+              tags: postTags,
+              is_pinned: isPostPinned,
+              visibility: postVisibility,
+              image_url: postImageUrl,
+              spotify_track_id: postSpotifyId,
+            }}
+            onCancelEdit={() => setIsEditing(false)}
+            onPostUpdated={(updated) => {
+              const nextBlocks = updated.blocks || [];
+              setPostContent(updated.content);
+              setBlocksState(nextBlocks);
+              setPostTags(updated.tags || []);
+              setIsPostPinned(Boolean(updated.is_pinned));
+              setPostVisibility(resolvePostVisibility(updated, nextBlocks));
+              setPostImageUrl(updated.image_url);
+              setPostSpotifyId(updated.spotify_track_id || null);
+              setIsEditing(false);
+            }}
+          />
+        </div>
+      ) : hasRichBlocks ? (
+        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
+          {blocksState.map((b, idx) => {
+            const rendered = renderBlock(b, idx);
+            // o wrapper assume a célula do grid; dentro dele a posição do bloco é ignorada
+            return b.spoiler && rendered ? (
+              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart)}>
+                {rendered}
+              </SpoilerBlock>
+            ) : (
+              rendered
+            );
           })}
         </div>
       ) : (
@@ -1188,8 +1107,12 @@ export function PostCard({
               <img
                 src={postImageUrl}
                 alt="Imagem do post"
-                className="w-full max-h-96 object-cover"
+                className="w-full max-h-96 object-cover cursor-zoom-in"
                 loading="lazy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openLightbox(postImageUrl);
+                }}
               />
             </div>
           )}
@@ -1209,6 +1132,8 @@ export function PostCard({
           )}
         </>
       )}
+
+      {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}
 
       {/* Hashtags */}
       {postTags && postTags.length > 0 && !isEditing && (
@@ -1231,7 +1156,8 @@ export function PostCard({
             <button
               type="button"
               onClick={onReplyClick}
-              aria-label="Responder"
+              aria-label="Comentar Insight"
+              title="Comentar Insight"
               className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
             >
               <MessageCircle className="w-4 h-4" />
@@ -1240,8 +1166,8 @@ export function PostCard({
           ) : (
             <Link
               href={`/post/${post.id}`}
-              aria-label="Abrir respostas"
-              title="Abrir discussão"
+              aria-label="Comentar Insight"
+              title="Comentar Insight"
               className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
             >
               <MessageCircle className="w-4 h-4" />
@@ -1249,22 +1175,65 @@ export function PostCard({
             </Link>
           )}
 
-          <button
-            type="button"
-            onClick={handleRepost}
-            aria-label="Repostar"
-            className={`flex items-center gap-1.5 py-1 transition-colors ${
-              hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
-            }`}
-          >
-            <Repeat2 className="w-4 h-4" />
-            <span>{reposts}</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (!loggedUserProfile) {
+                  window.location.href = loginHref();
+                  return;
+                }
+                setRepostMenu((v) => !v);
+              }}
+              aria-label="Repostar Insight"
+              title="Repostar Insight"
+              aria-haspopup="menu"
+              aria-expanded={repostMenu}
+              className={`flex items-center gap-1.5 py-1 transition-colors ${
+                hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
+              }`}
+            >
+              <Repeat2 className="w-4 h-4" />
+              <span>{reposts}</span>
+            </button>
+            {repostMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRepostMenu(false)} />
+                <div role="menu" className="absolute bottom-full left-0 mb-2 z-50 w-56 py-1 rounded-xl bg-elevated border border-border shadow-2xl">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setRepostMenu(false);
+                      void handleRepost();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                  >
+                    <Repeat2 className="w-4 h-4 text-[#1DB954]" />
+                    {hasReposted ? 'Desfazer repost' : 'Repostar Insight'}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setRepostMenu(false);
+                      setQuoteOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                  >
+                    <MessageCircle className="w-4 h-4 text-accent" />
+                    Repostar com comentário
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={handleLike}
-            aria-label="Curtir"
+            aria-label="Curtir Insight"
+            title="Curtir Insight"
             className={`flex items-center gap-1.5 py-1 transition-colors ${
               hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
@@ -1276,7 +1245,7 @@ export function PostCard({
           <button
             type="button"
             onClick={() => setOpenShareModal(true)}
-            aria-label="Compartilhar publicação"
+            aria-label="Compartilhar Insight"
             className={`flex items-center gap-1.5 py-1 transition-colors ${
               openShareModal ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
@@ -1290,8 +1259,8 @@ export function PostCard({
           <button
             type="button"
             onClick={handleReportPost}
-            title="Denunciar publicação à moderação"
-            aria-label="Denunciar publicação"
+            title="Denunciar Insight à moderação"
+            aria-label="Denunciar Insight"
             className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
           >
             <Flag className="w-3.5 h-3.5" />
@@ -1300,6 +1269,25 @@ export function PostCard({
       </div>
 
       {/* Modal Insight* Share Studio */}
+      {lightboxIndex !== null && lightboxImages.length > 0 && (
+        <ImageLightbox
+          images={lightboxImages}
+          index={Math.min(lightboxIndex, lightboxImages.length - 1)}
+          onIndexChange={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
+      {quoteOpen && loggedUserProfile && (
+        <QuoteComposerModal
+          post={post}
+          author={author}
+          me={loggedUserProfile}
+          onClose={() => setQuoteOpen(false)}
+          onPublished={() => setReposts((r) => r + 1)}
+        />
+      )}
+
       <SharePostModal
         isOpen={openShareModal}
         onClose={() => setOpenShareModal(false)}

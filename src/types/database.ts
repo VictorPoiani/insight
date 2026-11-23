@@ -52,6 +52,9 @@ export interface Profile {
   email_verified_at?: string | null;
   /** Insight Nitro: itens equipados (snapshot gravado via RPC set_my_cosmetics). */
   cosmetics?: NitroCosmetics | null;
+  /** Status online automático */
+  last_seen_at?: string | null;
+  presence_visible?: boolean;
 }
 
 export type PostBlockType =
@@ -75,7 +78,8 @@ export type PostBlockType =
   | 'roadmap';
 
 export type FontStyleType = 'sans' | 'serif' | 'mono';
-export type ImageWidthType = '25%' | '50%' | '75%' | '100%';
+/** Largura da imagem no card, em % (atalhos 25/50/75/100 ou valor livre). */
+export type ImageWidthType = `${number}%`;
 export type ImageAlignType = 'left' | 'center' | 'right';
 export type PostVisibility = 'public' | 'private';
 export type PostVisibilityType = PostVisibility;
@@ -131,6 +135,18 @@ export interface DietMealItem {
   calories: number;
   proteinGrams: number;
   completed: boolean;
+  /** Horário na agenda (HH:MM) */
+  at?: string;
+  /** Dias da semana (0 = domingo); vazio = todos os dias */
+  days?: number[];
+}
+
+/** Registro de um dia do plano nutricional (chave AAAA-MM-DD). */
+export interface DietDayLog {
+  done: string[];
+  water: number;
+  weight?: number;
+  note?: string;
 }
 
 export interface AgendaEventItem {
@@ -197,6 +213,7 @@ export interface TopicWorkspaceData {
   habitColumns?: string[];
   tasks?: TaskItem[];
   dietMeals?: DietMealItem[];
+  dietLog?: Record<string, DietDayLog>;
   waterGlasses?: number;
   waterGoal?: number;
   calorieGoal?: number;
@@ -272,6 +289,8 @@ export interface PostBlock {
   mindMapNodes?: MindMapNodeItem[];
   mindMapEdges?: MindMapEdgeItem[];
   roadmapSteps?: RoadmapStepItem[];
+  /** Marcado pelo autor: aparece desfocado até o leitor tocar. */
+  spoiler?: boolean;
 }
 
 export interface Post {
@@ -295,6 +314,8 @@ export interface Post {
   updated_at?: string;
   profiles?: Profile;
   replies_count?: number;
+  /** Repost com comentário: Insight citado. */
+  quoted_post_id?: string | null;
 }
 
 export interface Reply {
@@ -315,7 +336,7 @@ export interface Reply {
   blocks?: ReplyBlock[] | null;
 }
 
-export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify';
+export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify' | 'gif' | 'video';
 
 export interface ReplyBlock {
   id: string;
@@ -324,6 +345,8 @@ export interface ReplyBlock {
   url?: string;
   trackId?: string;
   bytes?: number;
+  /** GIF: miniatura leve para o compositor */
+  previewUrl?: string;
 }
 
 export interface NotificationItem {

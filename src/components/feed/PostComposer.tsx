@@ -1,5 +1,8 @@
 'use client';
 
+import { useAutoFocusMode } from '@/lib/useAutoFocusMode';
+import { PanZoomSurface, boundsFromPercent } from '@/components/canvas/PanZoom';
+import { MINDMAP_WORLD } from '@/components/canvas/MindMapViewer';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle, normalizeGridStart, normalizeGridSpan } from '@/lib/grid';
@@ -63,6 +66,8 @@ import {
   SlidersHorizontal,
   SpellCheck,
   Check,
+  EyeOff,
+  MoreHorizontal,
   Move,
   Globe,
   Lock,
@@ -530,6 +535,8 @@ export function PostComposer({
 }: PostComposerProps) {
   const isEditMode = Boolean(editingPost);
   const isEmbedded = Boolean(embedded);
+  // Notebook já tem tela cheia própria; no feed e na edição o foco é automático
+  const autoFocus = useAutoFocusMode(!isEmbedded);
   const uploadScope: 'posts' | 'notebook' = isEmbedded ? 'notebook' : 'posts';
 
   const [blocks, setBlocks] = useState<PostBlock[]>(() =>
@@ -571,6 +578,9 @@ export function PostComposer({
   } | null>(null);
 
   const mindMapCanvasRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [blockMoreMenuId, setBlockMoreMenuId] = useState<string | null>(null);
+  const [resizingImageId, setResizingImageId] = useState<string | null>(null);
+  const imageFrameRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draggingMindNode, setDraggingMindNode] = useState<{
     blockId: string;
     nodeId: string;
@@ -771,7 +781,7 @@ export function PostComposer({
   useEffect(() => {
     if (!draggingMindNode) return;
 
-    function handleMouseMove(e: MouseEvent) {
+    function handleMouseMove(e: PointerEvent) {
       if (!draggingMindNode) return;
       const canvasEl = mindMapCanvasRefs.current[draggingMindNode.blockId];
       if (!canvasEl) return;
@@ -780,8 +790,8 @@ export function PostComposer({
       const relX = ((e.clientX - rect.left) / rect.width) * 100;
       const relY = ((e.clientY - rect.top) / rect.height) * 100;
 
-      const clampedX = Math.max(10, Math.min(90, Math.round(relX * 10) / 10));
-      const clampedY = Math.max(12, Math.min(88, Math.round(relY * 10) / 10));
+      const clampedX = Math.max(4, Math.min(96, Math.round(relX * 10) / 10));
+      const clampedY = Math.max(5, Math.min(95, Math.round(relY * 10) / 10));
 
       setBlocks((prev) =>
         prev.map((blk) => {
@@ -802,11 +812,13 @@ export function PostComposer({
       setDraggingMindNode(null);
     }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
     };
   }, [draggingMindNode]);
 
@@ -1645,6 +1657,9 @@ export function PostComposer({
   return (
     <form
       onSubmit={handleSubmit}
+      onInput={autoFocus.onInput}
+      onFocusCapture={autoFocus.onFocusCapture}
+      onBlurCapture={autoFocus.onBlurCapture}
       className={`${
         isEmbedded
           ? 'nb-blocks-editor space-y-4'
@@ -1962,6 +1977,49 @@ export function PostComposer({
                 </div>
 
                 <div className="flex items-center gap-0.5 shrink-0">
+                  {block.spoiler && (
+                    <span className="mr-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[9px] font-bold">
+                      <EyeOff className="w-2.5 h-2.5" /> Spoiler
+                    </span>
+                  )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setBlockMoreMenuId(blockMoreMenuId === block.id ? null : block.id)}
+                      title="Mais opções do bloco"
+                      aria-label="Mais opções do bloco"
+                      aria-expanded={blockMoreMenuId === block.id}
+                      className="p-1 rounded hover:bg-elevated text-muted hover:text-primary"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+                    {blockMoreMenuId === block.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setBlockMoreMenuId(null)} />
+                        <div role="menu" className="absolute right-0 top-full mt-1 z-50 w-56 py-1 rounded-xl bg-surface border border-border shadow-2xl text-xs normal-case">
+                          <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={Boolean(block.spoiler)}
+                            onClick={() => {
+                              updateBlock(block.id, { spoiler: !block.spoiler });
+                              setBlockMoreMenuId(null);
+                            }}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-primary hover:bg-elevated"
+                          >
+                            <span className="flex items-center gap-2">
+                              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                              <span>
+                                <span className="block font-semibold">Contém spoiler</span>
+                                <span className="block text-[10px] text-muted">Desfoca este bloco para os leitores</span>
+                              </span>
+                            </span>
+                            {block.spoiler && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => moveBlockStep(block.id, 'up')}
@@ -2267,17 +2325,84 @@ export function PostComposer({
                           </div>
                         </div>
 
+                        <div className="flex items-center gap-2 px-0.5">
+                          <span className="text-[10px] font-semibold text-muted shrink-0">Tamanho</span>
+                          <input
+                            type="range"
+                            min={15}
+                            max={100}
+                            step={5}
+                            value={parseInt(block.imageWidth || '100%', 10) || 100}
+                            onChange={(e) => updateBlock(block.id, { imageWidth: `${Number(e.target.value)}%` })}
+                            aria-label="Largura da imagem no card"
+                            className="flex-1 min-w-0 accent-[var(--accent)] h-1 cursor-pointer"
+                          />
+                          <span className="w-9 text-right text-[10px] font-mono font-bold text-primary tabular-nums">
+                            {block.imageWidth || '100%'}
+                          </span>
+                        </div>
+
+                        <div
+                          ref={(el) => {
+                            imageFrameRefs.current[block.id] = el;
+                          }}
+                          className="w-full"
+                        >
                         <div
                           style={{ width: block.imageWidth || '100%' }}
                           className={`${getImageAlignClass(
                             block.imageAlign
-                          )} transition-all duration-200 space-y-1 max-w-full`}
+                          )} ${resizingImageId === block.id ? '' : 'transition-[width] duration-200'} space-y-1 max-w-full relative group/img`}
                         >
+                          <div className="relative">
                           <img
                             src={block.imageUrl}
                             alt={block.imageCaption || 'Imagem do post'}
+                            draggable={false}
                             className="w-full h-auto rounded-xl border border-border object-cover"
                           />
+                          {/* alça de redimensionar (arraste o canto) */}
+                          <span
+                            role="slider"
+                            aria-label="Arraste para redimensionar a imagem"
+                            aria-valuenow={parseInt(block.imageWidth || '100%', 10) || 100}
+                            aria-valuemin={15}
+                            aria-valuemax={100}
+                            title="Arraste para redimensionar"
+                            style={{ touchAction: 'none' }}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                              setResizingImageId(block.id);
+                            }}
+                            onPointerMove={(e) => {
+                              if (resizingImageId !== block.id) return;
+                              const frame = imageFrameRefs.current[block.id];
+                              if (!frame) return;
+                              const r = frame.getBoundingClientRect();
+                              const align = block.imageAlign || 'center';
+                              // largura em px a partir da borda fixa (esq., dir. ou centro)
+                              const px =
+                                align === 'left'
+                                  ? e.clientX - r.left
+                                  : align === 'right'
+                                    ? r.right - e.clientX
+                                    : Math.abs(e.clientX - (r.left + r.width / 2)) * 2;
+                              const pct = Math.max(15, Math.min(100, Math.round(((px / r.width) * 100) / 5) * 5));
+                              if (`${pct}%` !== block.imageWidth) updateBlock(block.id, { imageWidth: `${pct}%` });
+                            }}
+                            onPointerUp={() => setResizingImageId(null)}
+                            onPointerCancel={() => setResizingImageId(null)}
+                            className={`absolute ${
+                              (block.imageAlign || 'center') === 'right' ? 'left-1 cursor-nesw-resize' : 'right-1 cursor-nwse-resize'
+                            } bottom-1 w-6 h-6 rounded-full bg-accent text-white shadow-lg ring-2 ring-white/80 grid place-items-center opacity-90 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity`}
+                          >
+                            <svg viewBox="0 0 10 10" className="w-3 h-3" aria-hidden>
+                              <path d="M9 1 1 9M9 5 5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </span>
+                          </div>
                           <input
                             type="text"
                             value={block.imageCaption || ''}
@@ -2287,6 +2412,7 @@ export function PostComposer({
                             placeholder="Legenda (opcional)..."
                             className="w-full bg-transparent text-center text-[11px] text-secondary placeholder:text-muted focus:outline-none truncate"
                           />
+                        </div>
                         </div>
                       </div>
                     )}
@@ -2692,20 +2818,18 @@ export function PostComposer({
                       </div>
                     </div>
 
-                    <div
-                      ref={(el) => {
+                    <PanZoomSurface
+                      worldWidth={MINDMAP_WORLD.width}
+                      worldHeight={MINDMAP_WORLD.height}
+                      bounds={boundsFromPercent(block.mindMapNodes || [], MINDMAP_WORLD.width, MINDMAP_WORLD.height)}
+                      heightClass="h-[360px] sm:h-[420px]"
+                      worldRef={(el) => {
                         mindMapCanvasRefs.current[block.id] = el;
                       }}
-                      onClick={() => {
+                      onBackgroundClick={() => {
                         setSelectedMindNode(null);
                         setConnectingMindNodeFrom(null);
                       }}
-                      style={{
-                        backgroundImage:
-                          'radial-gradient(rgba(161, 161, 170, 0.16) 1px, transparent 1px)',
-                        backgroundSize: '18px 18px',
-                      }}
-                      className="relative w-full h-[360px] rounded-xl bg-[#09090b] border border-border overflow-hidden select-none"
                     >
                       <svg className="absolute inset-0 w-full h-full pointer-events-none">
                         {(block.mindMapEdges || []).map((edge) => {
@@ -2785,12 +2909,14 @@ export function PostComposer({
                               transform: 'translate(-50%, -50%)',
                               borderColor: isSelected ? '#ffffff' : '#27272a',
                             }}
+                            data-pz-stop
                             className={`absolute z-10 w-40 sm:w-48 p-2.5 rounded-xl bg-[#121215]/95 backdrop-blur border shadow-xl ${
                               isSelected ? 'ring-2 ring-accent/40' : ''
                             }`}
                           >
                             <div
-                              onMouseDown={(e) => {
+                              style={{ touchAction: 'none' }}
+                              onPointerDown={(e) => {
                                 e.stopPropagation();
                                 setSelectedMindNode({
                                   blockId: block.id,
@@ -2906,7 +3032,7 @@ export function PostComposer({
                           </div>
                         );
                       })}
-                    </div>
+                    </PanZoomSurface>
                   </div>
                 )}
 
@@ -3625,6 +3751,8 @@ export function PostComposer({
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           type="button"
+          title="Adicionar texto"
+          aria-label="Adicionar texto"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'paragraph')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3633,6 +3761,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar imagem"
+          aria-label="Adicionar imagem"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'image')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3641,6 +3771,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar vídeo"
+          aria-label="Adicionar vídeo"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'video')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3649,6 +3781,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar GIF"
+          aria-label="Adicionar GIF"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'gif')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3657,6 +3791,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar mapa mental 2D"
+          aria-label="Adicionar mapa mental 2D"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'mindmap')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3665,6 +3801,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar roadmap"
+          aria-label="Adicionar roadmap"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'roadmap')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3673,6 +3811,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar gráfico"
+          aria-label="Adicionar gráfico"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'chart')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3681,6 +3821,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar enquete"
+          aria-label="Adicionar enquete"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'poll')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
@@ -3689,6 +3831,8 @@ export function PostComposer({
 
         <button
           type="button"
+          title="Adicionar tabela"
+          aria-label="Adicionar tabela"
           onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'table')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >

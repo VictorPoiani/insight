@@ -4,6 +4,7 @@ import { loginHref } from '@/lib/account/loginRedirect';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Code2, ImagePlus, List, LogIn, Music, Quote, Send, Type, X } from 'lucide-react';
+import { GifPicker } from './GifPicker';
 import { Profile, ReplyBlock, ReplyBlockType } from '@/types/database';
 import { extractSpotifyTrackId } from '@/lib/spotify';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
@@ -25,7 +26,9 @@ const TEXT_TYPES: { type: ReplyBlockType; label: string; Icon: typeof Type }[] =
 
 const uid = () => `rb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const emptyBlocks = (): ReplyBlock[] => [{ id: uid(), type: 'paragraph', text: '' }];
-const isTextBlock = (b: ReplyBlock) => b.type !== 'image' && b.type !== 'spotify';
+const MEDIA_TYPES = new Set(['image', 'spotify', 'gif', 'video']);
+const isTextBlock = (b: ReplyBlock) => !MEDIA_TYPES.has(b.type);
+const MAX_MEDIA = 4;
 const isBlank = (bs: ReplyBlock[]) => !bs.some((b) => (isTextBlock(b) ? (b.text || '').trim() : b.url || b.trackId));
 
 export interface ReplySubmitPayload {
@@ -119,6 +122,8 @@ export function ReplyComposer({
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifyInput, setSpotifyInput] = useState('');
   const [uploading, setUploading] = useState<string | null>(null);
+  const [uploadLabel, setUploadLabel] = useState('');
+  const [gifOpen, setGifOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [restored, setRestored] = useState(false);
   const inputs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -265,28 +270,51 @@ export function ReplyComposer({
     }
   }
 
+  const mediaCount = blocks.filter((b) => b.type === 'gif' || b.type === 'video').length;
+
   async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !loggedUser) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Escolha uma imagem.');
+    const isVideo = file.type.startsWith('video/');
+    if (!file.type.startsWith('image/') && !isVideo) {
+      alert('Escolha uma imagem, GIF ou vídeo.');
+      return;
+    }
+    if (isVideo && mediaCount >= MAX_MEDIA) {
+      alert(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
       return;
     }
     const id = uid();
     setUploading(id);
+    setUploadLabel(isVideo ? 'Preparando vídeo…' : 'Otimizando e enviando imagem…');
     try {
       const res = await uploadMediaToInsight(file, {
         budgetBytes: getUserUploadLimitBytes(loggedUser.contributor_level ?? 0, loggedUser.role),
-        asImage: file.type !== 'image/gif',
+        asImage: !isVideo && file.type !== 'image/gif',
         asFile: file.type === 'image/gif',
+        onStatus: isVideo ? (label) => setUploadLabel(label) : undefined,
       });
-      insertAfter(focused?.id || blocks[blocks.length - 1].id, { id, type: 'image', url: res.publicUrl, bytes: res.compressedSize }, false);
+      insertAfter(
+        focused?.id || blocks[blocks.length - 1].id,
+        { id, type: isVideo ? 'video' : 'image', url: res.publicUrl, bytes: res.compressedSize },
+        false
+      );
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Não foi possível enviar a imagem.');
+      alert(err instanceof Error ? err.message : 'Não foi possível enviar o arquivo.');
     } finally {
       setUploading(null);
+      setUploadLabel('');
     }
+  }
+
+  function addGif(gif: { url: string; previewUrl: string }) {
+    if (mediaCount >= MAX_MEDIA) {
+      alert(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
+      return;
+    }
+    insertAfter(focused?.id || blocks[blocks.length - 1].id, { id: uid(), type: 'gif', url: gif.url, previewUrl: gif.previewUrl }, false);
+    setGifOpen(false);
   }
 
   function addSpotify() {
@@ -306,7 +334,7 @@ export function ReplyComposer({
     const clean = blocks
       .map((b) => (isTextBlock(b) ? { ...b, text: (b.text || '').replace(/\s+$/, '') } : b))
       .filter((b) => (isTextBlock(b) ? b.text : b.url || b.trackId))
-      .map(({ id, type, text, url, trackId }) => ({ id, type, text, url, trackId }) as ReplyBlock);
+      .map(({ id, type, text, url, trackId, previewUrl }) => ({ id, type, text, url, trackId, previewUrl }) as ReplyBlock);
     setSending(true);
     const ok = await onSubmit({ blocks: clean, content: replyBlocksToText(clean) });
     setSending(false);
@@ -315,6 +343,7 @@ export function ReplyComposer({
       setRestored(false);
       setBlocks(emptyBlocks());
       setSpotifyOpen(false);
+      setGifOpen(false);
     }
   }
 
@@ -383,9 +412,11 @@ export function ReplyComposer({
               </div>
             ) : (
               <div key={b.id} className="relative group/blk">
-                {b.type === 'image' ? (
+                {b.type === 'image' || b.type === 'gif' ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.url} alt="" className="max-h-56 w-auto max-w-full rounded-xl border border-border object-contain bg-elevated" />
+                  <img src={b.type === 'gif' ? b.previewUrl || b.url : b.url} alt="" className="max-h-56 w-auto max-w-full rounded-xl border border-border object-contain bg-elevated" />
+                ) : b.type === 'video' ? (
+                  <video src={`${b.url}#t=0.001`} muted playsInline preload="metadata" className="max-h-56 w-auto max-w-full rounded-xl border border-border bg-black" />
                 ) : (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-elevated border border-border text-xs text-secondary">
                     <Music className="w-3.5 h-3.5 text-[#1DB954]" /> Faixa do Spotify anexada
@@ -402,8 +433,10 @@ export function ReplyComposer({
               </div>
             )
           )}
-          {uploading && <p className="text-[11px] text-muted">Otimizando e enviando imagem…</p>}
+          {uploading && <p className="text-[11px] text-muted">{uploadLabel || 'Enviando…'}</p>}
         </div>
+
+        {gifOpen && <GifPicker onPick={addGif} onClose={() => setGifOpen(false)} />}
 
         {spotifyOpen && (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-elevated border border-border">
@@ -450,15 +483,27 @@ export function ReplyComposer({
             <span className="w-px h-4 bg-border mx-0.5" />
             <button
               type="button"
-              title="Imagem"
-              aria-label="Anexar imagem"
+              title="Imagem ou vídeo"
+              aria-label="Anexar imagem ou vídeo"
               disabled={Boolean(uploading) || blocks.length >= MAX_BLOCKS}
               onClick={() => fileRef.current?.click()}
               className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-elevated disabled:opacity-40"
             >
               <ImagePlus className="w-3.5 h-3.5" />
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
+            <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleImage} />
+            <button
+              type="button"
+              title="GIF"
+              aria-label="Anexar GIF"
+              disabled={blocks.length >= MAX_BLOCKS}
+              onClick={() => setGifOpen((v) => !v)}
+              className={`px-1.5 py-1 rounded-lg text-[10px] font-black tracking-wide transition-colors disabled:opacity-40 ${
+                gifOpen ? 'bg-accent/15 text-accent' : 'text-secondary hover:text-primary hover:bg-elevated'
+              }`}
+            >
+              GIF
+            </button>
             <button
               type="button"
               title="Spotify"

@@ -29,7 +29,15 @@ export function NitroFxCanvas({ fx, cssSize }: { fx: FxName; cssSize: number }) 
       return;
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // celular: resolução e quadros menores; aparelho fraco fica com a imagem estática
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const mobile = window.matchMedia('(pointer: coarse)').matches;
+    if (mobile && ((nav.deviceMemory ?? 4) <= 2 || (navigator.hardwareConcurrency ?? 4) <= 4)) {
+      setState('failed');
+      return;
+    }
+    const fps = mobile ? 24 : FPS;
+    const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
     const res = Math.min(MAX_RES, Math.round(cssSize * dpr));
     canvas.width = res;
     canvas.height = res;
@@ -76,9 +84,13 @@ export function NitroFxCanvas({ fx, cssSize }: { fx: FxName; cssSize: number }) 
     let first = true;
 
     const draw = (now: number) => {
+      // fora da tela ou aba escondida: para o laço (retoma pelo observer)
+      if (!visible || document.hidden) {
+        raf = 0;
+        return;
+      }
       raf = requestAnimationFrame(draw);
-      if (!visible || document.hidden) return;
-      if (now - last < 1000 / FPS) return;
+      if (now - last < 1000 / fps) return;
       last = now;
       gl.viewport(0, 0, res, res);
       gl.clearColor(0, 0, 0, 0);
@@ -93,10 +105,15 @@ export function NitroFxCanvas({ fx, cssSize }: { fx: FxName; cssSize: number }) 
     };
     raf = requestAnimationFrame(draw);
 
+    const resume = () => {
+      if (visible && !document.hidden && !raf) raf = requestAnimationFrame(draw);
+    };
     const io = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
+      resume();
     });
     io.observe(canvas);
+    document.addEventListener('visibilitychange', resume);
 
     const onLost = (e: Event) => {
       e.preventDefault();
@@ -107,6 +124,7 @@ export function NitroFxCanvas({ fx, cssSize }: { fx: FxName; cssSize: number }) 
     return () => {
       cancelAnimationFrame(raf);
       io.disconnect();
+      document.removeEventListener('visibilitychange', resume);
       canvas.removeEventListener('webglcontextlost', onLost);
       gl.deleteBuffer(buf);
       gl.deleteProgram(prog);

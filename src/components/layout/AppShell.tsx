@@ -8,8 +8,9 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
-import { NitroMenuItem } from '@/components/nitro/NitroMenuItem';
-import { Menu, X, Heart, Info, FileText, Shield } from 'lucide-react';
+import { PresenceProvider } from '@/components/presence/PresenceProvider';
+import { Menu, X, Heart, Info, FileText, Shield, Sparkles } from 'lucide-react';
+import { MobileNotificationBell } from '@/components/notifications/MobileNotificationBell';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
 // rotas com layout próprio (sem as barras do site)
@@ -42,13 +43,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isFullscreen) {
     return (
       <NitroProvider>
-        <main className="w-full min-h-screen">{children}</main>
+        <PresenceProvider>
+          <main className="w-full min-h-screen">{children}</main>
+        </PresenceProvider>
       </NitroProvider>
     );
   }
 
   return (
     <NitroProvider>
+    <PresenceProvider>
     <>
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
@@ -56,6 +60,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <InsightLogo className="text-xl" />
         </Link>
 
+        <div className="flex items-center gap-0.5">
+        <MobileNotificationBell />
         <div ref={menuRef} className="relative">
           <button
             type="button"
@@ -68,7 +74,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {menuOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-surface/95 backdrop-blur-xl border border-border shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-              <NitroMenuItem onNavigate={() => setMenuOpen(false)} />
+              <Link
+                href="/atualizacoes"
+                className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-accent" />
+                <span>Atualizações</span>
+              </Link>
               <NotebookNavItem variant="menu" onNavigate={() => setMenuOpen(false)} />
               <div className="my-1 border-t border-border/70" />
               <Link
@@ -103,6 +115,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
+        </div>
       </div>
 
       <div className="max-w-[1920px] mx-auto flex min-h-screen justify-center pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
@@ -117,6 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <MobileBottomNav />
     </>
+    </PresenceProvider>
     </NitroProvider>
   );
 }

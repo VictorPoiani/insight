@@ -1,5 +1,6 @@
 'use client';
 
+import { OnlineDot, usePresence } from '@/components/presence/PresenceProvider';
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -8,8 +9,11 @@ import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
-import { useNewsFeed, useNewsFollows, type NewsItem } from '@/components/news/useNews';
-import { PostComposer } from '@/components/feed/PostComposer';
+import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/components/news/useNews';
+import dynamic from 'next/dynamic';
+import { useProgressiveList } from '@/lib/useProgressiveList';
+// o editor só é baixado quando a pessoa abre o compositor
+const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
   Search,
@@ -23,6 +27,7 @@ import {
   PenSquare,
   ChevronLeft,
   ChevronRight,
+  Newspaper,
 } from 'lucide-react';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
@@ -234,6 +239,13 @@ function CommunityHomeFeed() {
     setTimeout(updateCarouselButtons, 150);
   }, [supabase, updateCarouselButtons]);
 
+  // Insight publicado fora do compositor (ex.: repost com comentário) recarrega o feed
+  useEffect(() => {
+    const onCreated = () => void loadExploreData();
+    window.addEventListener('insight:post-created', onCreated);
+    return () => window.removeEventListener('insight:post-created', onCreated);
+  }, [loadExploreData]);
+
   useEffect(() => {
     loadExploreData();
 
@@ -354,6 +366,9 @@ function CommunityHomeFeed() {
   // ---------------------------------------------------- notícias no Para você
   // Só temas que a pessoa segue; a aba Notícias mostra todos.
   const newsFollows = useNewsFollows(loggedProfile?.id ?? null);
+  const searchNews = useNewsSearch(activeTab === 'members' ? '' : search, 8);
+  const [showAllSearchNews, setShowAllSearchNews] = useState(false);
+  useEffect(() => setShowAllSearchNews(false), [search]);
   const mixNews = activeTab === 'for_you' && !selectedTag && !search.trim() && Boolean(loggedProfile);
   const followsKey = Array.from(newsFollows.follows).sort().join(',');
   const forYouNews = useNewsFeed('for_you', {
@@ -385,10 +400,15 @@ function CommunityHomeFeed() {
     for (let n = 0; n < extra && k < news.length; n++) out.push({ kind: 'news', item: news[k++] });
     return out;
   }, [filteredPosts, forYouNews.items, mixNews, showNewsOnboarding]);
+  const progressiveFeed = useProgressiveList(mixedFeed, 8, 8, `${activeTab}|${selectedTag}|${query}`);
 
+  const { isOnline } = usePresence();
+  // quem está online aparece primeiro no carrossel
   const carouselMembers = useMemo(() => {
-    return filteredProfiles;
-  }, [filteredProfiles]);
+    const on = filteredProfiles.filter((p) => isOnline(p.id, p.last_seen_at));
+    const off = filteredProfiles.filter((p) => !isOnline(p.id, p.last_seen_at));
+    return [...on, ...off];
+  }, [filteredProfiles, isOnline]);
 
   return (
     <div className="w-full min-h-screen bg-background">
@@ -508,8 +528,8 @@ function CommunityHomeFeed() {
               <button
                 type="button"
                 onClick={() => setShowQuickComposer(!showQuickComposer)}
-                title="Publicar na comunidade"
-                aria-label="Publicar na comunidade"
+                title="Publicar Insight"
+                aria-label="Publicar Insight"
                 className={`h-8 px-2.5 sm:px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
                   showQuickComposer
                     ? 'bg-elevated text-primary border border-border'
@@ -517,7 +537,7 @@ function CommunityHomeFeed() {
                 }`}
               >
                 <PenSquare className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Publicar</span>
+                <span className="hidden sm:inline">Publicar Insight</span>
               </button>
             )}
           </div>
@@ -636,11 +656,14 @@ function CommunityHomeFeed() {
                   className="px-4 sm:px-6 py-4 hover:bg-surface/40 transition-colors flex items-start justify-between gap-3 group"
                 >
                   <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <img
-                      src={prof.avatar_url || '/assets/net/default-perfil'}
-                      alt={prof.full_name}
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated shrink-0"
-                    />
+                    <span className="relative shrink-0">
+                      <img
+                        src={prof.avatar_url || '/assets/net/default-perfil'}
+                        alt={prof.full_name}
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated"
+                      />
+                      <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={12} />
+                    </span>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
@@ -769,11 +792,14 @@ function CommunityHomeFeed() {
                       className="w-[215px] sm:w-[240px] shrink-0 p-2.5 rounded-xl bg-surface border border-border hover:border-accent/60 transition-all flex items-center justify-between gap-2 group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={prof.avatar_url || '/assets/net/default-perfil'}
-                          alt={prof.full_name}
-                          className="w-9 h-9 rounded-full object-cover border border-border bg-elevated shrink-0"
-                        />
+                        <span className="relative shrink-0">
+                          <img
+                            src={prof.avatar_url || '/assets/net/default-perfil'}
+                            alt={prof.full_name}
+                            className="w-9 h-9 rounded-full object-cover border border-border bg-elevated"
+                          />
+                          <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={11} />
+                        </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
                             <p className="text-xs font-bold text-primary group-hover:text-accent transition-colors truncate">
@@ -812,12 +838,30 @@ function CommunityHomeFeed() {
             </section>
           )}
 
+          {search.trim().length >= 2 && searchNews.items.length > 0 && (
+            <section className="border-b border-border" aria-label="Notícias relacionadas à busca">
+              <div className="px-4 sm:px-6 pt-3 pb-1 flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                  <Newspaper className="w-3.5 h-3.5 text-sky-400" /> Notícias sobre &ldquo;{search.trim()}&rdquo;
+                </span>
+                {searchNews.items.length > 3 && (
+                  <button type="button" onClick={() => setShowAllSearchNews((v) => !v)} className="text-[11px] font-semibold text-accent hover:underline">
+                    {showAllSearchNews ? 'Ver menos' : `Ver todas (${searchNews.items.length})`}
+                  </button>
+                )}
+              </div>
+              {(showAllSearchNews ? searchNews.items : searchNews.items.slice(0, 3)).map((item) => (
+                <NewsCard key={`sn-${item.id}`} item={item} onPatch={searchNews.patch} compact />
+              ))}
+            </section>
+          )}
+
           {filteredPosts.length === 0 && !mixNews ? (
             <div className="py-16 px-6 text-center space-y-2">
               <p className="text-sm font-bold text-primary">
                 {activeTab === 'following'
-                  ? 'Nenhuma publicação das contas que você segue ainda'
-                  : 'Nenhuma publicação encontrada'}
+                  ? 'Nenhum Insight das contas que você segue ainda'
+                  : 'Nenhum Insight encontrado'}
               </p>
               <p className="text-xs text-muted max-w-sm mx-auto">
                 {activeTab === 'following'
@@ -827,7 +871,7 @@ function CommunityHomeFeed() {
             </div>
           ) : (
             <div>
-              {mixedFeed.map((entry) => {
+              {progressiveFeed.visible.map((entry) => {
                 if (entry.kind === 'news') {
                   return (
                     <NewsCard
@@ -871,6 +915,7 @@ function CommunityHomeFeed() {
                   />
                 );
               })}
+              {progressiveFeed.hasMore && <div ref={progressiveFeed.sentinelRef} className="h-24" aria-hidden />}
             </div>
           )}
         </div>

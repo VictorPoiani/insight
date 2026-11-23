@@ -82,7 +82,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
     <ShareSheet
       isOpen={isOpen}
       onClose={onClose}
-      title="Compartilhar publicação"
+      title="Compartilhar Insight"
       imageBase={`/api/share/${post.id}`}
       path={`/post/${post.id}`}
       shareTitle={`${name} no Insight*`}

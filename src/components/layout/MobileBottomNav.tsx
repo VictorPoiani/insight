@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Compass, Sparkles, Settings, UserCircle2, LogIn } from 'lucide-react';
+import { Compass, Zap, Settings, UserCircle2, LogIn } from 'lucide-react';
 
 
 
@@ -54,7 +54,7 @@ export function MobileBottomNav() {
 
   const items = [
     { label: 'Explorar', href: '/', icon: Compass },
-    { label: 'Novidades', href: '/atualizacoes', icon: Sparkles },
+    { label: 'Nitro', href: '/nitro', icon: Zap },
     { label: 'Ajustes', href: '/config', icon: Settings },
     {
       label: profileHref ? 'Meu Perfil' : 'Entrar',

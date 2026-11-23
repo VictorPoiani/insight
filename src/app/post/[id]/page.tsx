@@ -389,7 +389,7 @@ export default function PostDiscussionPage() {
       <div className="w-full">
         {header}
         <div className="py-20 px-6 text-center space-y-3">
-          <p className="text-sm font-bold text-primary">Publicação não encontrada</p>
+          <p className="text-sm font-bold text-primary">Insight não encontrado</p>
           <p className="text-xs text-muted">Ela pode ter sido excluída ou ser privada.</p>
           <Link href="/" className="inline-block text-xs font-semibold text-accent hover:underline">
             Voltar para o início
@@ -434,7 +434,8 @@ export default function PostDiscussionPage() {
           loggedUser={loggedUser}
           textareaRef={mainComposerRef}
           replyingTo={author.username}
-          placeholder="Publique sua resposta..."
+          placeholder="Comente este Insight..."
+          submitLabel="Comentar Insight"
           draftScope={`reply:${post.id}:root`}
           onSubmit={(payload) => submitReply(null, payload)}
         />

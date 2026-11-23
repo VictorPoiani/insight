@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { IntroItem, NitroCosmetics, getNitroItem } from '@/lib/nitro/catalog';
 import { prefersReducedMotion, useNitro, useProfileCosmetics } from './NitroProvider';
-import { IntroScene } from './intro/scenes';
+import dynamic from 'next/dynamic';
+
+// cenas ilustradas das aberturas (~118 KB de JS+CSS): só baixa quando uma toca
+const IntroScene = dynamic(() => import('./intro/scenes').then((m) => m.IntroScene), { ssr: false });
 
 type CSSVars = CSSProperties & Record<`--${string}`, string | number>;
 

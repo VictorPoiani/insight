@@ -38,10 +38,10 @@ export default function TermosPage() {
         </p>
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-muted">
           <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: Novembro de 2026
+            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 23 de novembro de 2026
           </span>
           <span className="flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 2.0 (Corporativa)
+            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 2.1
           </span>
           <span className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-accent" /> Vigência: Imediata
@@ -306,6 +306,48 @@ export default function TermosPage() {
           </p>
         </section>
 
+        {/* Cláusula 8-A */}
+        <section className="space-y-3">
+          <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
+            8-A. Dos Recursos de Publicação, Notícias e Presença
+          </h2>
+          <p>
+            <strong>8-A.1. Repostar com comentário:</strong> Ao repostar um Insight com comentário, o
+            novo Insight exibe uma prévia do original, que continua sob a autoria e as regras de
+            visibilidade de quem o publicou. Se o original for excluído ou ficar privado, a prévia
+            deixa de ser exibida. O autor original é notificado da citação.
+          </p>
+          <p>
+            <strong>8-A.2. Marcação de spoiler:</strong> O autor pode marcar blocos do seu Insight
+            como &ldquo;Contém spoiler&rdquo;, que aparecem desfocados até o leitor optar por vê-los. A
+            marcação é responsabilidade do autor e não altera as regras de uso aceitável da Cláusula 5.
+          </p>
+          <p>
+            <strong>8-A.3. Mídias em respostas:</strong> Respostas podem conter imagens, GIFs e
+            vídeos. Vídeos e imagens são comprimidos no próprio dispositivo do Usuário antes do envio
+            e estão sujeitos aos limites de tamanho do nível de contribuinte da conta.
+          </p>
+          <p>
+            <strong>8-A.4. Feed de notícias:</strong> As notícias exibidas no feed e na busca são
+            títulos, resumos e imagens divulgados publicamente pelos próprios portais em seus feeds,
+            sempre com o nome da fonte e o link para a matéria original. O conteúdo pertence aos
+            respectivos veículos; o Insight* não edita, endossa nem se responsabiliza pelas matérias
+            de terceiros.
+          </p>
+          <p>
+            <strong>8-A.5. Status online:</strong> A Plataforma mostra automaticamente quando um
+            Usuário está online e quando foi visto pela última vez. O Usuário pode ocultar essa
+            informação a qualquer momento no menu de status do próprio perfil.
+          </p>
+          <p>
+            <strong>8-A.6. Áreas de organização pessoal:</strong> Abas de tópicos como plano
+            nutricional, metas, hábitos e agenda seguem a visibilidade do perfil e da aba. Não
+            publique nessas áreas dados de saúde ou outras informações sensíveis que não queira
+            tornar públicas; as informações têm caráter organizacional e não substituem orientação
+            de profissional de saúde.
+          </p>
+        </section>
+
         {/* Cláusula 9 */}
         <section className="space-y-3">
           <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
@@ -327,11 +369,14 @@ export default function TermosPage() {
             <strong>9.1. Serviços e APIs de Terceiros:</strong> O funcionamento pleno do{' '}
             <strong className="text-primary">Insight*</strong> integra soluções tecnológicas de
             provedores líderes de mercado, incluindo, mas não se limitando a:{' '}
-            <strong className="text-primary">Supabase</strong> (banco de dados PostgreSQL,
-            autenticação e armazenamento), <strong className="text-primary">Vercel</strong>{' '}
+            <strong className="text-primary">Supabase</strong> (banco de dados PostgreSQL e
+            autenticação), <strong className="text-primary">Cloudflare R2</strong> (armazenamento e
+            entrega de imagens, vídeos e arquivos), <strong className="text-primary">Vercel</strong>{' '}
             (hospedagem em nuvem e rede de borda), <strong className="text-primary">Resend / Google SMTP</strong>{' '}
-            (disparo transacional de e-mails) e <strong className="text-primary">Spotify API</strong>{' '}
-            (incorporação de mídia de áudio). O Operador não se responsabiliza por instabilidades,
+            (disparo transacional de e-mails), <strong className="text-primary">Spotify API</strong>{' '}
+            (incorporação de mídia de áudio), <strong className="text-primary">GIPHY / Tenor</strong>{' '}
+            (busca de GIFs) e portais de notícias de terceiros (feeds públicos RSS/Atom e Google
+            Notícias). O Operador não se responsabiliza por instabilidades,
             interrupções ou alterações políticas originadas exclusivamente nos servidores desses
             provedores externos.
           </p>

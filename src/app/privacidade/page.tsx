@@ -39,7 +39,7 @@ export default function PrivacidadePage() {
         </p>
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-muted">
           <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: Novembro de 2026
+            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 23 de novembro de 2026
           </span>
           <span className="flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-accent" /> Versão 2.0 (Corporativa)
@@ -110,6 +110,29 @@ export default function PrivacidadePage() {
               IP, data e hora de acesso (com fuso horário), tipo de navegador (User-Agent) e dados
               de sessão, coletados de forma automatizada para prevenção a fraudes, segurança da
               informação e cumprimento do dever legal previsto no Art. 15 do Marco Civil da Internet.
+            </li>
+            <li>
+              <strong className="text-primary">Status online e &ldquo;visto por último&rdquo;:</strong>{' '}
+              enquanto o site está aberto, registramos a data e hora da sua última atividade e
+              informamos, em tempo real, que você está online. Você pode ficar invisível a qualquer
+              momento em &ldquo;Mostrar quando estou online&rdquo;, no menu de status do seu perfil; ao
+              fazer isso, o horário de última atividade é apagado.
+            </li>
+            <li>
+              <strong className="text-primary">Interações com notícias:</strong> temas que você
+              segue e notícias que abre, curte ou oculta. Usamos apenas para ordenar o seu feed de
+              notícias; essas informações não são exibidas a outras pessoas.
+            </li>
+            <li>
+              <strong className="text-primary">Áreas de organização pessoal:</strong> dados que você
+              registra em abas de tópicos (plano nutricional com refeições, água, peso e notas;
+              metas; hábitos; agenda). Eles seguem a visibilidade da aba e do perfil. Dados de saúde
+              são sensíveis (Art. 11 da LGPD): só os registre se quiser, e prefira abas privadas.
+            </li>
+            <li>
+              <strong className="text-primary">Mídias enviadas:</strong> imagens, GIFs, vídeos e
+              arquivos que você anexa a Insights e respostas. Vídeos e imagens são comprimidos no seu
+              próprio aparelho antes do envio; o arquivo original não é enviado aos nossos servidores.
             </li>
           </ul>
         </section>
@@ -214,6 +237,16 @@ export default function PrivacidadePage() {
             Ao interagir diretamente com o player incorporado, o serviço terceiro poderá aplicar suas
             próprias políticas de sessão e cookies técnicos para reprodução da faixa.
           </p>
+          <p>
+            <strong>GIFs e notícias:</strong> a busca de GIFs é feita pelo nosso servidor junto ao
+            GIPHY/Tenor (sem enviar seus dados pessoais), e as imagens dos GIFs e das notícias são
+            carregadas diretamente dos servidores desses serviços e dos portais de origem.
+          </p>
+          <p>
+            <strong>Preferências guardadas no aparelho:</strong> volume do player de vídeo, modo
+            foco automático, rascunhos e preferências de leitura ficam no armazenamento local do seu
+            navegador e não são enviados aos nossos servidores.
+          </p>
         </section>
 
         {/* Seção 5 */}
@@ -230,9 +263,13 @@ export default function PrivacidadePage() {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <strong className="text-primary">Supabase Inc.:</strong> Hospedagem de banco de dados
-              relacional PostgreSQL, gestão criptografada de autenticação (Supabase Auth) e
-              armazenamento de arquivos de mídia (Storage) com políticas de isolamento por linha (
+              relacional PostgreSQL, gestão criptografada de autenticação (Supabase Auth), presença
+              em tempo real (Realtime) e políticas de isolamento por linha (
               <em>Row Level Security - RLS</em>);
+            </li>
+            <li>
+              <strong className="text-primary">Cloudflare, Inc. (R2):</strong> Armazenamento e
+              entrega das imagens, vídeos e arquivos publicados, no domínio media.insight.app.br;
             </li>
             <li>
               <strong className="text-primary">Vercel Inc.:</strong> Hospedagem da aplicação web,

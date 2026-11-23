@@ -8,6 +8,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
+import { PresenceProvider } from '@/components/presence/PresenceProvider';
 import { NitroMenuItem } from '@/components/nitro/NitroMenuItem';
 import { Menu, X, Heart, Info, FileText, Shield } from 'lucide-react';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
@@ -42,13 +43,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isFullscreen) {
     return (
       <NitroProvider>
-        <main className="w-full min-h-screen">{children}</main>
+        <PresenceProvider>
+          <main className="w-full min-h-screen">{children}</main>
+        </PresenceProvider>
       </NitroProvider>
     );
   }
 
   return (
     <NitroProvider>
+    <PresenceProvider>
     <>
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
@@ -117,6 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <MobileBottomNav />
     </>
+    </PresenceProvider>
     </NitroProvider>
   );
 }

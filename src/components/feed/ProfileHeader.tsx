@@ -1,5 +1,6 @@
 'use client';
 
+import { usePresence, lastSeenLabel } from '@/components/presence/PresenceProvider';
 import { ShareProfileModal } from '@/components/feed/SharePostModal';
 import { FollowListModal, type FollowTab } from '@/components/feed/FollowListModal';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
@@ -71,6 +72,7 @@ import {
   Clock,
   ShieldAlert,
   Wifi,
+  WifiOff,
   ChevronDown,
   Link2,
   Trash2,
@@ -606,9 +608,30 @@ export function ProfileHeader({
 
   const supabase = createClient();
 
-  const currentStatus =
+  const { isOnline } = usePresence();
+  const [presenceVisible, setPresenceVisible] = useState<boolean>(profile.presence_visible !== false);
+  useEffect(() => setPresenceVisible(profile.presence_visible !== false), [profile.presence_visible]);
+  const online = isOnline(profile.id, profile.last_seen_at) && (presenceVisible || !isAdmin);
+  const chosenStatus =
     USER_STATUS_OPTIONS.find((s) => s.id === statusId) || USER_STATUS_OPTIONS[0];
+  // o status escolhido só aparece quando a pessoa está online de verdade
+  const currentStatus: StatusOptionConfig = online
+    ? chosenStatus
+    : {
+        id: 'offline',
+        label: isAdmin && !presenceVisible ? 'Invisível' : lastSeenLabel(profile.last_seen_at),
+        color: '#71717a',
+        pulse: false,
+        icon: WifiOff,
+      };
   const StatusIcon = currentStatus.icon;
+
+  async function togglePresenceVisible() {
+    const next = !presenceVisible;
+    setPresenceVisible(next);
+    const { error } = await supabase.rpc('set_presence_visible', { p_visible: next });
+    if (error) setPresenceVisible(!next);
+  }
 
   const detectedPreviewPlatform = useMemo(
     () => detectPlatformFromUrl(newLinkUrl),
@@ -1327,7 +1350,7 @@ export function ProfileHeader({
 
                   <span className="truncate max-w-[110px] sm:max-w-[135px]">
                     {currentStatus.label}
-                    {statusDetail ? (
+                    {statusDetail && online ? (
                       <span className="font-normal text-secondary">
                         {' '}
                         · {statusDetail}
@@ -1354,6 +1377,24 @@ export function ProfileHeader({
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={togglePresenceVisible}
+                      className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-elevated/80 border border-border text-[11px] font-semibold text-primary"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {presenceVisible ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-muted" />}
+                        Mostrar quando estou online
+                      </span>
+                      <span
+                        className={`relative w-8 h-4.5 h-[18px] rounded-full transition-colors ${presenceVisible ? 'bg-emerald-500' : 'bg-zinc-600'}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-[14px] h-[14px] rounded-full bg-white transition-all ${presenceVisible ? 'left-[16px]' : 'left-0.5'}`}
+                        />
+                      </span>
+                    </button>
 
                     <div className="grid grid-cols-2 gap-1">
                       {USER_STATUS_OPTIONS.map((opt) => {

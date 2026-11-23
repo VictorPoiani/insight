@@ -1,5 +1,6 @@
 'use client';
 
+import { OnlineDot, usePresence } from '@/components/presence/PresenceProvider';
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -393,9 +394,13 @@ function CommunityHomeFeed() {
     return out;
   }, [filteredPosts, forYouNews.items, mixNews, showNewsOnboarding]);
 
+  const { isOnline } = usePresence();
+  // quem está online aparece primeiro no carrossel
   const carouselMembers = useMemo(() => {
-    return filteredProfiles;
-  }, [filteredProfiles]);
+    const on = filteredProfiles.filter((p) => isOnline(p.id, p.last_seen_at));
+    const off = filteredProfiles.filter((p) => !isOnline(p.id, p.last_seen_at));
+    return [...on, ...off];
+  }, [filteredProfiles, isOnline]);
 
   return (
     <div className="w-full min-h-screen bg-background">
@@ -643,11 +648,14 @@ function CommunityHomeFeed() {
                   className="px-4 sm:px-6 py-4 hover:bg-surface/40 transition-colors flex items-start justify-between gap-3 group"
                 >
                   <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <img
-                      src={prof.avatar_url || '/assets/net/default-perfil'}
-                      alt={prof.full_name}
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated shrink-0"
-                    />
+                    <span className="relative shrink-0">
+                      <img
+                        src={prof.avatar_url || '/assets/net/default-perfil'}
+                        alt={prof.full_name}
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated"
+                      />
+                      <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={12} />
+                    </span>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
@@ -776,11 +784,14 @@ function CommunityHomeFeed() {
                       className="w-[215px] sm:w-[240px] shrink-0 p-2.5 rounded-xl bg-surface border border-border hover:border-accent/60 transition-all flex items-center justify-between gap-2 group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={prof.avatar_url || '/assets/net/default-perfil'}
-                          alt={prof.full_name}
-                          className="w-9 h-9 rounded-full object-cover border border-border bg-elevated shrink-0"
-                        />
+                        <span className="relative shrink-0">
+                          <img
+                            src={prof.avatar_url || '/assets/net/default-perfil'}
+                            alt={prof.full_name}
+                            className="w-9 h-9 rounded-full object-cover border border-border bg-elevated"
+                          />
+                          <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={11} />
+                        </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
                             <p className="text-xs font-bold text-primary group-hover:text-accent transition-colors truncate">

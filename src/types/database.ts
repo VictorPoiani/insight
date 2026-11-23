@@ -52,6 +52,9 @@ export interface Profile {
   email_verified_at?: string | null;
   /** Insight Nitro: itens equipados (snapshot gravado via RPC set_my_cosmetics). */
   cosmetics?: NitroCosmetics | null;
+  /** Status online automático */
+  last_seen_at?: string | null;
+  presence_visible?: boolean;
 }
 
 export type PostBlockType =

@@ -4,9 +4,10 @@ import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { MindMapViewer } from '@/components/canvas/MindMapViewer';
 import { QuotedPostCard, QuoteComposerModal } from './QuotedPost';
 import { SpoilerBlock } from './SpoilerBlock';
+import { ImageLightbox } from '@/components/media/ImageLightbox';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Post,
@@ -497,6 +498,18 @@ export function PostCard({
     }
   }
 
+  // Imagens do post em tela cheia (na ordem em que aparecem)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxImages = useMemo(() => {
+    const list = blocksState.filter((x) => x.type === 'image' && x.imageUrl).map((x) => ({ src: x.imageUrl!, alt: x.imageCaption || '' }));
+    if (!list.length && postImageUrl) list.push({ src: postImageUrl, alt: '' });
+    return list;
+  }, [blocksState, postImageUrl]);
+  const openLightbox = (src: string) => {
+    const i = lightboxImages.findIndex((x) => x.src === src);
+    setLightboxIndex(i >= 0 ? i : 0);
+  };
+
   if (!isAdmin && postVisibility === 'private') {
     return null;
   }
@@ -607,8 +620,12 @@ export function PostCard({
                     <img
                       src={b.imageUrl}
                       alt={b.imageCaption || 'Imagem do post'}
-                      className="w-full h-auto rounded-xl border border-border object-cover"
+                      className="w-full h-auto rounded-xl border border-border object-cover cursor-zoom-in"
                       loading="lazy"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLightbox(b.imageUrl!);
+                      }}
                     />
                     {b.imageCaption && (
                       <figcaption className="text-xs text-muted text-center">
@@ -1132,8 +1149,12 @@ export function PostCard({
               <img
                 src={postImageUrl}
                 alt="Imagem do post"
-                className="w-full max-h-96 object-cover"
+                className="w-full max-h-96 object-cover cursor-zoom-in"
                 loading="lazy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openLightbox(postImageUrl);
+                }}
               />
             </div>
           )}
@@ -1290,6 +1311,15 @@ export function PostCard({
       </div>
 
       {/* Modal Insight* Share Studio */}
+      {lightboxIndex !== null && lightboxImages.length > 0 && (
+        <ImageLightbox
+          images={lightboxImages}
+          index={Math.min(lightboxIndex, lightboxImages.length - 1)}
+          onIndexChange={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
       {quoteOpen && loggedUserProfile && (
         <QuoteComposerModal
           post={post}

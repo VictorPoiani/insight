@@ -4,7 +4,29 @@ import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type R
 import { observeFrame } from './inViewBudget';
 import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
 import { NitroFxCanvas } from './NitroFxCanvas';
-import { CRITTERS } from './critters';
+import type { CritterId } from './critters';
+
+// As artes das molduras ilustradas (~90 KB de SVG) só são baixadas quando
+// alguma moldura com bichinho aparece na tela.
+type CritterMap = typeof import('./critters').CRITTERS;
+let crittersCache: CritterMap | null = null;
+let crittersPromise: Promise<CritterMap> | null = null;
+function loadCritters(): Promise<CritterMap> {
+  if (!crittersPromise) crittersPromise = import('./critters').then((m) => (crittersCache = m.CRITTERS));
+  return crittersPromise;
+}
+function useCritters(needed: CritterId | undefined | null): CritterMap | null {
+  const [map, setMap] = useState<CritterMap | null>(crittersCache);
+  useEffect(() => {
+    if (!needed || map) return;
+    let alive = true;
+    loadCritters().then((m) => alive && setMap(m));
+    return () => {
+      alive = false;
+    };
+  }, [needed, map]);
+  return map;
+}
 import { SaturnBack, SaturnFront } from './saturn';
 import {
   Cpu,
@@ -113,15 +135,17 @@ function FrameShell({
   // IDs de degradê únicos por instância: a mesma moldura aparece várias vezes na
   // página (galeria, prévia, feed) e IDs repetidos fazem o navegador perder o degradê.
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const critters = useCritters(frame.critter);
   const critterArt = useMemo(() => {
-    if (!frame.critter) return null;
-    const art = CRITTERS[frame.critter];
+    if (!frame.critter || !critters) return null;
+    const art = critters[frame.critter];
+    if (!art) return null;
     const scope = (html?: string) =>
       html
         ? html.replace(/id="([^"]+)"/g, `id="$1-${uid}"`).replace(/url\(#([^)]+)\)/g, `url(#$1-${uid})`)
         : undefined;
     return { back: scope(art.back), front: scope(art.front)! };
-  }, [frame.critter, uid]);
+  }, [frame.critter, uid, critters]);
 
   useEffect(() => {
     if (mode !== 'nx-auto' || !ref.current) return;

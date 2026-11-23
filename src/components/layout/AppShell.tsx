@@ -9,7 +9,6 @@ import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { PresenceProvider } from '@/components/presence/PresenceProvider';
-import { NitroMenuItem } from '@/components/nitro/NitroMenuItem';
 import { Menu, X, Heart, Info, FileText, Shield, Sparkles } from 'lucide-react';
 import { MobileNotificationBell } from '@/components/notifications/MobileNotificationBell';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
@@ -82,7 +81,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Sparkles className="w-4 h-4 text-accent" />
                 <span>Atualizações</span>
               </Link>
-              <NitroMenuItem onNavigate={() => setMenuOpen(false)} />
               <NotebookNavItem variant="menu" onNavigate={() => setMenuOpen(false)} />
               <div className="my-1 border-t border-border/70" />
               <Link

@@ -285,6 +285,44 @@ export default function TermosPage() {
           </p>
         </section>
 
+        {/* Cláusula 7-A */}
+        <section className="space-y-3">
+          <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
+            7-A. Do Insight Nitro (Assinatura de Personalização)
+          </h2>
+          <p>
+            <strong>7-A.1. Objeto:</strong> O <strong className="text-primary">Insight Nitro</strong> é
+            uma assinatura opcional que libera itens de personalização visual do perfil (molduras,
+            aberturas, tags, títulos, temas e estilos de nome). Não altera o alcance das publicações
+            nem dá vantagem na moderação. Itens exclusivos de um Nível de Contribuinte continuam
+            restritos a quem alcançou esse nível.
+          </p>
+          <p>
+            <strong>7-A.2. Cobrança recorrente:</strong> A assinatura é cobrada mensalmente pelo
+            Mercado Pago, que processa os dados de pagamento. O Insight* não recebe nem armazena número
+            de cartão; guarda apenas o identificador e a situação da assinatura e as datas de
+            renovação. Cada conta pode ter uma única assinatura ativa por vez.
+          </p>
+          <p>
+            <strong>7-A.3. Cancelamento:</strong> O Usuário pode cancelar a qualquer momento na
+            página do Nitro. Não há novas cobranças após o cancelamento e o acesso continua até o fim
+            do período já pago. Cobranças recusadas ou pendentes suspendem o acesso após um breve
+            período de tolerância.
+          </p>
+          <p>
+            <strong>7-A.4. Nível 5 e acesso vitalício:</strong> Quem alcança o Nível 5 de
+            Contribuinte tem a mensalidade ativa reembolsada, a assinatura encerrada e o Nitro
+            liberado de forma vitalícia, sem novas cobranças. O acesso vitalício incondicional é
+            reservado ao perfil fundador.
+          </p>
+          <p>
+            <strong>7-A.5. Catálogo:</strong> Os itens podem ser adicionados, ajustados ou retirados
+            do catálogo. Itens de eventos podem ter disponibilidade limitada. O direito de
+            arrependimento de 7 (sete) dias do Art. 49 do Código de Defesa do Consumidor é garantido
+            pelo canal de atendimento.
+          </p>
+        </section>
+
         {/* Cláusula 8 */}
         <section className="space-y-3">
           <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
@@ -375,7 +413,8 @@ export default function TermosPage() {
             (hospedagem em nuvem e rede de borda), <strong className="text-primary">Resend / Google SMTP</strong>{' '}
             (disparo transacional de e-mails), <strong className="text-primary">Spotify API</strong>{' '}
             (incorporação de mídia de áudio), <strong className="text-primary">GIPHY / Tenor</strong>{' '}
-            (busca de GIFs) e portais de notícias de terceiros (feeds públicos RSS/Atom e Google
+            (busca de GIFs), <strong className="text-primary">Mercado Pago</strong> (pagamentos da
+            assinatura Nitro) e portais de notícias de terceiros (feeds públicos RSS/Atom e Google
             Notícias). O Operador não se responsabiliza por instabilidades,
             interrupções ou alterações políticas originadas exclusivamente nos servidores desses
             provedores externos.

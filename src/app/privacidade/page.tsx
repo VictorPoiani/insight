@@ -272,6 +272,11 @@ export default function PrivacidadePage() {
               entrega das imagens, vídeos e arquivos publicados, no domínio media.insight.app.br;
             </li>
             <li>
+              <strong className="text-primary">Mercado Pago (Mercado Livre):</strong> Processamento
+              dos pagamentos da assinatura Insight Nitro. Os dados do cartão são informados direto ao
+              Mercado Pago; guardamos apenas o identificador, a situação e as datas da assinatura;
+            </li>
+            <li>
               <strong className="text-primary">Vercel Inc.:</strong> Hospedagem da aplicação web,
               processamento de rotas serverless e distribuição global em rede de borda (CDN) sob
               criptografia SSL/TLS;

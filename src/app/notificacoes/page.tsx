@@ -269,7 +269,7 @@ export default function NotificationsPage() {
         return {
           icon: Heart,
           iconClass: 'text-rose-500 fill-rose-500',
-          actionText: 'curtiu sua publicação',
+          actionText: 'curtiu seu Insight',
         };
       case 'reply':
         return {
@@ -293,7 +293,7 @@ export default function NotificationsPage() {
         return {
           icon: Repeat2,
           iconClass: 'text-[#1DB954]',
-          actionText: 'repostou sua publicação',
+          actionText: 'repostou seu Insight',
         };
       case 'new_post':
         return {

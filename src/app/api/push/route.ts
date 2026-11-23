@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
 
       const {
         title = 'Novo Insight publicado — Victor Poiani',
-        message = 'Confira a nova publicação no Insight*.',
+        message = 'Confira o novo Insight publicado.',
         url = '/',
         tags = [],
         isOfficialUpdate = false,

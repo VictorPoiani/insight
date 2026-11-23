@@ -524,8 +524,8 @@ function CommunityHomeFeed() {
               <button
                 type="button"
                 onClick={() => setShowQuickComposer(!showQuickComposer)}
-                title="Publicar na comunidade"
-                aria-label="Publicar na comunidade"
+                title="Publicar Insight"
+                aria-label="Publicar Insight"
                 className={`h-8 px-2.5 sm:px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
                   showQuickComposer
                     ? 'bg-elevated text-primary border border-border'
@@ -533,7 +533,7 @@ function CommunityHomeFeed() {
                 }`}
               >
                 <PenSquare className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Publicar</span>
+                <span className="hidden sm:inline">Publicar Insight</span>
               </button>
             )}
           </div>
@@ -856,8 +856,8 @@ function CommunityHomeFeed() {
             <div className="py-16 px-6 text-center space-y-2">
               <p className="text-sm font-bold text-primary">
                 {activeTab === 'following'
-                  ? 'Nenhuma publicação das contas que você segue ainda'
-                  : 'Nenhuma publicação encontrada'}
+                  ? 'Nenhum Insight das contas que você segue ainda'
+                  : 'Nenhum Insight encontrado'}
               </p>
               <p className="text-xs text-muted max-w-sm mx-auto">
                 {activeTab === 'following'

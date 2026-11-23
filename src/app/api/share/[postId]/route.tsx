@@ -70,7 +70,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
 
   // tamanho do texto conforme o espaço e o tamanho do post
   const limits = { story: image ? 260 : 460, square: image ? 150 : 300, og: 170 }[format];
-  const text = clip(fullText || 'Confira esta publicação no Insight*', limits);
+  const text = clip(fullText || 'Confira este Insight', limits);
   const len = text.length;
   const fontSize =
     format === 'story'

@@ -435,7 +435,7 @@ export function PostCard({
         type: 'repost',
         post_id: post.id,
         content_preview: snippet,
-        message: snippet || 'repostou sua publicação',
+        message: snippet || 'repostou seu Insight',
       });
     }
   }
@@ -467,7 +467,7 @@ export function PostCard({
 
   async function handleDelete() {
     if (!isAdmin) return;
-    if (!confirm('Excluir esta publicação? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Excluir este Insight? Esta ação não pode ser desfeita.')) return;
 
     for (const blk of blocksState) {
       if (blk.r2Key) {
@@ -591,7 +591,7 @@ export function PostCard({
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              title={isEditing ? 'Fechar editor' : 'Editar publicação'}
+              title={isEditing ? 'Fechar editor' : 'Editar Insight'}
               className={`p-1.5 rounded-lg transition-colors ${
                 isEditing
                   ? 'text-accent bg-accent/10'
@@ -604,7 +604,7 @@ export function PostCard({
             <button
               type="button"
               onClick={handleDelete}
-              title="Excluir publicação"
+              title="Excluir Insight"
               className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
             >
               <Trash2 className="w-4 h-4" />
@@ -1163,7 +1163,8 @@ export function PostCard({
             <button
               type="button"
               onClick={onReplyClick}
-              aria-label="Responder"
+              aria-label="Comentar Insight"
+              title="Comentar Insight"
               className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
             >
               <MessageCircle className="w-4 h-4" />
@@ -1172,8 +1173,8 @@ export function PostCard({
           ) : (
             <Link
               href={`/post/${post.id}`}
-              aria-label="Abrir respostas"
-              title="Abrir discussão"
+              aria-label="Comentar Insight"
+              title="Comentar Insight"
               className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
             >
               <MessageCircle className="w-4 h-4" />
@@ -1192,6 +1193,7 @@ export function PostCard({
                 setRepostMenu((v) => !v);
               }}
               aria-label="Repostar Insight"
+              title="Repostar Insight"
               aria-haspopup="menu"
               aria-expanded={repostMenu}
               className={`flex items-center gap-1.5 py-1 transition-colors ${
@@ -1237,7 +1239,8 @@ export function PostCard({
           <button
             type="button"
             onClick={handleLike}
-            aria-label="Curtir"
+            aria-label="Curtir Insight"
+            title="Curtir Insight"
             className={`flex items-center gap-1.5 py-1 transition-colors ${
               hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
@@ -1249,7 +1252,7 @@ export function PostCard({
           <button
             type="button"
             onClick={() => setOpenShareModal(true)}
-            aria-label="Compartilhar publicação"
+            aria-label="Compartilhar Insight"
             className={`flex items-center gap-1.5 py-1 transition-colors ${
               openShareModal ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
@@ -1263,8 +1266,8 @@ export function PostCard({
           <button
             type="button"
             onClick={handleReportPost}
-            title="Denunciar publicação à moderação"
-            aria-label="Denunciar publicação"
+            title="Denunciar Insight à moderação"
+            aria-label="Denunciar Insight"
             className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
           >
             <Flag className="w-3.5 h-3.5" />

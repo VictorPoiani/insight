@@ -1,5 +1,7 @@
 'use client';
 
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { getPostFlags, setPostFlag } from '@/lib/postFlags';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { MindMapViewer } from '@/components/canvas/MindMapViewer';
 import { QuotedPostCard, QuoteComposerModal } from './QuotedPost';
@@ -186,72 +188,26 @@ export function PostCard({
     setRepliesCount(post.replies_count || 0);
   }, [post]);
 
-  // Sincroniza usuário logado e estado de curtida
+  // Usuário logado vem do provedor global (uma consulta para o site todo) e
+  // curtida/repost são buscados em lote com os outros cartões da tela.
+  const { viewer } = useNitro();
   useEffect(() => {
     let active = true;
-
-    async function syncLoggedUser() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!active) return;
-
-      if (!session?.user) {
-        setLoggedUserProfile(null);
-        setHasLiked(false);
-        return;
-      }
-
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
-        .maybeSingle();
-
-      if (!active) return;
-
-      if (prof) {
-        const typedProf = prof as Profile;
-        setLoggedUserProfile(typedProf);
-
-        const { data: existingLike } = await supabase
-          .from('post_likes')
-          .select('post_id')
-          .eq('post_id', post.id)
-          .eq('profile_id', typedProf.id)
-          .maybeSingle();
-
-        if (active) setHasLiked(Boolean(existingLike));
-
-        const { data: existingRepost } = await supabase
-          .from('post_reposts')
-          .select('post_id')
-          .eq('post_id', post.id)
-          .eq('profile_id', typedProf.id)
-          .maybeSingle();
-
-        if (active) setHasReposted(Boolean(existingRepost));
-      } else {
-        setLoggedUserProfile(null);
-        setHasLiked(false);
-        setHasReposted(false);
-      }
+    setLoggedUserProfile(viewer);
+    if (!viewer) {
+      setHasLiked(false);
+      setHasReposted(false);
+      return;
     }
-
-    syncLoggedUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      syncLoggedUser();
+    getPostFlags(post.id, viewer.id).then((f) => {
+      if (!active) return;
+      setHasLiked(f.liked);
+      setHasReposted(f.reposted);
     });
-
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
-  }, [post.id, supabase]);
+  }, [post.id, viewer]);
 
   // Carrega votos locais em enquetes
   useEffect(() => {
@@ -397,6 +353,7 @@ export function PostCard({
     if (!error && data) {
       setHasLiked(Boolean((data as any).liked));
       setLikes(Number((data as any).likes_count) || 0);
+      setPostFlag(post.id, loggedUserProfile.id, { liked: Boolean((data as any).liked) });
     } else if (error) {
       // Reverte o otimista: a curtida só é gravada pela RPC toggle_post_like
       setHasLiked(!nextLiked);
@@ -427,6 +384,7 @@ export function PostCard({
 
     const repostResult = repostData as { reposted: boolean; reposts_count: number };
     setHasReposted(Boolean(repostResult.reposted));
+    setPostFlag(post.id, loggedUserProfile.id, { reposted: Boolean(repostResult.reposted) });
     setReposts(Number(repostResult.reposts_count) || 0);
 
     if (repostResult.reposted && author.id !== loggedUserProfile.id) {

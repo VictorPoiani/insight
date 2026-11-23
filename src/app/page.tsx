@@ -10,7 +10,10 @@ import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
 import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/components/news/useNews';
-import { PostComposer } from '@/components/feed/PostComposer';
+import dynamic from 'next/dynamic';
+import { useProgressiveList } from '@/lib/useProgressiveList';
+// o editor só é baixado quando a pessoa abre o compositor
+const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
   Search,
@@ -397,6 +400,7 @@ function CommunityHomeFeed() {
     for (let n = 0; n < extra && k < news.length; n++) out.push({ kind: 'news', item: news[k++] });
     return out;
   }, [filteredPosts, forYouNews.items, mixNews, showNewsOnboarding]);
+  const progressiveFeed = useProgressiveList(mixedFeed, 8, 8, `${activeTab}|${selectedTag}|${query}`);
 
   const { isOnline } = usePresence();
   // quem está online aparece primeiro no carrossel
@@ -867,7 +871,7 @@ function CommunityHomeFeed() {
             </div>
           ) : (
             <div>
-              {mixedFeed.map((entry) => {
+              {progressiveFeed.visible.map((entry) => {
                 if (entry.kind === 'news') {
                   return (
                     <NewsCard
@@ -911,6 +915,7 @@ function CommunityHomeFeed() {
                   />
                 );
               })}
+              {progressiveFeed.hasMore && <div ref={progressiveFeed.sentinelRef} className="h-24" aria-hidden />}
             </div>
           )}
         </div>

@@ -134,6 +134,18 @@ export interface DietMealItem {
   calories: number;
   proteinGrams: number;
   completed: boolean;
+  /** Horário na agenda (HH:MM) */
+  at?: string;
+  /** Dias da semana (0 = domingo); vazio = todos os dias */
+  days?: number[];
+}
+
+/** Registro de um dia do plano nutricional (chave AAAA-MM-DD). */
+export interface DietDayLog {
+  done: string[];
+  water: number;
+  weight?: number;
+  note?: string;
 }
 
 export interface AgendaEventItem {
@@ -200,6 +212,7 @@ export interface TopicWorkspaceData {
   habitColumns?: string[];
   tasks?: TaskItem[];
   dietMeals?: DietMealItem[];
+  dietLog?: Record<string, DietDayLog>;
   waterGlasses?: number;
   waterGoal?: number;
   calorieGoal?: number;

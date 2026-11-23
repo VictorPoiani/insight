@@ -1,5 +1,6 @@
 'use client';
 
+import { useAutoFocusMode } from '@/lib/useAutoFocusMode';
 import { PanZoomSurface, boundsFromPercent } from '@/components/canvas/PanZoom';
 import { MINDMAP_WORLD } from '@/components/canvas/MindMapViewer';
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -532,6 +533,8 @@ export function PostComposer({
 }: PostComposerProps) {
   const isEditMode = Boolean(editingPost);
   const isEmbedded = Boolean(embedded);
+  // Notebook já tem tela cheia própria; no feed e na edição o foco é automático
+  const autoFocus = useAutoFocusMode(!isEmbedded);
   const uploadScope: 'posts' | 'notebook' = isEmbedded ? 'notebook' : 'posts';
 
   const [blocks, setBlocks] = useState<PostBlock[]>(() =>
@@ -1649,6 +1652,9 @@ export function PostComposer({
   return (
     <form
       onSubmit={handleSubmit}
+      onInput={autoFocus.onInput}
+      onFocusCapture={autoFocus.onFocusCapture}
+      onBlurCapture={autoFocus.onBlurCapture}
       className={`${
         isEmbedded
           ? 'nb-blocks-editor space-y-4'

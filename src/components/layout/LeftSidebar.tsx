@@ -140,10 +140,27 @@ export function LeftSidebar() {
       loadLoggedProfile();
     });
 
+    // auto = modo foco automático da escrita: lembra o estado anterior para restaurar
+    let beforeAuto: boolean | null = null;
     function handleFocusMode(e: Event) {
-      const customEvent = e as CustomEvent<{ collapse?: boolean }>;
-      if (typeof customEvent.detail?.collapse === 'boolean') {
-        setIsCollapsed(customEvent.detail.collapse);
+      const customEvent = e as CustomEvent<{ collapse?: boolean; auto?: boolean }>;
+      const d = customEvent.detail;
+      if (d?.auto) {
+        if (d.collapse) {
+          setIsCollapsed((prev) => {
+            if (beforeAuto === null) beforeAuto = prev;
+            return true;
+          });
+        } else if (beforeAuto !== null) {
+          const restore = beforeAuto;
+          beforeAuto = null;
+          setIsCollapsed(restore);
+        }
+        return;
+      }
+      beforeAuto = null;
+      if (typeof d?.collapse === 'boolean') {
+        setIsCollapsed(d.collapse);
       } else {
         setIsCollapsed((prev) => !prev);
       }
@@ -278,7 +295,7 @@ export function LeftSidebar() {
       ref={sidebarRef}
       style={{ width: isCollapsed ? 64 : width }}
       className={`shrink-0 hidden md:flex flex-col justify-between h-screen sticky top-0 bg-background py-5 group/sidebar select-none ${
-        isResizing ? '' : 'transition-[width] duration-150 ease-out'
+        isResizing ? '' : 'transition-[width,padding] duration-300 ease-out'
       } ${isCollapsed ? 'px-2 items-center' : 'px-4'}`}
     >
       {/* Alça de Redimensionamento */}

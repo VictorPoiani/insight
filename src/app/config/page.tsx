@@ -1,5 +1,6 @@
 'use client';
 
+import { autoFocusModeEnabled, setAutoFocusModeEnabled } from '@/lib/useAutoFocusMode';
 import { PasswordStrength, validateNewPassword } from '@/components/account/PasswordStrength';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useCallback } from 'react';
@@ -191,6 +192,8 @@ export default function ConfigPage() {
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [mounted, setMounted] = useState(false);
   const [focusSidebarsCollapsed, setFocusSidebarsCollapsed] = useState(false);
+  const [autoFocusWriting, setAutoFocusWriting] = useState(true);
+  useEffect(() => setAutoFocusWriting(autoFocusModeEnabled()), []);
 
   // Notificações (Web Push + Newsletter)
   const [pushSupported, setPushSupported] = useState(false);
@@ -1199,6 +1202,25 @@ export default function ConfigPage() {
               <FluidSwitch
                 checked={focusSidebarsCollapsed}
                 onChange={handleToggleFocusSidebars}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">
+                  Modo foco automático ao escrever
+                </p>
+                <p className="text-xs text-muted">
+                  Recolhe as barras laterais quando você começa a escrever um Insight e as traz de volta ao terminar
+                </p>
+              </div>
+              <FluidSwitch
+                checked={autoFocusWriting}
+                onChange={() => {
+                  const next = !autoFocusWriting;
+                  setAutoFocusWriting(next);
+                  setAutoFocusModeEnabled(next);
+                }}
               />
             </div>
 

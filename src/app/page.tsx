@@ -234,6 +234,13 @@ function CommunityHomeFeed() {
     setTimeout(updateCarouselButtons, 150);
   }, [supabase, updateCarouselButtons]);
 
+  // Insight publicado fora do compositor (ex.: repost com comentário) recarrega o feed
+  useEffect(() => {
+    const onCreated = () => void loadExploreData();
+    window.addEventListener('insight:post-created', onCreated);
+    return () => window.removeEventListener('insight:post-created', onCreated);
+  }, [loadExploreData]);
+
   useEffect(() => {
     loadExploreData();
 

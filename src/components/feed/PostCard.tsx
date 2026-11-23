@@ -2,6 +2,7 @@
 
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { MindMapViewer } from '@/components/canvas/MindMapViewer';
+import { QuotedPostCard, QuoteComposerModal } from './QuotedPost';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useRef } from 'react';
@@ -143,6 +144,8 @@ export function PostCard({
   const [hasLiked, setHasLiked] = useState(false);
   const [reposts, setReposts] = useState(post.reposts_count || 0);
   const [hasReposted, setHasReposted] = useState(false);
+  const [repostMenu, setRepostMenu] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [repliesCount, setRepliesCount] = useState(post.replies_count || 0);
 
   // UI & Modais
@@ -1137,6 +1140,8 @@ export function PostCard({
         </>
       )}
 
+      {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}
+
       {/* Hashtags */}
       {postTags && postTags.length > 0 && !isEditing && (
         <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
@@ -1176,17 +1181,58 @@ export function PostCard({
             </Link>
           )}
 
-          <button
-            type="button"
-            onClick={handleRepost}
-            aria-label="Repostar"
-            className={`flex items-center gap-1.5 py-1 transition-colors ${
-              hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
-            }`}
-          >
-            <Repeat2 className="w-4 h-4" />
-            <span>{reposts}</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (!loggedUserProfile) {
+                  window.location.href = loginHref();
+                  return;
+                }
+                setRepostMenu((v) => !v);
+              }}
+              aria-label="Repostar Insight"
+              aria-haspopup="menu"
+              aria-expanded={repostMenu}
+              className={`flex items-center gap-1.5 py-1 transition-colors ${
+                hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
+              }`}
+            >
+              <Repeat2 className="w-4 h-4" />
+              <span>{reposts}</span>
+            </button>
+            {repostMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRepostMenu(false)} />
+                <div role="menu" className="absolute bottom-full left-0 mb-2 z-50 w-56 py-1 rounded-xl bg-elevated border border-border shadow-2xl">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setRepostMenu(false);
+                      void handleRepost();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                  >
+                    <Repeat2 className="w-4 h-4 text-[#1DB954]" />
+                    {hasReposted ? 'Desfazer repost' : 'Repostar Insight'}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setRepostMenu(false);
+                      setQuoteOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                  >
+                    <MessageCircle className="w-4 h-4 text-accent" />
+                    Repostar com comentário
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             type="button"
@@ -1227,6 +1273,16 @@ export function PostCard({
       </div>
 
       {/* Modal Insight* Share Studio */}
+      {quoteOpen && loggedUserProfile && (
+        <QuoteComposerModal
+          post={post}
+          author={author}
+          me={loggedUserProfile}
+          onClose={() => setQuoteOpen(false)}
+          onPublished={() => setReposts((r) => r + 1)}
+        />
+      )}
+
       <SharePostModal
         isOpen={openShareModal}
         onClose={() => setOpenShareModal(false)}

@@ -295,6 +295,8 @@ export interface Post {
   updated_at?: string;
   profiles?: Profile;
   replies_count?: number;
+  /** Repost com comentário: Insight citado. */
+  quoted_post_id?: string | null;
 }
 
 export interface Reply {

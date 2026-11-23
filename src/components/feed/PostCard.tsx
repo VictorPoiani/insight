@@ -1,5 +1,6 @@
 'use client';
 
+import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
 import { useState, useEffect, useRef } from 'react';
@@ -776,19 +777,10 @@ export function PostCard({
                           loading="lazy"
                         />
                       ) : (
-                        <video
-                          src={`${b.videoUrl}#t=0.001`}
-                          controls={!isGifMode}
-                          autoPlay={isGifMode}
-                          loop={isGifMode}
-                          muted={isGifMode}
-                          playsInline
-                          preload="metadata"
-                          className="w-full h-auto max-h-[520px] object-contain mx-auto"
-                        />
+                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} />
                       )}
 
-                      {isGifMode && (
+                      {isGifMode && isRawGif && (
                         <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded bg-black/75 text-white font-mono text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
                           GIF
                         </span>

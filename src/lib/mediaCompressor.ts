@@ -8,6 +8,10 @@
  * (`compressedSize`), somado por post. O servidor (/api/upload/r2 + trigger
  * posts_media_quota) confere de novo — este arquivo só evita trabalho inútil.
  *
+ * Vídeo: primeiro tenta o codificador de HARDWARE do aparelho (WebCodecs, em
+ * videoFastEncode.ts) — dezenas de vezes mais rápido e sem travar a página.
+ * Só quando o navegador/arquivo não permite, cai no ffmpeg.wasm abaixo.
+ *
  * Limites do ffmpeg.wasm (core 0.12 single-thread, sem SharedArrayBuffer):
  *  - memória: heap wasm32 ≤ ~2 GB; a SAÍDA fica inteira em MEMFS e é copiada
  *    mais uma vez no readFile. A ENTRADA é montada via WORKERFS (lida sob
@@ -24,6 +28,7 @@ type FFFSType = Parameters<FFmpeg['mount']>[0];
 import { toBlobURL } from '@ffmpeg/util';
 import { createClient } from '@/lib/supabase/client';
 import { formatBytes, MB } from '@/lib/contributorLevels';
+import { hasWebCodecs, transcodeWithWebCodecs } from '@/lib/videoFastEncode';
 
 // ============================================================================
 // Ambiente
@@ -40,10 +45,11 @@ function deviceMemoryGB(): number {
   return nav.deviceMemory ?? (isMobileDevice() ? 3 : 8);
 }
 
-/** Maior SAÍDA que cabe com folga na memória do wasm (saída + cópia do readFile). */
-function safeWasmOutputBytes(): number {
-  if (isMobileDevice() || deviceMemoryGB() <= 4) return 220 * MB;
-  return 700 * MB;
+/** Maior SAÍDA que cabe com folga na memória (wasm: saída + cópia do readFile; WebCodecs: buffer JS). */
+function safeOutputBytes(fast: boolean): number {
+  const low = isMobileDevice() || deviceMemoryGB() <= 4;
+  if (fast) return low ? 600 * MB : 1500 * MB;
+  return low ? 220 * MB : 700 * MB;
 }
 
 /** Tempo máximo aceitável de encoding no navegador. */
@@ -253,7 +259,9 @@ export function planVideoCompression(
   probe: VideoProbe | null,
   inputBytes: number,
   budgetBytes: number,
-  isGif: boolean
+  isGif: boolean,
+  /** true = codificador de hardware (WebCodecs); false = ffmpeg.wasm */
+  fast: boolean = false
 ): VideoPlan {
   const mobile = isMobileDevice();
   const audioKbps = isGif ? 0 : 96;
@@ -276,10 +284,14 @@ export function planVideoCompression(
 
   const srcH = Math.min(probe.height || 1080, probe.width || 1920);
   const fps = isGif ? 20 : 30;
-  const encodeFpsFor = (h: number) => (h >= 1000 ? 4 : h >= 700 ? 9 : 16) / (mobile ? 3 : 1);
+  // quadros por segundo codificados: hardware (estimativa conservadora) × x264 de 1 thread
+  const encodeFpsFor = (h: number) =>
+    fast
+      ? (h >= 1000 ? 90 : h >= 700 ? 160 : 240) / (mobile ? 2.5 : 1)
+      : (h >= 1000 ? 4 : h >= 700 ? 9 : 16) / (mobile ? 3 : 1);
 
   // maior resolução (≤ 1080p; GIF ≤ 540p) cujo encoding cabe no tempo máximo
-  const ladder = (isGif ? [540, 360] : mobile ? [720, 540] : [1080, 720, 540]).filter((h) => h <= Math.max(srcH, 360));
+  const ladder = (isGif ? [540, 360] : mobile && !fast ? [720, 540] : [1080, 720, 540]).filter((h) => h <= Math.max(srcH, 360));
   if (ladder.length === 0) ladder.push(Math.min(srcH, 540));
   let height = ladder[ladder.length - 1];
   for (const h of ladder) {
@@ -291,7 +303,7 @@ export function planVideoCompression(
   height = Math.min(height, srcH);
 
   const quality = height >= 1000 ? 4500 : height >= 700 ? 2400 : 1200; // kbps "bons"
-  const byteBudget = Math.min(budgetBytes, safeWasmOutputBytes()) * 0.92; // folga do container
+  const byteBudget = Math.min(budgetBytes, safeOutputBytes(fast)) * 0.92; // folga do container
   const fitKbps = ((byteBudget * 8) / probe.duration) / 1000 - audioKbps;
   const videoKbps = Math.floor(Math.min(quality, fitKbps));
   const estimatedBytes = Math.round((((videoKbps + audioKbps) * 1000) / 8) * probe.duration);
@@ -343,7 +355,33 @@ export async function compressMediaForInsight(
 
   onStatus?.('Analisando vídeo...', 4);
   const probe = await probeVideo(inputFile);
-  const plan = planVideoCompression(probe, originalSize, budgetBytes, isGifMode);
+  // GIF de entrada não é lido pelo WebCodecs; o resto tenta o caminho rápido primeiro
+  const fastCapable = !isGifInput && probe !== null && hasWebCodecs();
+  let plan = planVideoCompression(probe, originalSize, budgetBytes, isGifMode, fastCapable);
+
+  if (fastCapable && plan.action === 'transcode') {
+    const estLabel = `~${formatBytes(plan.estimatedBytes)}`;
+    onStatus?.(`Compactando com aceleração de hardware (${estLabel})...`, 6);
+    try {
+      const out = await transcodeWithWebCodecs(
+        inputFile,
+        { height: plan.height, fps: plan.fps, videoKbps: plan.videoKbps, audioKbps: isGifMode ? 0 : plan.audioKbps },
+        (p) => onStatus?.(`Compactando (${Math.round(p * 100)}% · ${estLabel})...`, 8 + Math.round(p * 84))
+      );
+      if (out) {
+        if (out.size >= originalSize) {
+          if (originalSize <= budgetBytes) return result(inputFile, originalSize, isGifMode, 'kept', 'o original já era menor');
+        } else if (out.size <= budgetBytes) {
+          onStatus?.(`Compactado: ${formatBytes(out.size)}`, 94);
+          return result(out, originalSize, isGifMode, 'transcoded');
+        }
+      }
+    } catch (err) {
+      console.warn('[mediaCompressor] WebCodecs falhou; usando o compressor de software.', err);
+    }
+    // caminho rápido indisponível neste arquivo/navegador: refaz o plano para o ffmpeg.wasm
+    plan = planVideoCompression(probe, originalSize, budgetBytes, isGifMode, false);
+  }
 
   if (plan.action === 'reject') {
     throw new MediaQuotaError(

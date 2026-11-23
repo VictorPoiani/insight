@@ -1,5 +1,6 @@
 'use client';
 
+import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
@@ -2105,14 +2106,11 @@ export default function NotificacoesPage() {
                     if ((b.type === 'video' || b.type === 'gif') && b.videoUrl) {
                       return (
                         <div key={b.id || idx} style={cellStyle} className="w-full py-1">
-                          <video
-                            src={`${b.videoUrl}#t=0.001`}
-                            controls={!b.isGif}
-                            autoPlay={Boolean(b.isGif)}
-                            loop={Boolean(b.isGif)}
-                            muted={Boolean(b.isGif)}
-                            playsInline
-                            className="w-full max-h-[480px] rounded-xl border border-border bg-black object-contain"
+                          <VideoPlayer
+                            src={b.videoUrl}
+                            gif={Boolean(b.isGif)}
+                            maxHeight={480}
+                            className="rounded-xl border border-border overflow-hidden"
                           />
                         </div>
                       );

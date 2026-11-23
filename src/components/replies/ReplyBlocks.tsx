@@ -1,4 +1,5 @@
 import { ReplyBlock } from '@/types/database';
+import { VideoPlayer } from '@/components/media/VideoPlayer';
 
 /** Renderiza o corpo em blocos de uma resposta (texto puro, sem HTML do usuário). */
 export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
@@ -40,6 +41,22 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
                 className="max-h-96 w-auto max-w-full rounded-xl border border-border object-contain bg-elevated"
               />
             ) : null;
+          case 'gif':
+            if (!b.url?.startsWith('https://')) return null;
+            return /\.mp4(\?|$)/i.test(b.url) ? (
+              <div key={b.id || i} className="max-w-xs rounded-xl overflow-hidden border border-border">
+                <VideoPlayer src={b.url} gif maxHeight={320} label="GIF" />
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={b.id || i} src={b.url} alt="GIF" loading="lazy" className="max-h-80 w-auto max-w-full rounded-xl border border-border" />
+            );
+          case 'video':
+            return b.url?.startsWith('https://') ? (
+              <div key={b.id || i} className="rounded-xl overflow-hidden border border-border">
+                <VideoPlayer src={b.url} maxHeight={420} label="Vídeo da resposta" />
+              </div>
+            ) : null;
           case 'spotify':
             return b.trackId && /^[A-Za-z0-9]{10,40}$/.test(b.trackId) ? (
               <iframe
@@ -72,6 +89,8 @@ export function replyBlocksToText(blocks: ReplyBlock[]): string {
     .map((b) => {
       if (b.type === 'image') return '[imagem]';
       if (b.type === 'spotify') return '[música]';
+      if (b.type === 'gif') return '[GIF]';
+      if (b.type === 'video') return '[vídeo]';
       if (b.type === 'quote') return `“${(b.text || '').trim()}”`;
       return (b.text || '').trim();
     })

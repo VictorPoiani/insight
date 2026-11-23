@@ -315,7 +315,7 @@ export interface Reply {
   blocks?: ReplyBlock[] | null;
 }
 
-export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify';
+export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify' | 'gif' | 'video';
 
 export interface ReplyBlock {
   id: string;
@@ -324,6 +324,8 @@ export interface ReplyBlock {
   url?: string;
   trackId?: string;
   bytes?: number;
+  /** GIF: miniatura leve para o compositor */
+  previewUrl?: string;
 }
 
 export interface NotificationItem {

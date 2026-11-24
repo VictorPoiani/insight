@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
@@ -58,23 +59,8 @@ interface PostCardProps {
   onReplyClick?: () => void;
 }
 
-function sanitizeBlockHtml(dirtyHtml?: string | null): string {
-  if (!dirtyHtml) return '';
-  return dirtyHtml
-    .replace(
-      /<(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea)[^>]*>[\s\S]*?<\/\1>/gi,
-      ''
-    )
-    .replace(
-      /<\/?(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea|svg|math|base)[^>]*>/gi,
-      ''
-    )
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(
-      /(href|src|xlink:href|action)\s*=\s*(?:"\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*')/gi,
-      '$1="#"'
-    );
-}
+// HTML de usuário passa pelo DOMPurify (lista branca); o filtro por regex anterior era contornável
+const sanitizeBlockHtml = sanitizeUserHtml;
 
 function getProfileHref(_profileId?: string | null, username?: string | null) {
   if (username) return `/u/${encodeURIComponent(username)}`;

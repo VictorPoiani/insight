@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -2008,7 +2009,7 @@ export default function NotificacoesPage() {
                           key={b.id || idx}
                           style={{ ...cellStyle, ...alignStyle }}
                           className={`${fontCls} text-xl sm:text-2xl font-extrabold text-primary leading-tight pt-1`}
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                         />
                       );
                     }
@@ -2019,7 +2020,7 @@ export default function NotificacoesPage() {
                           key={b.id || idx}
                           style={{ ...cellStyle, ...alignStyle }}
                           className={`${fontCls} text-base sm:text-lg font-bold text-primary leading-snug pt-1`}
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                         />
                       );
                     }
@@ -2030,7 +2031,7 @@ export default function NotificacoesPage() {
                           key={b.id || idx}
                           style={{ ...cellStyle, ...alignStyle }}
                           className={`${fontCls} border-l-4 border-accent pl-4 italic text-secondary`}
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                         />
                       );
                     }
@@ -2046,7 +2047,7 @@ export default function NotificacoesPage() {
                           <div
                             style={alignStyle}
                             className={`${fontCls} text-sm text-primary flex-1`}
-                            dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                           />
                         </div>
                       );
@@ -2058,7 +2059,7 @@ export default function NotificacoesPage() {
                           key={b.id || idx}
                           style={cellStyle}
                           className="p-3.5 rounded-xl bg-elevated border border-border font-mono text-xs text-primary overflow-x-auto whitespace-pre-wrap"
-                          dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                         />
                       );
                     }
@@ -2074,7 +2075,7 @@ export default function NotificacoesPage() {
                           <div
                             style={alignStyle}
                             className={`${fontCls} flex-1`}
-                            dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                           />
                         </div>
                       );
@@ -2220,7 +2221,7 @@ export default function NotificacoesPage() {
                         key={b.id || idx}
                         style={{ ...cellStyle, ...alignStyle }}
                         className={`${fontCls} leading-relaxed`}
-                        dangerouslySetInnerHTML={{ __html: b.html || '' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                       />
                     );
                   })}

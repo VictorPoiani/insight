@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -46,23 +47,8 @@ import {
 
 const DEFAULT_FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
-function sanitizeBlockHtml(dirtyHtml?: string | null): string {
-  if (!dirtyHtml) return '';
-  return dirtyHtml
-    .replace(
-      /<(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea)[^>]*>[\s\S]*?<\/\1>/gi,
-      ''
-    )
-    .replace(
-      /<\/?(script|iframe|object|embed|applet|meta|link|style|form|input|button|textarea|svg|math|base)[^>]*>/gi,
-      ''
-    )
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(
-      /(href|src|xlink:href|action)\s*=\s*(?:"\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*')/gi,
-      '$1="#"'
-    );
-}
+// HTML de usuário passa pelo DOMPurify (lista branca); o filtro por regex anterior era contornável
+const sanitizeBlockHtml = sanitizeUserHtml;
 
 /**
  * Animação do Asterisco (*) de 8 pontas para as abas e workspaces

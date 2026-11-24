@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const FALLBACK_GIPHY_KEY = 'GlVGYHkr3WSBnllca54iNt0yFbjz7L65';
 
 function getGiphyApiKey(): string {
   return (
     process.env.GIPHY_API_KEY?.trim() ||
     process.env.NEXT_PUBLIC_GIPHY_API_KEY?.trim() ||
-    FALLBACK_GIPHY_KEY
+    ''
   );
 }
 

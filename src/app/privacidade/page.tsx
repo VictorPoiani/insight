@@ -11,7 +11,7 @@ import {
   Mail,
   FileCheck,
   Cookie,
-} from 'lucide-react';
+} from '@/components/icons';
 
 export default function PrivacidadePage() {
   return (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Download, Link2, Lock, Share2, X } from 'lucide-react';
+import { Check, Download, Link2, Lock, Share2, X } from '@/components/icons';
 import { Post, Profile } from '@/types/database';
 import { SHARE_THEMES, ShareFormat } from '@/lib/share/themes';
 

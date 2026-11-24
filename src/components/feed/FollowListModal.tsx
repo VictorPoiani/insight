@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { X, Loader2, Search, UserCheck, UserPlus } from 'lucide-react';
+import { X, Loader2, Search, UserCheck, UserPlus } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile } from '@/types/database';
 import { CosmeticAvatar, CosmeticName } from '@/components/nitro/Cosmetics';

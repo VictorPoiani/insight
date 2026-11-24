@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, CornerDownLeft, Plus, Loader2, Hash } from 'lucide-react';
+import { Search, CornerDownLeft, Plus, Loader2, Hash } from '@/components/icons';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { NOTEBOOK_TEMPLATES, SECTION_LABELS, type NotebookTemplateDef, type TemplateSection } from '@/lib/notebook/templates';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';

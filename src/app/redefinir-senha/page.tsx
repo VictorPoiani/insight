@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { KeyRound, ShieldCheck } from 'lucide-react';
+import { KeyRound, ShieldCheck } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
 import { PasswordStrength, validateNewPassword } from '@/components/account/PasswordStrength';

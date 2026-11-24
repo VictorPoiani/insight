@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Heart, MessageCircle, UserPlus, Repeat2, FileText, BarChart3, Loader2, Check } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Repeat2, FileText, BarChart3, Loader2, Check } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 
 /** Tipos de notificação do app que cada pessoa pode ligar/desligar. */

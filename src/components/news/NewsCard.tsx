@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
+import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from '@/components/icons';
 import { TOPIC_BY_ID } from '@/lib/news/topics';
 import { PostTime } from '@/components/feed/PostTime';
 import { trackNews, type NewsItem } from './useNews';

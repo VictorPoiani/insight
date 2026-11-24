@@ -13,7 +13,7 @@ import {
   ExternalLink,
   ArrowUp,
   ArrowDown,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface SocialLinksManagerProps {
   profileId: string;

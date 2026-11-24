@@ -2,7 +2,7 @@
 import { PostTime } from '@/components/feed/PostTime';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, MessageCircle, Music, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, MessageCircle, Music, Flame } from '@/components/icons';
 import { ReplyNode } from './utils';
 import { CosmeticAvatar, CosmeticName } from '@/components/nitro/Cosmetics';
 import type { AuthorProfiles } from './ReplyThread';

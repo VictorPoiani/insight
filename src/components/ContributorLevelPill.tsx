@@ -8,7 +8,7 @@ import {
   amountToPoints,
   getContributorTier,
 } from '@/lib/contributorLevels';
-import { Eye, Zap, Hexagon, Award, Compass, Sparkles } from 'lucide-react';
+import { Eye, Zap, Hexagon, Award, Compass, Sparkles } from '@/components/icons';
 
 interface ContributorLevelPillProps {
   points?: number | null;

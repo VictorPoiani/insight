@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Repeat2 } from 'lucide-react';
+import { Repeat2 } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import type { Post, Profile } from '@/types/database';
 import { PostCard } from './PostCard';

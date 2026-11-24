@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   Mail,
   Building2,
-} from 'lucide-react';
+} from '@/components/icons';
 
 export default function TermosPage() {
   return (

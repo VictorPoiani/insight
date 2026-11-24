@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Trash2, ChevronDown, Link2 } from 'lucide-react';
+import { Heart, MessageCircle, Trash2, ChevronDown, Link2 } from '@/components/icons';
 import { Profile } from '@/types/database';
 import { ReplyComposer, ReplySubmitPayload } from './ReplyComposer';
 import { ReplyBlocks } from './ReplyBlocks';

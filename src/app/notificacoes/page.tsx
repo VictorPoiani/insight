@@ -21,7 +21,7 @@ import {
   Trash2,
   Settings2,
   BarChart3,
-} from 'lucide-react';
+} from '@/components/icons';
 import { NotificationSettings } from '@/components/notifications/NotificationSettings';
 
 type MainBoxTab = 'inbox' | 'official';

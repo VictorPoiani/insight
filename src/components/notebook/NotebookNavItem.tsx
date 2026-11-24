@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { NotebookPen, Lock } from 'lucide-react';
+import { NotebookPen, Lock } from '@/components/icons';
 import { useNitro } from '@/components/nitro/NitroProvider';
 
 /**

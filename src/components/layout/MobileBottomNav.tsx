@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Compass, Zap, Settings, UserCircle2, LogIn } from 'lucide-react';
+import { Compass, Zap, Settings, UserCircle2, LogIn } from '@/components/icons';
 
 
 

@@ -57,7 +57,7 @@ import {
   Move,
   Compass,
   Download,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface OfficialUpdateRecord {
   id: string;

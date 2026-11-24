@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Network, Move } from 'lucide-react';
+import { Network, Move } from '@/components/icons';
 import { usePanZoom, PanZoomControls, boundsFromPercent } from './PanZoom';
 
 export interface ViewerNode {

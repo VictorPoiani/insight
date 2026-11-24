@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, ExternalLink, Music, Pencil, Volume2 } from 'lucide-react';
+import { Play, Pause, ExternalLink, Music, Pencil, Volume2 } from '@/components/icons';
 import type { SpotifyTrackMetadata } from '@/app/api/spotify/route';
 
 interface CustomSpotifyPlayerProps {

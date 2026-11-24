@@ -24,7 +24,7 @@ import {
   PencilLine,
   Columns2,
   Loader2,
-} from 'lucide-react';
+} from '@/components/icons';
 import { renderMarkdown, toggleTaskLine } from '@/lib/notebook/markdown';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';

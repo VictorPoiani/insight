@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Droplets, Flame, Plus, Scale, Trash2, Trophy, Beef, CalendarDays } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Droplets, Flame, Plus, Scale, Trash2, Trophy, Beef, CalendarDays } from '@/components/icons';
 import type { DietDayLog, DietMealItem, TopicWorkspaceData } from '@/types/database';
 
 /**

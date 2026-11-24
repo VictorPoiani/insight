@@ -76,7 +76,7 @@ import {
   Network,
   Link2,
   ImagePlus,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface PostComposerProps {
   authorId: string;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Loader2, Quote, X } from 'lucide-react';
+import { Loader2, Quote, X } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import type { Post, Profile } from '@/types/database';
 import { PostTime } from './PostTime';

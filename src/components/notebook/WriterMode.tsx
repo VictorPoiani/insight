@@ -25,7 +25,7 @@ import {
   Settings2,
   Loader2,
   ExternalLink,
-} from 'lucide-react';
+} from '@/components/icons';
 import { countWords, htmlToText } from '@/lib/notebook/markdown';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';

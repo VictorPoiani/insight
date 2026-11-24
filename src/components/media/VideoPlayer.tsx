@@ -13,7 +13,7 @@ import {
   RotateCcw,
   RotateCw,
   Loader2,
-} from 'lucide-react';
+} from '@/components/icons';
 
 /**
  * Player de vídeo do Insight.

@@ -18,7 +18,7 @@ import {
   Search,
   X,
   RotateCcw,
-} from 'lucide-react';
+} from '@/components/icons';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { getTemplate } from '@/lib/notebook/templates';

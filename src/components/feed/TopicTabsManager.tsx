@@ -42,7 +42,7 @@ import {
   Layers,
   Database,
   BookOpen,
-} from 'lucide-react';
+} from '@/components/icons';
 
 const DEFAULT_FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, MailWarning } from 'lucide-react';
+import { CheckCircle2, MailWarning } from '@/components/icons';
 import { AsteriskLoader } from '@/components/ui/AsteriskLoader';
 
 function VerifyEmail() {

@@ -10,7 +10,7 @@ import {
   X,
   ArrowRight,
   Layers,
-} from 'lucide-react';
+} from '@/components/icons';
 
 const NOTICE_STORAGE_KEY = 'insight-notice-v2-transition-acknowledged';
 

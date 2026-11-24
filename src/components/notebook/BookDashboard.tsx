@@ -14,7 +14,7 @@ import {
   Loader2,
   X,
   Flame,
-} from 'lucide-react';
+} from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';

@@ -28,7 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Newspaper,
-} from 'lucide-react';
+} from '@/components/icons';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 

@@ -42,7 +42,7 @@ import {
   Compass,
   Network,
   Flag,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface PostCardProps {
   post: Post;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell } from 'lucide-react';
+import { Bell } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { useNitro } from '@/components/nitro/NitroProvider';
 

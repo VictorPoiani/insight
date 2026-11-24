@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Loader2, Plus, Sparkles } from 'lucide-react';
+import { Check, Loader2, Plus, Sparkles } from '@/components/icons';
 import { NEWS_TOPICS } from '@/lib/news/topics';
 import { NewsCard } from './NewsCard';
 import { useNewsFeed, useNewsFollows } from './useNews';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Music, X, Loader2 } from 'lucide-react';
+import { Search, Music, X, Loader2 } from '@/components/icons';
 
 interface SpotifySearchModalProps {
   isOpen: boolean;

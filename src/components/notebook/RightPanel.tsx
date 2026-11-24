@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ListTree, Link2, Info, History, X, RotateCcw, Save, Loader2, ArrowUpRight } from 'lucide-react';
+import { ListTree, Link2, Info, History, X, RotateCcw, Save, Loader2, ArrowUpRight } from '@/components/icons';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { extractHeadings, htmlToText, countWords } from '@/lib/notebook/markdown';

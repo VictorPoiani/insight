@@ -31,7 +31,7 @@ import {
   PenLine,
   Brain,
   Layers,
-} from 'lucide-react';
+} from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { PostComposer } from '@/components/feed/PostComposer';

@@ -19,7 +19,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-} from 'lucide-react';
+} from '@/components/icons';
 
 // ============================================================================
 // CONTROLE DO BETA FECHADO: Mude para false quando sair do Closed Beta

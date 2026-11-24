@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Download } from '@/components/icons';
 import { usePanZoom } from '@/components/canvas/PanZoom';
 
 export interface LightboxImage {

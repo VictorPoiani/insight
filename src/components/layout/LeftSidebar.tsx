@@ -20,7 +20,7 @@ import {
   MoreHorizontal,
   User,
   Zap,
-} from 'lucide-react';
+} from '@/components/icons';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';

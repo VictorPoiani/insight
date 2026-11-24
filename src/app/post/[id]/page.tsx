@@ -4,7 +4,7 @@ import { loginHref } from '@/lib/account/loginRedirect';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MessagesSquare } from 'lucide-react';
+import { ArrowLeft, MessagesSquare } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { Post, Profile, Reply } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';

@@ -55,7 +55,7 @@ import {
   Download,
   ArrowRight,
   ArrowLeft,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface TopicWorkspaceViewProps {
   topicId: string;

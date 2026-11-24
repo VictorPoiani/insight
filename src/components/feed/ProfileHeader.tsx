@@ -81,7 +81,7 @@ import {
   ArrowDown,
   Mail,
   Send,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface ProfileHeaderProps {
   profile: Profile;

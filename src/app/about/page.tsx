@@ -26,7 +26,7 @@ import {
   Shield,
   Zap,
   Globe,
-} from 'lucide-react';
+} from '@/components/icons';
 
 interface ProjectStats {
   posts: number;

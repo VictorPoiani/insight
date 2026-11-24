@@ -9,7 +9,7 @@ import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { PresenceProvider } from '@/components/presence/PresenceProvider';
-import { Menu, X, Heart, Info, FileText, Shield, Sparkles } from 'lucide-react';
+import { Menu, X, Heart, Info, FileText, Shield, Sparkles } from '@/components/icons';
 import { MobileNotificationBell } from '@/components/notifications/MobileNotificationBell';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 

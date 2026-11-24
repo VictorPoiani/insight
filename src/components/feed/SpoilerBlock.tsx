@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { EyeOff, Eye } from 'lucide-react';
+import { EyeOff, Eye } from '@/components/icons';
 
 /**
  * Bloco marcado pelo autor como "Contém spoiler": fica desfocado até a pessoa

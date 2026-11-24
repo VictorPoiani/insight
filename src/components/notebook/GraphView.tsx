@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, FolderTree, Tags } from 'lucide-react';
+import { Crosshair, FolderTree, Tags } from '@/components/icons';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { getTemplate } from '@/lib/notebook/templates';
 

@@ -3,7 +3,7 @@
 import { loginHref } from '@/lib/account/loginRedirect';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Code2, ImagePlus, List, LogIn, Music, Quote, Send, Type, X } from 'lucide-react';
+import { Code2, ImagePlus, List, LogIn, Music, Quote, Send, Type, X } from '@/components/icons';
 import { GifPicker } from './GifPicker';
 import { Profile, ReplyBlock, ReplyBlockType } from '@/types/database';
 import { extractSpotifyTrackId } from '@/lib/spotify';

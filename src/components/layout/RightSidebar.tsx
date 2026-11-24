@@ -16,7 +16,7 @@ import {
   Copy,
   PanelRightClose,
   PanelRightOpen,
-} from 'lucide-react';
+} from '@/components/icons';
 
 const SUPPORT_EMAIL = 'contato.insightproject@gmail.com';
 const SUPPORT_WHATSAPP_NUMBER =

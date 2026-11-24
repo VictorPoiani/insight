@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { NitroConfigTab } from '@/components/nitro/NitroConfigTab';
-import { Zap as NitroZap } from 'lucide-react';
+import { Zap as NitroZap } from '@/components/icons';
 import {
   BookOpen,
   Eye,
@@ -39,7 +39,7 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
-} from 'lucide-react';
+} from '@/components/icons';
 
 type ThemeOption = 'dark' | 'light' | 'night' | 'oled';
 type ReadingFontOption = 'sans' | 'serif' | 'mono';

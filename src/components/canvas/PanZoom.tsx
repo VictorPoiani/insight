@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, Maximize2, Minimize2, Scan } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Minimize2, Scan } from '@/components/icons';
 
 /**
  * Navegação 2D (arrastar + zoom) para quadros: mapa mental dos posts, editor

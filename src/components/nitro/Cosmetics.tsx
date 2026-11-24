@@ -39,7 +39,7 @@ import {
   Sparkles,
   Star,
   Zap,
-} from 'lucide-react';
+} from '@/components/icons';
 import {
   FrameItem,
   FontItem,

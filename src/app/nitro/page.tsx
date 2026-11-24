@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Check, Lock, Play, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Check, Lock, Play, Sparkles, Zap } from '@/components/icons';
 import {
   IntroItem,
   KIND_LABELS,

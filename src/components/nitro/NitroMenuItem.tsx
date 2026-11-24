@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
+import { Zap } from '@/components/icons';
 import { useNitro } from './NitroProvider';
 
 /**

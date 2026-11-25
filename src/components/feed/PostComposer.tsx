@@ -587,6 +587,29 @@ export function PostComposer({
   // soltar na borda esquerda/direita de outro bloco = ficar lado a lado
   const [dragSide, setDragSide] = useState<'left' | 'right' | null>(null);
   const [dragHoverCol, setDragHoverCol] = useState<number | null>(null);
+  // alça inferior: altura da célula
+  const [heightResize, setHeightResize] = useState<{ blockId: string; startY: number; startH: number } | null>(null);
+  useEffect(() => {
+    if (!heightResize) return;
+    const onMove = (e: PointerEvent) => {
+      const next = Math.max(48, Math.round(heightResize.startH + e.clientY - heightResize.startY));
+      setBlocks((prev) => prev.map((b) => (b.id === heightResize.blockId ? { ...b, blockHeight: next } : b)));
+    };
+    const onUp = () => {
+      setHeightResize(null);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [heightResize]);
+
   const [resizingState, setResizingState] = useState<{
     blockId: string;
     startX: number;
@@ -1962,7 +1985,7 @@ export function PostComposer({
                 setDragSide(null);
               }}
               onDrop={(e) => handleGridDrop(e, block.id)}
-              style={gridCellStyle(span, start)}
+              style={gridCellStyle(span, start, block.blockHeight)}
               className={`group relative flex flex-col gap-1.5 rounded-xl p-2 transition-all border min-w-0 ${
                 isDragOver
                   ? 'border-accent bg-accent/5'
@@ -1979,6 +2002,26 @@ export function PostComposer({
                   }`}
                 />
               )}
+
+              {/* ALÇA INFERIOR: AJUSTA A ALTURA DA CÉLULA (duplo clique volta ao automático) */}
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Arraste para ajustar a altura do bloco"
+                title="Arraste para cima ou para baixo para ajustar a altura · duplo clique volta ao automático"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const cell = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+                  setHeightResize({ blockId: block.id, startY: e.clientY, startH: cell.height });
+                }}
+                onDoubleClick={() => updateBlock(block.id, { blockHeight: undefined })}
+                className={`absolute left-6 right-6 bottom-0 h-2.5 cursor-ns-resize z-20 flex items-end justify-center transition-opacity ${
+                  heightResize?.blockId === block.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <div className={`h-1 w-10 mb-0.5 rounded-full ${heightResize?.blockId === block.id ? 'bg-accent' : 'bg-border'}`} />
+              </div>
 
               {/* ALÇA LATERAL DIREITA PARA REDIMENSIONAR ARRASTANDO */}
               <div

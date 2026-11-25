@@ -509,7 +509,7 @@ export function PostCard({
   const renderBlock = (b: PostBlock, idx: number): React.ReactNode => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
-            const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
+            const cellStyle = gridCellStyle(b.gridSpan, b.gridStart, b.blockHeight);
 
             if (b.type === 'divider') {
               return (
@@ -1128,7 +1128,7 @@ export function PostCard({
             const rendered = renderBlock(b, idx);
             // o wrapper assume a célula do grid; dentro dele a posição do bloco é ignorada
             return b.spoiler && rendered ? (
-              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart)}>
+              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart, b.blockHeight)}>
                 {rendered}
               </SpoilerBlock>
             ) : (

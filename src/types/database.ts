@@ -265,6 +265,8 @@ export interface PostBlock {
 
   gridSpan?: number;
   gridStart?: number;
+  /** Altura mínima da célula em px (alça inferior do editor); vazio = automática. */
+  blockHeight?: number;
 
   imageUrl?: string | null;
   imageCaption?: string;

@@ -1,3 +1,4 @@
+import { sendNitroWelcomeOnce } from '@/lib/nitro/welcomeEmail';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -65,6 +66,7 @@ async function syncNitroPreapproval(preapprovalId: string, accessToken: string) 
 
     const supabaseAdmin = createAdminClient();
     await supabaseAdmin.from('profiles').update(update).eq('id', profileId);
+    if (nitroStatus === 'active') await sendNitroWelcomeOnce(supabaseAdmin, profileId);
     return { synced: true, status: nitroStatus };
 }
 

@@ -234,6 +234,17 @@ export async function moderateEntity(
       })
       .eq('id', id);
 
+    // resposta +18: os avisos que já saíram não mostram o texto
+    if (type === 'reply' && decision.verdict === 'NSFW') {
+      const since = new Date(new Date(String(r.created_at)).getTime() - 5000).toISOString();
+      await admin
+        .from('notifications')
+        .update({ content_preview: '[Conteúdo +18]', message: '[Conteúdo +18]' })
+        .eq('post_id', r.post_id as string)
+        .eq('actor_id', owner as string)
+        .in('type', ['reply', 'mention'])
+        .gte('created_at', since);
+    }
     // resposta retida: apaga os avisos que já tinham saído com o texto dela
     if (type === 'reply' && (decision.verdict === 'BLOCK' || decision.verdict === 'REVIEW')) {
       const since = new Date(new Date(String(r.created_at)).getTime() - 5000).toISOString();

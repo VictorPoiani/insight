@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 function resolveValidNotificationUrl(request: Request): string | undefined {
   const hostHeader = request.headers.get('host') || '';
@@ -54,13 +55,27 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const amount = Number(body.amount);
-    const profileId: string | null = body.profileId || null;
+    // O perfil creditado vem da SESSÃO, nunca do corpo da requisição (antes dava
+    // para atribuir a doação — e os pontos/patente — a qualquer perfil).
+    const authed = await createServerSupabase();
+    const {
+      data: { user: sessionUser },
+    } = await authed.auth.getUser();
+    let profileId: string | null = null;
+    if (sessionUser) {
+      const { data: me } = await authed
+        .from('profiles')
+        .select('id')
+        .or(`user_id.eq.${sessionUser.id},id.eq.${sessionUser.id}`)
+        .maybeSingle();
+      profileId = me?.id ?? null;
+    }
     const donorName: string | null = body.donorName?.trim() || null;
     const message: string | null = body.message?.trim()?.slice(0, 140) || null;
     const payerEmail: string =
       body.email?.trim() || 'apoiador@insight.app.br';
 
-    if (!Number.isFinite(amount) || amount < 1) {
+    if (!Number.isFinite(amount) || amount < 1 || amount > 10000) {
       return NextResponse.json(
         { error: 'O valor mínimo para gerar o PIX automático é R$ 1,00.' },
         { status: 400 }

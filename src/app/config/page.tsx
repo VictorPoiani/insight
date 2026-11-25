@@ -78,9 +78,7 @@ interface ReportRow {
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
-const DEFAULT_VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
+const DEFAULT_VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -144,12 +142,11 @@ const DEFAULT_PREFS: UserPreferences = {
 };
 
 function generateRandomBetaCode(): string {
+  // gerador criptográfico e 12 caracteres aleatórios (~60 bits): inviável adivinhar
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const pick = (len: number) =>
-    Array.from({ length: len }, () =>
-      chars.charAt(Math.floor(Math.random() * chars.length))
-    ).join('');
-  return `INSG-${pick(4)}-${pick(4)}`;
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const s = Array.from(bytes, (b) => chars.charAt(b % chars.length)).join('');
+  return `INSG-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
 }
 
 /**

@@ -104,9 +104,7 @@ interface DetectedPlatform {
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
-const DEFAULT_VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
+const DEFAULT_VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

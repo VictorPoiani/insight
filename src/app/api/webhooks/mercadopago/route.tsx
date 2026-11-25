@@ -76,6 +76,12 @@ export async function POST(request: Request) {
         if (!accessToken) {
             return NextResponse.json({ error: 'Token ausente' }, { status: 500 });
         }
+        // Em produção a assinatura HMAC do Mercado Pago é obrigatória: sem o
+        // segredo configurado o webhook recusa tudo (falha fechada).
+        if (!webhookSecret && process.env.VERCEL_ENV === 'production') {
+            console.error('[webhook MP] MERCADOPAGO_WEBHOOK_SECRET ausente em produção');
+            return NextResponse.json({ error: 'Webhook não configurado' }, { status: 503 });
+        }
 
         const url = new URL(request.url);
         const body = await request.json().catch(() => ({}));

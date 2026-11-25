@@ -1,3 +1,4 @@
+import { NITRO_PRICE_BRL } from './entitlement';
 /**
  * Insight Nitro × Mercado Pago (só no servidor: usa MERCADOPAGO_ACCESS_TOKEN).
  *
@@ -47,6 +48,13 @@ export function profileFieldsFromPreapproval(pre: MpPreapproval): Record<string,
   const map: Record<string, string> = { authorized: 'active', paused: 'past_due', cancelled: 'canceled' };
   const status = map[pre.status];
   if (!status) return null;
+  // Defesa extra: só libera se a assinatura for do valor e moeda do Nitro
+  // (o preço vem do servidor; nunca de algo que o cliente possa alterar).
+  if (status === 'active') {
+    const ar = (pre as { auto_recurring?: { transaction_amount?: number; currency_id?: string } }).auto_recurring;
+    if (ar?.currency_id && ar.currency_id !== 'BRL') return null;
+    if (ar?.transaction_amount != null && Number(ar.transaction_amount) + 0.001 < NITRO_PRICE_BRL) return null;
+  }
   const out: Record<string, unknown> = { nitro_status: status, nitro_subscription_id: String(pre.id) };
   if (status === 'active') {
     const next = pre.next_payment_date ? new Date(pre.next_payment_date).getTime() : NaN;

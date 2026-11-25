@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PenLine,
@@ -479,7 +480,7 @@ export function BookDashboard({ book, api, onOpen, onNew, role, level }: Props) 
                     {c.title}
                   </h2>
                   {/* HTML passou pela lista branca sanitizeWriterHtml */}
-                  <div dangerouslySetInnerHTML={{ __html: c.html }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(c.html) }} />
                 </section>
               ))}
               <p className="!indent-0 text-center mt-16 opacity-50 tracking-[0.4em] text-xs">FIM</p>

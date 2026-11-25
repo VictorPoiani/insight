@@ -7,18 +7,17 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  'BGilUzY0daz-dWuBYeF7daX9tjFve3exE_StHwqBWnYiK1QHeeTcrObIX0Kwdi5UY8MPbRKw0Aza3Ps-MuvVMJI';
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 
-const VAPID_PRIVATE_KEY =
-  process.env.VAPID_PRIVATE_KEY ||
-  'vbhLMvBahKwhghOIIzE7GlTXBi8X0kBmZJvVQsP2AMo';
+// A chave privada NUNCA fica no código (o repositório é público): só pela variável de ambiente.
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 
 const VAPID_SUBJECT =
   process.env.VAPID_SUBJECT || 'mailto:contato.insightproject@gmail.com';
 
-setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// sem as chaves configuradas o push fica desligado (em vez de usar uma chave vazada)
+const PUSH_READY = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+if (PUSH_READY) setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -43,6 +42,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action } = body;
+    if (!PUSH_READY && action !== 'unsubscribe') {
+      return NextResponse.json({ error: 'Notificações push indisponíveis no momento.' }, { status: 503 });
+    }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
       return NextResponse.json(

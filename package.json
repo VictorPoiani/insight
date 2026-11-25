@@ -15,6 +15,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.48.1",
+    "isomorphic-dompurify": "4.7.0",
     "lucide-react": "^0.475.0",
     "mediabunny": "1.65.2",
     "next": "^15.1.0",

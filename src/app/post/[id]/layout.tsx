@@ -15,10 +15,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     });
     const { data: post } = await supabase
       .from('posts')
-      .select('content, profile_id, author_id, visibility, is_draft')
+      .select('content, profile_id, author_id, visibility, is_draft, moderation_status, is_nsfw')
       .eq('id', id)
       .maybeSingle();
-    if (!post || post.visibility === 'private' || post.is_draft) return fallback;
+    if (!post || post.visibility === 'private' || post.is_draft || post.moderation_status !== 'approved' || post.is_nsfw) return fallback;
     const { data: author } = await supabase
       .from('profiles')
       .select('display_name, full_name, username')

@@ -1,5 +1,6 @@
 'use client';
 
+import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -227,17 +228,25 @@ export default function PostDiscussionPage() {
     const { data, error } = await supabase.from('replies').insert(payload).select().single();
 
     if (error || !data) {
-      alert('Erro ao publicar resposta: ' + (error?.message || 'desconhecido'));
+      alert(moderationErrorMessage(error) || 'Erro ao publicar resposta: ' + (error?.message || 'desconhecido'));
       return false;
     }
 
-    const created = { likes_count: 0, ...(data as Reply) };
+    let created = { likes_count: 0, ...(data as Reply) };
     setReplies((prev) => [...prev, created]);
+
+    // moderação: resposta só "vale" (e avisa alguém) depois do veredito
+    const outcome = await moderateNow('reply', created.id);
+    if (outcome) {
+      created = { ...created, moderation_status: outcome.status as Reply['moderation_status'], is_nsfw: outcome.isNsfw, moderation_reason: outcome.reason || null };
+      setReplies((prev) => prev.map((r) => (r.id === created.id ? { ...r, ...created } : r)));
+    }
+    const approved = !outcome || outcome.status === 'approved';
 
     // O dono do post já é notificado pelo trigger notify_on_reply do banco.
     // Aqui notificamos só o autor da resposta respondida (se for outra pessoa).
-    if (parent?.profile_id && parent.profile_id !== author?.id) {
-      notify(parent.profile_id, me, content);
+    if (approved && parent?.profile_id && parent.profile_id !== author?.id) {
+      notify(parent.profile_id, me, outcome?.isNsfw ? '[Conteúdo +18]' : content);
     }
 
     if (!parent) {

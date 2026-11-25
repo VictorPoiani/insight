@@ -471,6 +471,8 @@ export interface UploadR2Result {
   savedPercent: number;
   strategy?: CompressedMediaResult['strategy'];
   note?: string;
+  /** vídeos: quadros enviados para a moderação analisar (URLs de imagens) */
+  frames?: string[];
 }
 
 function putWithProgress(
@@ -612,10 +614,29 @@ export async function uploadMediaToInsight(
 
   onStatus?.('Conectando à Cloudflare R2...', 95);
   const up = await uploadFileToR2(compressed.file, { isGif: compressed.isGif, originalSize: compressed.originalSize, scope }, onStatus);
+
+  // moderação: 3 quadros do vídeo (publicações; o caderno é privado)
+  let frames: string[] | undefined;
+  if (scope === 'posts' && compressed.file.type.startsWith('video/')) {
+    try {
+      onStatus?.('Preparando verificação do vídeo...', 98);
+      const { extractVideoFrames } = await import('./videoFrames');
+      const blobs = await extractVideoFrames(compressed.file, 3);
+      frames = [];
+      for (const [i, blob] of blobs.entries()) {
+        const f = new File([blob], `frame-${i}.jpg`, { type: 'image/jpeg' });
+        const r = await uploadFileToR2(f, { isGif: false, originalSize: f.size, scope });
+        frames.push(r.publicUrl);
+      }
+    } catch {
+      frames = undefined; // sem quadros: a equipe revisa o vídeo
+    }
+  }
   onStatus?.('Concluído!', 100);
 
   return {
     ...up,
+    frames,
     isGif: compressed.isGif,
     originalSize: compressed.originalSize,
     compressedSize: compressed.compressedSize,

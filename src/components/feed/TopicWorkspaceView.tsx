@@ -1,5 +1,6 @@
 'use client';
 
+import { kickModeration } from '@/components/moderation/ModerationHost';
 import { WritingDesk } from './WritingDesk';
 import { DietPlanner } from './DietPlanner';
 import { usePanZoom, PanZoomControls, boundsFromPercent } from '@/components/canvas/PanZoom';
@@ -187,6 +188,8 @@ export function TopicWorkspaceView({
 
     setSavingStatus('saved');
     setTimeout(() => setSavingStatus('idle'), 1800);
+    // texto novo no tópico passa pela moderação (pós-moderação: continua no ar)
+    kickModeration();
   }
 
   function toggleFocusSidebars() {

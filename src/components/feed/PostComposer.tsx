@@ -11,6 +11,7 @@ import { formatBytes, getTierByLevel, getUserUploadLimitBytes } from '@/lib/cont
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
+import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import {
@@ -1346,6 +1347,7 @@ export function PostComposer({
         r2Key: result.r2Key,
         isGif: result.isGif,
         mediaBytes: result.compressedSize,
+        videoFrames: result.frames,
       });
       setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
     } catch (err) {
@@ -1386,14 +1388,14 @@ export function PostComposer({
             return {
               ...b,
               mindMapNodes: (b.mindMapNodes || []).map((n) =>
-                n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key, mediaBytes } : n
+                n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key, mediaBytes, mediaFrames: res.frames } : n
               ),
             };
           }
           return {
             ...b,
             roadmapSteps: (b.roadmapSteps || []).map((st) =>
-              st.id === itemId ? { ...st, mediaUrl: publicUrl, mediaBytes } : st
+              st.id === itemId ? { ...st, mediaUrl: publicUrl, mediaBytes, mediaFrames: res.frames } : st
             ),
           };
         })
@@ -1642,11 +1644,14 @@ export function PostComposer({
       if (!error && updatedData) {
         void draft.clear();
         onPostUpdated?.({ ...(updatedData as Post), visibility });
+        // conteúdo editado passa de novo pela moderação
+        const editedId = (updatedData as Post).id || editingPost?.id;
+        if (editedId) void moderateNow('post', editedId);
       } else {
         alert(
           error?.message?.includes('post_media_quota_exceeded')
             ? `Os anexos passam do limite de ${formatBytes(uploadLimit)} por post do seu nível.`
-            : 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
+            : moderationErrorMessage(error) || 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
         );
       }
       return;
@@ -1677,15 +1682,21 @@ export function PostComposer({
       error = retry.error;
     }
 
+    // moderação: espera o veredito antes de avisar seguidores (bloqueado/em
+    // análise não sai em push nem e-mail; +18 não vai por e-mail)
+    const outcome = !error && createdPost?.id ? await moderateNow('post', createdPost.id) : null;
     setIsSubmitting(false);
 
     if (!error) {
-      if (visibility === 'public' && createdPost?.id) {
+      const approved = !outcome || outcome.status === 'approved';
+      if (visibility === 'public' && createdPost?.id && approved) {
         // Avisa só quem segue o autor (o servidor carrega o post do banco e
-        // confere a autoria; o e-mail sai em nome do autor).
+        // confere a autoria e a moderação; o e-mail sai em nome do autor).
         const notifyBody = JSON.stringify({ action: 'new_post', postId: createdPost.id });
         fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
-        fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
+        if (!outcome?.isNsfw) {
+          fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
+        }
       }
 
       void draft.clear();
@@ -1700,7 +1711,7 @@ export function PostComposer({
       if (createdPost?.id) onPublished?.(createdPost.id);
       onPostCreated?.();
     } else {
-      alert('Erro ao publicar insight: ' + error.message);
+      alert(moderationErrorMessage(error) || 'Erro ao publicar insight: ' + error.message);
     }
   }
 

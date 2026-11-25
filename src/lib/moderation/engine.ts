@@ -163,8 +163,13 @@ export async function moderateEntity(
   const r = row as unknown as Record<string, unknown>;
   const owner = ownerOf(type, r);
 
-  // nada na fila e já decidido: devolve o estado atual
-  if (!queued && !opts.force && type !== 'profile' && r.moderation_status !== 'pending') {
+  // moderação desligada (interruptor) ou nada na fila e já decidido: devolve o estado atual
+  const { data: settings } = await admin.from('moderation_settings').select('enabled').eq('id', 1).maybeSingle();
+  const enabled = Boolean(settings?.enabled);
+  if (!opts.force && (!enabled || (!queued && (type === 'profile' || r.moderation_status !== 'pending')))) {
+    if (type === 'profile') {
+      return { entityType: type, entityId: id, verdict: 'ALLOW', status: 'approved', isNsfw: false, reason: '', message: '', skipped: 'unchanged' };
+    }
     const verdict: Verdict = r.moderation_status === 'blocked' ? 'BLOCK' : r.moderation_status === 'approved' ? (r.is_nsfw ? 'NSFW' : 'ALLOW') : 'REVIEW';
     return {
       entityType: type,

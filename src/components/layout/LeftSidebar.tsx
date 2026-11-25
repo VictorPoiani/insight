@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   User,
   Zap,
+  ShieldCheck,
 } from 'lucide-react';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
@@ -457,6 +458,17 @@ export function LeftSidebar() {
                     <Settings className="w-3.5 h-3.5" />
                     <span>Configurações</span>
                   </Link>
+
+                  {(currentUser.role === 'admin' || currentUser.role === 'moderator') && (
+                    <Link
+                      href="/moderacao"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-secondary hover:text-primary hover:bg-elevated/70 transition-colors"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Moderação</span>
+                    </Link>
+                  )}
                 </div>
 
                 <div className="pt-1 border-t border-border/70">

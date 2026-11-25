@@ -32,9 +32,9 @@ function walk(node: unknown, out: { texts: string[]; images: Set<string>; videos
     if (!v || (key && IGNORE_KEYS.has(key))) return;
     if (/^https?:\/\//i.test(v)) {
       if (TRUSTED_MEDIA.test(v)) return;
-      const isVideoKey = key === 'videoUrl' || (key === 'url' && parent?.type === 'video');
+      const isVideoKey = key === 'videoUrl' || (key === 'url' && parent?.type === 'video') || (key === 'mediaUrl' && VIDEO_EXT.test(v));
       if (isVideoKey || VIDEO_EXT.test(v)) {
-        const frames = (parent?.videoFrames ?? parent?.frames) as unknown;
+        const frames = (parent?.videoFrames ?? parent?.frames ?? parent?.mediaFrames) as unknown;
         out.videos.set(v, Array.isArray(frames) && frames.length > 0);
         return;
       }

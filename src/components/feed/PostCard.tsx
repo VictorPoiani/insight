@@ -1,5 +1,8 @@
 'use client';
 
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { ModerationBanner } from '@/components/moderation/ModerationBanner';
+import { moderateNow } from '@/components/moderation/ModerationHost';
 import { MediaCarousel } from '@/components/media/MediaCarousel';
 import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
@@ -221,6 +224,35 @@ export function PostCard({
   // Usuário logado vem do provedor global (uma consulta para o site todo) e
   // curtida/repost são buscados em lote com os outros cartões da tela.
   const { viewer } = useNitro();
+  // moderação: status e +18 (atualizados ao vivo quando o veredito chega)
+  const [modStatus, setModStatus] = useState(post.moderation_status || 'approved');
+  const [isNsfw, setIsNsfw] = useState(Boolean(post.is_nsfw));
+  const [modReason, setModReason] = useState(post.moderation_reason || null);
+  useEffect(() => {
+    setModStatus(post.moderation_status || 'approved');
+    setIsNsfw(Boolean(post.is_nsfw));
+    setModReason(post.moderation_reason || null);
+  }, [post.id, post.moderation_status, post.is_nsfw, post.moderation_reason]);
+  useEffect(() => {
+    const onUpdate = (e: Event) => {
+      const o = (e as CustomEvent<{ entityType?: string; kind?: string; entityId?: string; id?: string; status?: string; verdict?: string; isNsfw?: boolean; reason?: string }>).detail;
+      if ((o?.entityType || o?.kind) !== 'post' || (o?.entityId || o?.id) !== post.id) return;
+      const st = o.status || (o.verdict === 'BLOCK' ? 'blocked' : o.verdict === 'REVIEW' ? 'review' : 'approved');
+      setModStatus(st as typeof modStatus);
+      setIsNsfw(Boolean(o.isNsfw ?? o.verdict === 'NSFW'));
+      if (o.reason) setModReason(o.reason);
+    };
+    window.addEventListener('insight-moderation-updated', onUpdate);
+    return () => window.removeEventListener('insight-moderation-updated', onUpdate);
+  }, [post.id]);
+  const isPostOwner = Boolean(viewer && (viewer.id === post.author_id || viewer.id === post.profile_id));
+  // o próprio autor ainda pendente: pede o veredito (se o editor não pediu)
+  useEffect(() => {
+    if (isPostOwner && modStatus === 'pending') {
+      const t = setTimeout(() => void moderateNow('post', post.id), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [isPostOwner, modStatus, post.id]);
   const [hasSaved, setHasSaved] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
 
@@ -1140,7 +1172,9 @@ export function PostCard({
             }}
           />
         </div>
-      ) : hasRichBlocks ? (
+      ) : (
+        <NsfwGate active={isNsfw && !isPostOwner}>
+        {hasRichBlocks ? (
         <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
           {groupMediaRuns(blocksState).map((item) => {
             if (item.kind === 'carousel') {
@@ -1203,6 +1237,17 @@ export function PostCard({
             </div>
           )}
         </>
+      )}
+        </NsfwGate>
+      )}
+
+      {isPostOwner && !isEditing && isNsfw && modStatus === 'approved' && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 px-2.5 py-1 text-[11px] font-bold text-amber-500">
+          +18 · aparece borrado para os outros
+        </p>
+      )}
+      {isPostOwner && !isEditing && (
+        <ModerationBanner kind="post" id={post.id} status={modStatus} reason={modReason} onAppealed={() => setModStatus('appealed')} />
       )}
 
       {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}

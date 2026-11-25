@@ -9,6 +9,9 @@ import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getTopicLimit } from '@/lib/contributorLevels';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { ModerationBanner } from '@/components/moderation/ModerationBanner';
+import { moderateNow } from '@/components/moderation/ModerationHost';
 import {
   CustomTopic,
   PostBlock,
@@ -452,6 +455,7 @@ export function TopicTabsManager({
   ];
 
   const currentTab = allTabs.find((t) => t.id === activeTabId) || baseDefaultTabs[0];
+  const currentTopicRow = customTopics.find((ct) => ct.id === currentTab.id) || null;
 
   const templatesCatalog = useMemo(
     () => [
@@ -681,6 +685,9 @@ export function TopicTabsManager({
     };
 
     setCustomTopics((prev) => [...prev, created]);
+    void moderateNow('topic', created.id).then((o) => {
+      if (o) setCustomTopics((prev) => prev.map((ct) => (ct.id === created.id ? { ...ct, moderation_status: o.status as CustomTopic['moderation_status'], is_nsfw: o.isNsfw, moderation_reason: o.reason || null } : ct)));
+    });
     setSelectedTemplate(null);
     setName('');
     setTag('');
@@ -1745,10 +1752,16 @@ export function TopicTabsManager({
             </div>
           )}
 
+          {/* Moderação do tópico: aviso para o dono */}
+          {currentTopicRow && viewer?.id === currentTopicRow.profile_id && (
+            <ModerationBanner kind="topic" id={currentTopicRow.id} status={currentTopicRow.moderation_status} reason={currentTopicRow.moderation_reason} />
+          )}
+
           {/* 4. Painel de Workspace do Tópico */}
           {!currentTab.isDefault &&
             currentTab.templateType &&
             currentTab.templateType !== 'blank_page' && (
+              <NsfwGate active={Boolean(currentTopicRow?.is_nsfw) && viewer?.id !== currentTopicRow?.profile_id}>
               <TopicWorkspaceView
                 topicId={currentTab.id}
                 topicColor={currentTab.color}
@@ -1766,6 +1779,7 @@ export function TopicTabsManager({
                   );
                 }}
               />
+              </NsfwGate>
             )}
         </>
       )}

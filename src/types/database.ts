@@ -265,6 +265,8 @@ export interface PostBlock {
 
   gridSpan?: number;
   gridStart?: number;
+  /** Quadros do vídeo (URLs de imagem) usados pela moderação automática. */
+  videoFrames?: string[];
   /** Altura mínima da célula em px (alça inferior do editor); vazio = automática. */
   blockHeight?: number;
 
@@ -330,6 +332,10 @@ export interface Post {
   replies_count?: number;
   /** Repost com comentário: Insight citado. */
   quoted_post_id?: string | null;
+  /** Moderação (o autor vê os próprios itens retidos; os outros só veem 'approved'). */
+  moderation_status?: 'pending' | 'approved' | 'review' | 'blocked' | 'appealed';
+  is_nsfw?: boolean;
+  moderation_reason?: string | null;
 }
 
 export interface Reply {
@@ -348,6 +354,9 @@ export interface Reply {
   likes_count?: number | null;
   /** Corpo em blocos (texto, citação, código, lista, imagem, Spotify). */
   blocks?: ReplyBlock[] | null;
+  moderation_status?: 'pending' | 'approved' | 'review' | 'blocked' | 'appealed';
+  is_nsfw?: boolean;
+  moderation_reason?: string | null;
 }
 
 export type ReplyBlockType = 'paragraph' | 'quote' | 'code' | 'bullet' | 'image' | 'spotify' | 'gif' | 'video';
@@ -387,4 +396,7 @@ export interface CustomTopic {
   description_blocks?: PostBlock[] | null;
   workspace_data?: TopicWorkspaceData | null;
   created_at: string;
+  moderation_status?: 'pending' | 'approved' | 'review' | 'blocked' | 'appealed';
+  is_nsfw?: boolean;
+  moderation_reason?: string | null;
 }

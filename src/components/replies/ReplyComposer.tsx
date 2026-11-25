@@ -300,7 +300,7 @@ export function ReplyComposer({
       });
       insertAfter(
         focused?.id || blocks[blocks.length - 1].id,
-        { id, type: isVideo ? 'video' : 'image', url: res.publicUrl, bytes: res.compressedSize },
+        { id, type: isVideo ? 'video' : 'image', url: res.publicUrl, bytes: res.compressedSize, ...(isVideo && res.frames?.length ? { frames: res.frames } : {}) },
         false
       );
     } catch (err) {

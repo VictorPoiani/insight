@@ -1,5 +1,7 @@
 'use client';
 
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { ModerationBanner } from '@/components/moderation/ModerationBanner';
 import { MentionText } from '@/components/mentions/MentionText';
 import { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
@@ -145,7 +147,8 @@ function ReplyItem({
             </p>
           )}
 
-          {/* Conteúdo */}
+          {/* Conteúdo (+18 borrado para os outros) */}
+          <NsfwGate active={Boolean(node.is_nsfw) && loggedUser?.id !== node.profile_id} compact>
           {Array.isArray(node.blocks) && node.blocks.length > 0 ? (
             <ReplyBlocks blocks={node.blocks} />
           ) : (
@@ -154,6 +157,10 @@ function ReplyItem({
                 <MentionText text={node.content} />
               </p>
             )
+          )}
+          </NsfwGate>
+          {loggedUser?.id === node.profile_id && (
+            <ModerationBanner kind="reply" id={node.id} status={node.moderation_status} reason={node.moderation_reason} />
           )}
 
           {node.spotify_track_id && !(Array.isArray(node.blocks) && node.blocks.length > 0) && (

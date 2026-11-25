@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { ModerationHost } from '@/components/moderation/ModerationHost';
 import { ActivityPanelHost, openActivityPanel } from '@/components/activity/ActivityPanel';
 import { ActivityTracker } from '@/components/activity/ActivityTracker';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <PresenceProvider>
           <ActivityTracker />
       <ActivityPanelHost />
+      <ModerationHost />
           <main className="w-full min-h-screen">{children}</main>
         </PresenceProvider>
       </NitroProvider>
@@ -60,6 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <ActivityTracker />
       <ActivityPanelHost />
+      <ModerationHost />
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
         <Link href="/" className="inline-flex items-center">

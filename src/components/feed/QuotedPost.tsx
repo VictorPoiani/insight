@@ -1,5 +1,7 @@
 'use client';
 
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
@@ -63,7 +65,7 @@ export function QuotedPostCard({ postId, preloaded }: { postId: string; preloade
 
   const { post, author } = data;
   const img = firstImage(post);
-  return (
+  const card = (
     <Link
       href={`/post/${post.id}`}
       onClick={(e) => e.stopPropagation()}
@@ -90,6 +92,8 @@ export function QuotedPostCard({ postId, preloaded }: { postId: string; preloade
       )}
     </Link>
   );
+  // citação de um Insight +18: borrada também
+  return post.is_nsfw ? <NsfwGate active compact>{card}</NsfwGate> : card;
 }
 
 const escapeHtml = (s: string) =>
@@ -147,9 +151,16 @@ export function QuoteComposerModal({
       })
       .select('*')
       .single();
-    setSending(false);
     if (err || !data) {
-      setError('Não foi possível publicar agora. Tente de novo.');
+      setSending(false);
+      setError(moderationErrorMessage(err) || 'Não foi possível publicar agora. Tente de novo.');
+      return;
+    }
+    // moderação antes de avisar alguém
+    const outcome = await moderateNow('post', (data as Post).id);
+    setSending(false);
+    if (outcome && outcome.status !== 'approved') {
+      onClose();
       return;
     }
     if (author.id !== me.id) {

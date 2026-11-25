@@ -1,0 +1,89 @@
+/* Sobre nós — animações e efeitos (respeita "reduzir animações") */
+
+.ab-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.45;
+  animation: ab-float 18s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes ab-float {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(40px, -30px, 0) scale(1.12); }
+  100% { transform: translate3d(-30px, 25px, 0) scale(0.95); }
+}
+
+.ab-spin { animation: ab-spin 26s linear infinite; }
+.ab-spin-rev { animation: ab-spin 40s linear infinite reverse; }
+@keyframes ab-spin { to { transform: rotate(360deg); } }
+
+/* palavra que troca no título */
+.ab-word-in { animation: ab-word-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes ab-word-in { from { opacity: 0; transform: translateY(0.4em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+.ab-word { display: inline-grid; }
+.ab-word > span { grid-area: 1 / 1; opacity: 0; transform: translateY(0.45em) rotateX(-60deg); transition: opacity 0.5s, transform 0.5s; }
+.ab-word > span.on { opacity: 1; transform: none; }
+
+/* entrada ao rolar */
+.ab-reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.ab-reveal.in { opacity: 1; transform: none; }
+.ab-reveal[data-delay='1'] { transition-delay: 0.08s; }
+.ab-reveal[data-delay='2'] { transition-delay: 0.16s; }
+.ab-reveal[data-delay='3'] { transition-delay: 0.24s; }
+.ab-reveal[data-delay='4'] { transition-delay: 0.32s; }
+
+/* faixa de hashtags */
+.ab-marquee { display: flex; width: max-content; animation: ab-marquee 40s linear infinite; }
+.ab-marquee.rev { animation-direction: reverse; animation-duration: 48s; }
+@keyframes ab-marquee { to { transform: translateX(-50%); } }
+
+/* cartões flutuantes do hero */
+.ab-bob { animation: ab-bob 6s ease-in-out infinite; }
+.ab-bob.d2 { animation-delay: -2s; animation-duration: 7s; }
+.ab-bob.d3 { animation-delay: -4s; animation-duration: 8s; }
+@keyframes ab-bob { 50% { transform: translateY(-12px); } }
+
+/* linha do tempo desenhada */
+.ab-line { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.8s ease-out; }
+.ab-line.in { stroke-dashoffset: 0; }
+
+/* órbita da stack */
+.ab-orbit { animation: ab-spin 36s linear infinite; }
+.ab-orbit .ab-counter { animation: ab-spin 36s linear infinite reverse; }
+
+/* barra de equalizador da ilustração de música */
+.ab-eq > i { display: block; width: 3px; border-radius: 2px; background: currentColor; animation: ab-eq 1s ease-in-out infinite; }
+.ab-eq > i:nth-child(2) { animation-delay: -0.3s; }
+.ab-eq > i:nth-child(3) { animation-delay: -0.6s; }
+.ab-eq > i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes ab-eq { 0%, 100% { height: 4px; } 50% { height: 14px; } }
+
+/* brilho que segue o mouse nos cartões */
+.ab-glow { position: relative; isolation: isolate; }
+.ab-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 35%, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: -1;
+}
+.ab-glow:hover::before { opacity: 1; }
+
+/* desenho do traço das ilustrações */
+.ab-draw path, .ab-draw line, .ab-draw circle { stroke-dasharray: 400; stroke-dashoffset: 400; transition: stroke-dashoffset 2s ease-out; }
+.in .ab-draw path, .in .ab-draw line, .in .ab-draw circle, .ab-draw.in path, .ab-draw.in line, .ab-draw.in circle { stroke-dashoffset: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ab-word-in { animation: none !important; }
+  .ab-blob, .ab-spin, .ab-spin-rev, .ab-marquee, .ab-bob, .ab-orbit, .ab-orbit .ab-counter, .ab-eq > i { animation: none !important; }
+  .ab-reveal { opacity: 1; transform: none; transition: none; }
+  .ab-line { stroke-dashoffset: 0; transition: none; }
+  .ab-draw path, .ab-draw line, .ab-draw circle { stroke-dashoffset: 0; transition: none; }
+}
+[data-reduce-motion='true'] .ab-blob, [data-reduce-motion='true'] .ab-spin, [data-reduce-motion='true'] .ab-spin-rev,
+[data-reduce-motion='true'] .ab-marquee, [data-reduce-motion='true'] .ab-bob, [data-reduce-motion='true'] .ab-orbit,
+[data-reduce-motion='true'] .ab-orbit .ab-counter { animation: none !important; }

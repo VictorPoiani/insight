@@ -21,6 +21,7 @@ import {
   User,
   Zap,
   MessageCircle,
+  GraduationCap,
 } from 'lucide-react';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
@@ -37,6 +38,7 @@ const MAIN_ITEMS: NavItem[] = [
   { name: 'Configurações', href: '/config', icon: Settings },
 ];
 const EXTRA_ITEMS: NavItem[] = [
+  { name: 'Tutorial', href: '/tutorial', icon: GraduationCap },
   { name: 'Atualizações', href: '/atualizacoes', icon: Sparkles },
   { name: 'Sobre', href: '/about', icon: Info },
 ];

@@ -138,7 +138,12 @@ export function GlobalShortcuts() {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-[11px] text-muted">No Mac, use ⌘ no lugar de Ctrl.</p>
+            <p className="mt-4 text-[11px] text-muted">
+              No Mac, use ⌘ no lugar de Ctrl.{' '}
+              <a href="/tutorial" className="text-accent font-bold hover:underline">
+                Ver tutorial completo
+              </a>
+            </p>
           </div>
         </div>
       )}

@@ -974,6 +974,7 @@ export function PostCard({
     <article
       ref={articleRef}
       id={`post-${post.id}`}
+      data-post-view={post.id}
       className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
         isHighlightedFromUrl
           ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'

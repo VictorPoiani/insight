@@ -1,5 +1,6 @@
 'use client';
 
+import { openActivityPanel } from '@/components/activity/ActivityPanel';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,6 +17,7 @@ import {
   Copy,
   PanelRightClose,
   PanelRightOpen,
+  BarChart3,
 } from 'lucide-react';
 
 const SUPPORT_EMAIL = 'contato.insightproject@gmail.com';
@@ -224,6 +226,16 @@ export function RightSidebar() {
             <Search className="w-4 h-4" />
           </button>
 
+          <button
+            type="button"
+            onClick={openActivityPanel}
+            title="Sua atividade"
+            aria-label="Sua atividade"
+            className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-surface transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+          </button>
+
 
           <a
             href="https://github.com/VictorPoiani"
@@ -247,6 +259,16 @@ export function RightSidebar() {
                 className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-surface border border-transparent hover:border-border transition-colors shrink-0"
               >
                 <PanelRightClose className="w-4 h-4 opacity-60 group-hover/rsidebar:opacity-100 transition-opacity" />
+              </button>
+
+              <button
+                type="button"
+                onClick={openActivityPanel}
+                title="Sua atividade"
+                aria-label="Sua atividade"
+                className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-surface border border-transparent hover:border-border transition-colors shrink-0 order-last"
+              >
+                <BarChart3 className="w-4 h-4" />
               </button>
 
               <form onSubmit={handleSearch} className="relative flex-1 min-w-0">

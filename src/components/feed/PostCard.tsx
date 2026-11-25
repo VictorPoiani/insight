@@ -1,5 +1,6 @@
 'use client';
 
+import { MediaCarousel } from '@/components/media/MediaCarousel';
 import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
@@ -61,6 +62,48 @@ interface PostCardProps {
 
 // HTML de usuário passa pelo DOMPurify (lista branca); o filtro por regex anterior era contornável
 const sanitizeBlockHtml = (html?: string | null) => linkifyMentionsHtml(sanitizeUserHtml(html));
+
+/** Mídia que pode entrar no carrossel: imagem/vídeo/GIF ocupando a linha toda, sem spoiler. */
+function isCarouselMedia(b: PostBlock) {
+  const full = !b.gridSpan || b.gridSpan >= 12;
+  const media = (b.type === 'image' && Boolean(b.imageUrl)) || ((b.type === 'video' || b.type === 'gif') && Boolean(b.videoUrl));
+  return media && full && !b.spoiler;
+}
+
+function isBlankText(b: PostBlock) {
+  return b.type === 'paragraph' && !b.spoiler && !(b.html || '').replace(/<[^>]*>|&nbsp;|\s/g, '');
+}
+
+type BlockRun = { kind: 'block'; block: PostBlock; index: number } | { kind: 'carousel'; blocks: PostBlock[]; start: number };
+
+/** Duas ou mais mídias seguidas viram um carrossel (estilo Instagram). */
+function groupMediaRuns(blocks: PostBlock[]): BlockRun[] {
+  const out: BlockRun[] = [];
+  for (let i = 0; i < blocks.length; ) {
+    if (isCarouselMedia(blocks[i])) {
+      // junta as mídias seguidas, pulando parágrafos vazios entre elas
+      const media: PostBlock[] = [blocks[i]];
+      let end = i + 1;
+      let k = i + 1;
+      while (k < blocks.length) {
+        if (isCarouselMedia(blocks[k])) {
+          media.push(blocks[k]);
+          end = ++k;
+        } else if (isBlankText(blocks[k])) {
+          k++;
+        } else break;
+      }
+      if (media.length >= 2) {
+        out.push({ kind: 'carousel', blocks: media, start: i });
+        i = end;
+        continue;
+      }
+    }
+    out.push({ kind: 'block', block: blocks[i], index: i });
+    i++;
+  }
+  return out;
+}
 
 function getProfileHref(_profileId?: string | null, username?: string | null) {
   if (username) return `/u/${encodeURIComponent(username)}`;
@@ -1068,7 +1111,19 @@ export function PostCard({
         </div>
       ) : hasRichBlocks ? (
         <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
-          {blocksState.map((b, idx) => {
+          {groupMediaRuns(blocksState).map((item) => {
+            if (item.kind === 'carousel') {
+              return (
+                <MediaCarousel
+                  key={`car-${item.blocks[0].id || item.start}`}
+                  slides={item.blocks.map((m, k) => ({
+                    key: m.id || `m-${item.start + k}`,
+                    node: renderBlock({ ...m, imageWidth: '100%', videoWidth: '100%', gridSpan: 12, gridStart: 0 }, item.start + k),
+                  }))}
+                />
+              );
+            }
+            const { block: b, index: idx } = item;
             const rendered = renderBlock(b, idx);
             // o wrapper assume a célula do grid; dentro dele a posição do bloco é ignorada
             return b.spoiler && rendered ? (

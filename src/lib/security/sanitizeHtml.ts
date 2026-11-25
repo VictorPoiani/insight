@@ -47,3 +47,28 @@ export function sanitizeUserHtml(dirty?: string | null): string {
     ALLOWED_URI_REGEXP: SAFE_URL,
   });
 }
+
+/**
+ * Transforma "@usuario" em link para o perfil nos trechos de texto de um HTML já
+ * sanitizado (ignora o que já está dentro de <a>, <code> e <pre>).
+ */
+export function linkifyMentionsHtml(html: string): string {
+  if (!html || !html.includes('@')) return html;
+  let skip = 0;
+  return html
+    .split(/(<[^>]+>)/g)
+    .map((part) => {
+      if (part.startsWith('<')) {
+        const m = /^<(\/?)(a|code|pre)\b/i.exec(part);
+        if (m) skip = Math.max(0, skip + (m[1] ? -1 : 1));
+        return part;
+      }
+      if (skip > 0 || !part.includes('@')) return part;
+      return part.replace(
+        /(^|[^\w@/.&])@([A-Za-z0-9_](?:[A-Za-z0-9_.]{0,28}[A-Za-z0-9_])?)/g,
+        (_all, pre: string, handle: string) =>
+          `${pre}<a href="/u/${handle}" data-mention="${handle}" class="mention-link">@${handle}</a>`
+      );
+    })
+    .join('');
+}

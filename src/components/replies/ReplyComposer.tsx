@@ -92,6 +92,7 @@ function AutoTextarea({
           inputRef(el);
         }}
         value={block.text || ''}
+        data-mentions={block.type === 'code' ? undefined : 'true'}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}

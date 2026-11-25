@@ -1,3 +1,4 @@
+import { MentionAutocomplete } from '@/components/mentions/MentionAutocomplete';
 import { GlobalShortcuts } from '@/components/layout/GlobalShortcuts';
 import type { Metadata, Viewport } from 'next';
 // @ts-ignore
@@ -104,6 +105,7 @@ export default function RootLayout({
 
         <ReleaseNotesModal />
         <GlobalShortcuts />
+        <MentionAutocomplete />
 
         <AppShell>{children}</AppShell>
       </body>

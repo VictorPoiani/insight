@@ -1,5 +1,6 @@
 'use client';
 
+import { MentionText } from '@/components/mentions/MentionText';
 import { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
 import { Heart, MessageCircle, Trash2, ChevronDown, Link2 } from 'lucide-react';
@@ -150,7 +151,7 @@ function ReplyItem({
           ) : (
             node.content && (
               <p className="mt-1 text-sm text-primary whitespace-pre-line leading-relaxed break-words">
-                {node.content}
+                <MentionText text={node.content} />
               </p>
             )
           )}

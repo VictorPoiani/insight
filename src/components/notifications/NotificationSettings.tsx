@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Heart, MessageCircle, UserPlus, Repeat2, FileText, BarChart3, Loader2, Check } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Repeat2, FileText, BarChart3, Loader2, Check, AtSign } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 /** Tipos de notificação do app que cada pessoa pode ligar/desligar. */
 export const NOTIFICATION_TYPES = [
   { id: 'like', label: 'Curtidas', desc: 'Quando curtem um post seu', icon: Heart, color: 'text-rose-500' },
   { id: 'reply', label: 'Respostas', desc: 'Quando respondem seus posts', icon: MessageCircle, color: 'text-accent' },
+  { id: 'mention', label: 'Menções', desc: 'Quando alguém marca você com @', icon: AtSign, color: 'text-violet-400' },
   { id: 'poll_vote', label: 'Votos em enquetes', desc: 'Quando alguém vota numa enquete sua', icon: BarChart3, color: 'text-amber-400' },
   { id: 'follow', label: 'Novos seguidores', desc: 'Quando alguém começa a seguir você', icon: UserPlus, color: 'text-emerald-400' },
   { id: 'repost', label: 'Reposts', desc: 'Quando repostam algo seu', icon: Repeat2, color: 'text-[#1DB954]' },

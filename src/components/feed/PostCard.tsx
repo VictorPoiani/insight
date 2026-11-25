@@ -1,6 +1,6 @@
 'use client';
 
-import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
+import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
@@ -60,7 +60,7 @@ interface PostCardProps {
 }
 
 // HTML de usuário passa pelo DOMPurify (lista branca); o filtro por regex anterior era contornável
-const sanitizeBlockHtml = sanitizeUserHtml;
+const sanitizeBlockHtml = (html?: string | null) => linkifyMentionsHtml(sanitizeUserHtml(html));
 
 function getProfileHref(_profileId?: string | null, username?: string | null) {
   if (username) return `/u/${encodeURIComponent(username)}`;
@@ -532,7 +532,7 @@ export function PostCard({
                   key={b.id || idx}
                   style={cellStyle}
                   className="p-3.5 rounded-xl bg-elevated border border-border font-mono text-xs text-primary overflow-x-auto whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                 />
               );
             }

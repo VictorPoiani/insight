@@ -194,6 +194,7 @@ export function QuoteComposerModal({
             <img src={me.avatar_url || '/assets/net/default-perfil'} alt="" className="w-9 h-9 rounded-full object-cover border border-border shrink-0" />
             <textarea
               autoFocus
+              data-mentions="true"
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {

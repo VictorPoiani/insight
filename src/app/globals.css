@@ -238,3 +238,16 @@ body {
     font-size: 16px !important;
   }
 }
+/* @menções */
+.mention-link,
+.notion-content a[data-mention],
+.notion-editable a[data-mention] {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.mention-link:hover,
+.notion-content a[data-mention]:hover {
+  text-decoration: underline;
+}

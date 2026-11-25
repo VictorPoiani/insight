@@ -1,4 +1,5 @@
 import { NITRO_PRICE_BRL } from './entitlement';
+import { sendNitroWelcomeOnce } from './welcomeEmail';
 /**
  * Insight Nitro × Mercado Pago (só no servidor: usa MERCADOPAGO_ACCESS_TOKEN).
  *
@@ -77,6 +78,7 @@ export async function syncNitroForProfile(admin: SupabaseClient, token: string, 
   if (!fields) return { synced: false as const, status: pick.status };
   // cancelada: não apaga a validade do período já pago
   await admin.from('profiles').update(fields).eq('id', profileId);
+  if (fields.nitro_status === 'active') await sendNitroWelcomeOnce(admin, profileId);
   return { synced: true as const, status: String(fields.nitro_status) };
 }
 

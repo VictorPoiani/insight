@@ -1,5 +1,6 @@
 'use client';
 
+import { openActivityPanel } from '@/components/activity/ActivityPanel';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,6 +17,9 @@ import {
   Copy,
   PanelRightClose,
   PanelRightOpen,
+  BarChart3,
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react';
 
 const SUPPORT_EMAIL = 'contato.insightproject@gmail.com';
@@ -31,6 +35,7 @@ const DEFAULT_TOPICS = [
   'artigue',
 ];
 
+const SIDEBAR_KEY = 'insight-right-sidebar-v2';
 const DEFAULT_WIDTH = 256;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -46,17 +51,22 @@ export function RightSidebar() {
 
   // Estados de Redimensionamento e Recolhimento
   const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Padrão: recolhida (a esquerda vem aberta). Quem abrir, fica aberta.
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
-      const savedLayout = localStorage.getItem('insight-right-sidebar');
+      const savedLayout = localStorage.getItem(SIDEBAR_KEY);
       if (savedLayout) {
         const parsed = JSON.parse(savedLayout);
         if (typeof parsed.width === 'number') setWidth(parsed.width);
         if (typeof parsed.isCollapsed === 'boolean') setIsCollapsed(parsed.isCollapsed);
+      } else {
+        // versão anterior: aproveita só a largura (todos começam com a barra recolhida)
+        const old = JSON.parse(localStorage.getItem('insight-right-sidebar') || 'null');
+        if (typeof old?.width === 'number') setWidth(old.width);
       }
     } catch {
       // Mantém padrão
@@ -97,7 +107,7 @@ export function RightSidebar() {
   function saveSidebarState(nextWidth: number, nextCollapsed: boolean) {
     try {
       localStorage.setItem(
-        'insight-right-sidebar',
+        SIDEBAR_KEY,
         JSON.stringify({ width: nextWidth, isCollapsed: nextCollapsed })
       );
     } catch {
@@ -218,6 +228,33 @@ export function RightSidebar() {
             <Search className="w-4 h-4" />
           </button>
 
+          <button
+            type="button"
+            onClick={() => openActivityPanel()}
+            title="Sua atividade"
+            aria-label="Sua atividade"
+            className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-surface transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+          </button>
+
+          <Link
+            href="/tutorial"
+            title="Tutorial"
+            aria-label="Tutorial"
+            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
+          >
+            <GraduationCap className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/atualizacoes"
+            title="Atualizações"
+            aria-label="Atualizações"
+            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+          </Link>
 
           <a
             href="https://github.com/VictorPoiani"
@@ -241,6 +278,16 @@ export function RightSidebar() {
                 className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-surface border border-transparent hover:border-border transition-colors shrink-0"
               >
                 <PanelRightClose className="w-4 h-4 opacity-60 group-hover/rsidebar:opacity-100 transition-opacity" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openActivityPanel()}
+                title="Sua atividade"
+                aria-label="Sua atividade"
+                className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-surface border border-transparent hover:border-border transition-colors shrink-0 order-last"
+              >
+                <BarChart3 className="w-4 h-4" />
               </button>
 
               <form onSubmit={handleSearch} className="relative flex-1 min-w-0">
@@ -402,7 +449,15 @@ export function RightSidebar() {
           </div>
 
           {/* 6. Rodapé  Compacto */}
-          <footer className="px-1 pt-2 space-y-1 text-[10px] text-muted leading-tight shrink-0">
+          <footer className="px-1 pt-2 space-y-1.5 text-[10px] text-muted leading-tight shrink-0">
+            <div className="flex items-center gap-3 text-[11px]">
+              <Link href="/tutorial" className="inline-flex items-center gap-1 hover:text-accent transition-colors">
+                <GraduationCap className="w-3.5 h-3.5" /> Tutorial
+              </Link>
+              <Link href="/atualizacoes" className="inline-flex items-center gap-1 hover:text-accent transition-colors">
+                <Sparkles className="w-3.5 h-3.5" /> Atualizações
+              </Link>
+            </div>
             <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
               <Link href="/privacidade" className="hover:text-secondary transition-colors">
                 Privacidade (LGPD)

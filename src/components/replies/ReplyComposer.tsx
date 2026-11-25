@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Code2, ImagePlus, List, LogIn, Music, Quote, Send, Type, X } from 'lucide-react';
 import { GifPicker } from './GifPicker';
+import { SpotifySearchModal } from '@/components/feed/SpotifySearchModal';
 import { Profile, ReplyBlock, ReplyBlockType } from '@/types/database';
 import { extractSpotifyTrackId } from '@/lib/spotify';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
@@ -92,6 +93,7 @@ function AutoTextarea({
           inputRef(el);
         }}
         value={block.text || ''}
+        data-mentions={block.type === 'code' ? undefined : 'true'}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
@@ -121,6 +123,7 @@ export function ReplyComposer({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifyInput, setSpotifyInput] = useState('');
+  const [musicSearch, setMusicSearch] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [uploadLabel, setUploadLabel] = useState('');
   const [gifOpen, setGifOpen] = useState(false);
@@ -297,7 +300,7 @@ export function ReplyComposer({
       });
       insertAfter(
         focused?.id || blocks[blocks.length - 1].id,
-        { id, type: isVideo ? 'video' : 'image', url: res.publicUrl, bytes: res.compressedSize },
+        { id, type: isVideo ? 'video' : 'image', url: res.publicUrl, bytes: res.compressedSize, ...(isVideo && res.frames?.length ? { frames: res.frames } : {}) },
         false
       );
     } catch (err) {
@@ -317,15 +320,17 @@ export function ReplyComposer({
     setGifOpen(false);
   }
 
-  function addSpotify() {
-    const trackId = extractSpotifyTrackId(spotifyInput);
-    if (!trackId) {
-      alert('Cole um link de faixa do Spotify.');
-      return;
-    }
+  function attachTrack(trackId: string) {
     insertAfter(focused?.id || blocks[blocks.length - 1].id, { id: uid(), type: 'spotify', trackId }, false);
     setSpotifyInput('');
     setSpotifyOpen(false);
+  }
+
+  /** Link do Spotify anexa direto; nome da música abre a pesquisa. */
+  function addSpotify() {
+    const trackId = /spotify/i.test(spotifyInput) ? extractSpotifyTrackId(spotifyInput) : null;
+    if (trackId) attachTrack(trackId);
+    else setMusicSearch(spotifyInput.trim());
   }
 
   async function submit(e?: React.FormEvent) {
@@ -451,15 +456,25 @@ export function ReplyComposer({
                   addSpotify();
                 }
               }}
-              placeholder="Link da faixa no Spotify..."
+              placeholder="Nome da música ou link do Spotify..."
               className="flex-1 min-w-0 bg-transparent text-xs text-primary focus:outline-none"
               autoFocus
             />
             <button type="button" onClick={addSpotify} className="text-[11px] font-bold text-accent">
-              Anexar
+              {/spotify/i.test(spotifyInput) ? 'Anexar' : 'Pesquisar'}
             </button>
           </div>
         )}
+
+        <SpotifySearchModal
+          isOpen={musicSearch !== null}
+          initialQuery={musicSearch || ''}
+          onClose={() => setMusicSearch(null)}
+          onSelectTrack={(_q, song) => {
+            if (/^\d{3,15}$/.test(song.id)) attachTrack(`it${song.id}`);
+            setMusicSearch(null);
+          }}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
           <div className="flex items-center gap-1" role="toolbar" aria-label="Formatação da resposta">

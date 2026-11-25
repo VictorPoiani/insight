@@ -1,3 +1,5 @@
+import { MentionAutocomplete } from '@/components/mentions/MentionAutocomplete';
+import { GlobalShortcuts } from '@/components/layout/GlobalShortcuts';
 import type { Metadata, Viewport } from 'next';
 // @ts-ignore
 import './globals.css';
@@ -65,11 +67,15 @@ const themeInitScript = `
         if (prefs.reduceMotion) {
           root.setAttribute('data-reduce-motion', 'true');
         }
-        if (typeof prefs.warmFilter === 'number' && prefs.warmFilter > 0) {
-          root.style.setProperty('--warm-overlay-opacity', (prefs.warmFilter / 100).toFixed(2));
-        } else {
-          root.style.setProperty('--warm-overlay-opacity', '0');
+        var warm = typeof prefs.warmFilter === 'number' ? prefs.warmFilter : 0;
+        if (prefs.nightLight) {
+          var toMin = function (v, d) { var m = /^(\\d{1,2}):(\\d{2})$/.exec(v || d); return (Number(m[1]) * 60 + Number(m[2])) % 1440; };
+          var st = toMin(prefs.nightStart, '21:00'), en = toMin(prefs.nightEnd, '06:00');
+          var nw = new Date(), cur = nw.getHours() * 60 + nw.getMinutes();
+          var on = st === en ? true : st < en ? (cur >= st && cur < en) : (cur >= st || cur < en);
+          if (on) warm = Math.max(warm, typeof prefs.nightStrength === 'number' ? prefs.nightStrength : 25);
         }
+        root.style.setProperty('--warm-overlay-opacity', (Math.min(40, warm) / 100).toFixed(2));
       }
     } catch (e) {}
   })();
@@ -98,6 +104,8 @@ export default function RootLayout({
         />
 
         <ReleaseNotesModal />
+        <GlobalShortcuts />
+        <MentionAutocomplete />
 
         <AppShell>{children}</AppShell>
       </body>

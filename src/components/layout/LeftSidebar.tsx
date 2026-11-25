@@ -8,8 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 import {
   House,
   Bell,
-  Sparkles,
-  Info,
   Heart,
   Settings,
   LogOut,
@@ -20,20 +18,23 @@ import {
   MoreHorizontal,
   User,
   Zap,
+  ShieldCheck,
 } from 'lucide-react';
-import { useNitro } from '@/components/nitro/NitroProvider';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
-const navItems = [
-  { name: 'Início', href: '/', icon: House },
+type NavItem = { name: string; href: string; icon: typeof House; showBadge?: boolean; soon?: boolean };
+
+// Ordem: Início, My Notebook, Notificações, Apoie, Configurações, Insight Nitro
+// (Tutorial, Atualizações e Sobre ficam na barra direita)
+const HOME_ITEM: NavItem = { name: 'Início', href: '/', icon: House };
+const MAIN_ITEMS: NavItem[] = [
   { name: 'Notificações', href: '/notificacoes', icon: Bell, showBadge: true },
-  { name: 'Atualizações', href: '/atualizacoes', icon: Sparkles },
   { name: 'Apoie', href: '/apoie', icon: Heart },
   { name: 'Configurações', href: '/config', icon: Settings },
-  { name: 'Sobre', href: '/about', icon: Info },
 ];
+
 
 const DEFAULT_WIDTH = 248;
 const MIN_WIDTH = 180;
@@ -60,7 +61,6 @@ export function LeftSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const { hasAccess: hasNitroAccess } = useNitro();
 
   const sidebarRef = useRef<HTMLElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -290,6 +290,56 @@ export function LeftSidebar() {
     currentUser?.role === 'admin' ||
     currentUser?.id === '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
+  function renderNavItem(item: NavItem) {
+    const Icon = item.icon;
+    const isActive = pathname === item.href;
+    const showBadge = Boolean(item.showBadge && unreadCount > 0);
+    const layout = isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5';
+
+    if (item.soon) {
+      return (
+        <span
+          key={item.href}
+          aria-disabled="true"
+          title={`${item.name} — em breve`}
+          className={`flex items-center rounded-lg text-sm font-medium text-secondary opacity-60 cursor-not-allowed ${isCollapsed ? layout : 'gap-3 px-3 py-1.5'}`}
+        >
+          <Icon className="w-5 h-5 shrink-0" />
+          {!isCollapsed && (
+            <span className="flex-1 min-w-0 leading-tight">
+              <span className="block truncate">{item.name}</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted">Em breve</span>
+            </span>
+          )}
+        </span>
+      );
+    }
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        title={isCollapsed ? item.name : undefined}
+        className={`flex items-center rounded-lg text-sm font-medium transition-colors ${layout} ${
+          isActive ? 'bg-surface text-accent border border-border' : 'text-secondary hover:bg-surface hover:text-primary'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <Icon className="w-5 h-5" />
+          {showBadge && isCollapsed && (
+            <span className="w-2 h-2 rounded-full bg-accent absolute -top-0.5 -right-0.5 ring-2 ring-background" />
+          )}
+        </div>
+        {!isCollapsed && <span className="truncate flex-1">{item.name}</span>}
+        {!isCollapsed && showBadge && (
+          <span className="px-1.5 py-0.2 rounded-full bg-accent text-white text-[10px] font-mono font-bold shrink-0">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </Link>
+    );
+  }
+
   return (
     <aside
       ref={sidebarRef}
@@ -339,44 +389,10 @@ export function LeftSidebar() {
 
         {/* Navegação Principal */}
         <nav className="space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            const showBadge = Boolean(item.showBadge && unreadCount > 0);
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={isCollapsed ? item.name : undefined}
-                className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-                } ${
-                  isActive
-                    ? 'bg-surface text-accent border border-border'
-                    : 'text-secondary hover:bg-surface hover:text-primary'
-                }`}
-              >
-                <div className="relative shrink-0">
-                  <Icon className="w-5 h-5" />
-                  {showBadge && isCollapsed && (
-                    <span className="w-2 h-2 rounded-full bg-accent absolute -top-0.5 -right-0.5 ring-2 ring-background" />
-                  )}
-                </div>
-
-                {!isCollapsed && (
-                  <span className="truncate flex-1">{item.name}</span>
-                )}
-
-                {!isCollapsed && showBadge && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-accent text-white text-[10px] font-mono font-bold shrink-0">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-
+          {renderNavItem(HOME_ITEM)}
+          {/* My Notebook — beta fechada: só admin entra; os demais veem bloqueado */}
+          <NotebookNavItem variant="sidebar" collapsed={isCollapsed} isAdmin={currentUser?.role === 'admin'} active={pathname.startsWith('/notebook')} />
+          {MAIN_ITEMS.map(renderNavItem)}
           {/* Insight Nitro — todos veem catálogo e planos; só admin aplica (beta) */}
           <Link
             href="/nitro"
@@ -395,17 +411,10 @@ export function LeftSidebar() {
                 <span className="truncate flex-1 bg-gradient-to-r from-sky-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
                   Insight Nitro
                 </span>
-                {!hasNitroAccess && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30">
-                    Novo
-                  </span>
-                )}
               </>
             )}
           </Link>
 
-          {/* My Notebook — beta fechada: só admin entra; os demais veem bloqueado */}
-          <NotebookNavItem variant="sidebar" collapsed={isCollapsed} isAdmin={currentUser?.role === 'admin'} active={pathname.startsWith('/notebook')} />
         </nav>
       </div>
 
@@ -449,6 +458,17 @@ export function LeftSidebar() {
                     <Settings className="w-3.5 h-3.5" />
                     <span>Configurações</span>
                   </Link>
+
+                  {(currentUser.role === 'admin' || currentUser.role === 'moderator') && (
+                    <Link
+                      href="/moderacao"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-secondary hover:text-primary hover:bg-elevated/70 transition-colors"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Moderação</span>
+                    </Link>
+                  )}
                 </div>
 
                 <div className="pt-1 border-t border-border/70">

@@ -11,6 +11,7 @@ import { formatBytes, getTierByLevel, getUserUploadLimitBytes } from '@/lib/cont
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
+import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import {
@@ -317,7 +318,14 @@ function resolveInitialVisibility(post?: Post | null): PostVisibility {
   return 'public';
 }
 
+/** Mídia nova entra com metade da largura no desktop (evita fotos gigantes no feed); dá para ampliar até 100%. */
+function defaultMediaWidth(): ImageWidthType {
+  if (typeof window === 'undefined') return '100%';
+  return window.matchMedia('(min-width: 768px)').matches ? '50%' : '100%';
+}
+
 function createNewBlock(type: PostBlockType = 'paragraph'): PostBlock {
+  const mediaWidth = type === 'image' || type === 'video' || type === 'gif' ? defaultMediaWidth() : '100%';
   const uid = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const cId = `node-c-${uid}`;
   const n1Id = `node-1-${uid}`;
@@ -334,12 +342,12 @@ function createNewBlock(type: PostBlockType = 'paragraph'): PostBlock {
     gridStart: 0,
     imageUrl: null,
     imageCaption: '',
-    imageWidth: '100%',
+    imageWidth: mediaWidth,
     imageAlign: 'center',
     videoUrl: null,
     r2Key: null,
     videoCaption: '',
-    videoWidth: '100%',
+    videoWidth: mediaWidth,
     videoAlign: 'center',
     isGif: type === 'gif',
     spotifyTrackId: null,
@@ -433,6 +441,7 @@ function buildInitialBlocksFromPost(post?: Post | null): PostBlock[] {
   if (post.image_url) {
     const imgBlock = createNewBlock('image');
     imgBlock.imageUrl = post.image_url;
+    imgBlock.imageWidth = '100%'; // post antigo: mantém como era
     converted.push(imgBlock);
   }
   if (post.spotify_track_id) {
@@ -491,9 +500,15 @@ function RichBlockEditable({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === 'Enter' && !e.shiftKey && block.type !== 'code') {
+    if (e.key === 'Enter' && block.type !== 'code') {
+      // Ctrl/Cmd+Enter cria outro bloco; Enter só pula linha (títulos continuam criando bloco)
+      const newBlock = e.ctrlKey || e.metaKey || ((block.type === 'h1' || block.type === 'h2') && !e.shiftKey);
       e.preventDefault();
-      onEnterPressed();
+      if (newBlock) {
+        onEnterPressed();
+      } else if (!document.execCommand('insertLineBreak')) {
+        document.execCommand('insertHTML', false, '<br><br>');
+      }
     } else if (e.key === 'Backspace') {
       const plain = e.currentTarget.innerText.replace(/\n/g, '').trim();
       if (plain.length === 0) {
@@ -565,11 +580,37 @@ export function PostComposer({
   const [showHighlighterMenu, setShowHighlighterMenu] = useState(false);
   const [showGridLines, setShowGridLines] = useState(true);
   const [spotifySearchForBlockId, setSpotifySearchForBlockId] = useState<string | null>(null);
+  const [spotifyInitialQuery, setSpotifyInitialQuery] = useState('');
 
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dragOverBlockId, setDragOverBlockId] = useState<string | null>(null);
+  // soltar na borda esquerda/direita de outro bloco = ficar lado a lado
+  const [dragSide, setDragSide] = useState<'left' | 'right' | null>(null);
   const [dragHoverCol, setDragHoverCol] = useState<number | null>(null);
+  // alça inferior: altura da célula
+  const [heightResize, setHeightResize] = useState<{ blockId: string; startY: number; startH: number } | null>(null);
+  useEffect(() => {
+    if (!heightResize) return;
+    const onMove = (e: PointerEvent) => {
+      const next = Math.max(48, Math.round(heightResize.startH + e.clientY - heightResize.startY));
+      setBlocks((prev) => prev.map((b) => (b.id === heightResize.blockId ? { ...b, blockHeight: next } : b)));
+    };
+    const onUp = () => {
+      setHeightResize(null);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [heightResize]);
+
   const [resizingState, setResizingState] = useState<{
     blockId: string;
     startX: number;
@@ -1093,6 +1134,17 @@ export function PostComposer({
     setActiveBlockId(newBlk.id);
     setMenuOpenForBlockId(null);
     setCellConfigOpenForId(null);
+    // leva o cursor para o bloco novo assim que ele aparecer
+    let tries = 0;
+    const focusNew = () => {
+      const el = document.querySelector<HTMLElement>(`[data-block-id="${newBlk.id}"] .notion-editable`);
+      if (el) {
+        el.focus();
+        return;
+      }
+      if (++tries < 10) requestAnimationFrame(focusNew);
+    };
+    requestAnimationFrame(focusNew);
   }
 
   function removeBlock(id: string) {
@@ -1146,6 +1198,9 @@ export function PostComposer({
     e.preventDefault();
     if (draggedBlockId && draggedBlockId !== targetId) {
       setDragOverBlockId(targetId);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = (e.clientX - rect.left) / Math.max(1, rect.width);
+      setDragSide(x < 0.28 ? 'left' : x > 0.72 ? 'right' : null);
     }
   }
 
@@ -1157,6 +1212,29 @@ export function PostComposer({
     const draggedBlk = blocks.find((b) => b.id === draggedBlockId);
     const span = draggedBlk?.gridSpan || 12;
     const newCol = computeTargetColumn(e.clientX, span);
+    const side = targetId && targetId !== draggedBlockId ? dragSide : null;
+
+    if (side && targetId) {
+      // lado a lado: divide a linha entre o bloco alvo e o arrastado
+      setBlocks((prev) => {
+        const target = prev.find((b) => b.id === targetId);
+        if (!target) return prev;
+        const targetSpan = normalizeGridSpan(target.gridSpan);
+        const nextTargetSpan = targetSpan >= 9 ? 6 : targetSpan;
+        const draggedSpan = Math.max(3, Math.min(12 - nextTargetSpan, normalizeGridSpan(draggedBlk?.gridSpan)));
+        const rest = prev.filter((b) => b.id !== draggedBlockId);
+        const moved = { ...(draggedBlk as PostBlock), gridSpan: draggedSpan, gridStart: 0 };
+        const out = rest.map((b) => (b.id === targetId ? { ...b, gridSpan: nextTargetSpan, gridStart: 0 } : b));
+        const at = out.findIndex((b) => b.id === targetId);
+        out.splice(side === 'left' ? at : at + 1, 0, moved);
+        return out;
+      });
+      setDraggedBlockId(null);
+      setDragOverBlockId(null);
+      setDragSide(null);
+      setDragHoverCol(null);
+      return;
+    }
 
     setBlocks((prev) => {
       const updated = prev.map((b) =>
@@ -1269,6 +1347,7 @@ export function PostComposer({
         r2Key: result.r2Key,
         isGif: result.isGif,
         mediaBytes: result.compressedSize,
+        videoFrames: result.frames,
       });
       setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
     } catch (err) {
@@ -1309,14 +1388,14 @@ export function PostComposer({
             return {
               ...b,
               mindMapNodes: (b.mindMapNodes || []).map((n) =>
-                n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key, mediaBytes } : n
+                n.id === itemId ? { ...n, mediaUrl: publicUrl, r2Key, mediaBytes, mediaFrames: res.frames } : n
               ),
             };
           }
           return {
             ...b,
             roadmapSteps: (b.roadmapSteps || []).map((st) =>
-              st.id === itemId ? { ...st, mediaUrl: publicUrl, mediaBytes } : st
+              st.id === itemId ? { ...st, mediaUrl: publicUrl, mediaBytes, mediaFrames: res.frames } : st
             ),
           };
         })
@@ -1565,11 +1644,14 @@ export function PostComposer({
       if (!error && updatedData) {
         void draft.clear();
         onPostUpdated?.({ ...(updatedData as Post), visibility });
+        // conteúdo editado passa de novo pela moderação
+        const editedId = (updatedData as Post).id || editingPost?.id;
+        if (editedId) void moderateNow('post', editedId);
       } else {
         alert(
           error?.message?.includes('post_media_quota_exceeded')
             ? `Os anexos passam do limite de ${formatBytes(uploadLimit)} por post do seu nível.`
-            : 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
+            : moderationErrorMessage(error) || 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
         );
       }
       return;
@@ -1600,15 +1682,21 @@ export function PostComposer({
       error = retry.error;
     }
 
+    // moderação: espera o veredito antes de avisar seguidores (bloqueado/em
+    // análise não sai em push nem e-mail; +18 não vai por e-mail)
+    const outcome = !error && createdPost?.id ? await moderateNow('post', createdPost.id) : null;
     setIsSubmitting(false);
 
     if (!error) {
-      if (visibility === 'public' && createdPost?.id) {
+      const approved = !outcome || outcome.status === 'approved';
+      if (visibility === 'public' && createdPost?.id && approved) {
         // Avisa só quem segue o autor (o servidor carrega o post do banco e
-        // confere a autoria; o e-mail sai em nome do autor).
+        // confere a autoria e a moderação; o e-mail sai em nome do autor).
         const notifyBody = JSON.stringify({ action: 'new_post', postId: createdPost.id });
         fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
-        fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
+        if (!outcome?.isNsfw) {
+          fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifyBody }).catch(() => {});
+        }
       }
 
       void draft.clear();
@@ -1623,7 +1711,7 @@ export function PostComposer({
       if (createdPost?.id) onPublished?.(createdPost.id);
       onPostCreated?.();
     } else {
-      alert('Erro ao publicar insight: ' + error.message);
+      alert(moderationErrorMessage(error) || 'Erro ao publicar insight: ' + error.message);
     }
   }
 
@@ -1899,12 +1987,16 @@ export function PostComposer({
           return (
             <div
               key={block.id}
+              data-block-id={block.id}
               draggable={!draggingMindNode}
               onDragStart={(e) => handleDragStart(e, block.id)}
               onDragOver={(e) => handleBlockDragOver(e, block.id)}
-              onDragLeave={() => setDragOverBlockId(null)}
+              onDragLeave={() => {
+                setDragOverBlockId(null);
+                setDragSide(null);
+              }}
               onDrop={(e) => handleGridDrop(e, block.id)}
-              style={gridCellStyle(span, start)}
+              style={gridCellStyle(span, start, block.blockHeight)}
               className={`group relative flex flex-col gap-1.5 rounded-xl p-2 transition-all border min-w-0 ${
                 isDragOver
                   ? 'border-accent bg-accent/5'
@@ -1913,6 +2005,35 @@ export function PostComposer({
                   : 'border-transparent hover:bg-elevated/40'
               }`}
             >
+              {isDragOver && dragSide && (
+                <div
+                  aria-hidden
+                  className={`absolute top-1 bottom-1 w-1 rounded-full bg-accent shadow-[0_0_12px_var(--accent)] z-30 pointer-events-none ${
+                    dragSide === 'left' ? '-left-1.5' : '-right-1.5'
+                  }`}
+                />
+              )}
+
+              {/* ALÇA INFERIOR: AJUSTA A ALTURA DA CÉLULA (duplo clique volta ao automático) */}
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Arraste para ajustar a altura do bloco"
+                title="Arraste para cima ou para baixo para ajustar a altura · duplo clique volta ao automático"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const cell = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+                  setHeightResize({ blockId: block.id, startY: e.clientY, startH: cell.height });
+                }}
+                onDoubleClick={() => updateBlock(block.id, { blockHeight: undefined })}
+                className={`absolute left-6 right-6 bottom-0 h-2.5 cursor-ns-resize z-20 flex items-end justify-center transition-opacity ${
+                  heightResize?.blockId === block.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <div className={`h-1 w-10 mb-0.5 rounded-full ${heightResize?.blockId === block.id ? 'bg-accent' : 'bg-border'}`} />
+              </div>
+
               {/* ALÇA LATERAL DIREITA PARA REDIMENSIONAR ARRASTANDO */}
               <div
                 title="Arraste para os lados para ajustar a largura da célula"
@@ -1949,7 +2070,7 @@ export function PostComposer({
                   </button>
 
                   <div
-                    title="Arraste verticalmente ou horizontalmente"
+                    title="Arraste para reordenar · solte na borda esquerda ou direita de outro bloco para ficarem lado a lado"
                     className="p-1 rounded cursor-grab active:cursor-grabbing hover:bg-elevated text-secondary hover:text-primary shrink-0"
                   >
                     <GripVertical className="w-3.5 h-3.5" />
@@ -2125,7 +2246,7 @@ export function PostComposer({
                     spellCheckEnabled={spellCheckEnabled}
                     placeholder={
                       index === 0 && block.type === 'paragraph' && span === 12
-                        ? "Apenas poste... (Digite '/' para inserir blocos ou selecione o texto para realçar)"
+                        ? "Compartilhe seu Insight... (Digite '/' para inserir blocos ou selecione o texto para realçar)"
                         : block.type === 'h1'
                         ? 'Título...'
                         : block.type === 'h2'
@@ -3661,8 +3782,15 @@ export function PostComposer({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                const id = extractSpotifyTrackId(e.currentTarget.value);
-                                if (id) updateBlock(block.id, { spotifyTrackId: id });
+                                const value = e.currentTarget.value.trim();
+                                const id = /spotify/i.test(value) ? extractSpotifyTrackId(value) : null;
+                                if (id) {
+                                  updateBlock(block.id, { spotifyTrackId: id });
+                                } else if (value) {
+                                  // nome da música: abre a pesquisa já com o texto
+                                  setSpotifyInitialQuery(value);
+                                  setSpotifySearchForBlockId(block.id);
+                                }
                               }
                             }}
                             className="flex-1 min-w-0 bg-transparent text-xs text-primary placeholder:text-muted focus:outline-none"
@@ -4031,7 +4159,11 @@ export function PostComposer({
       {/* MODAL DE PESQUISA DE MÚSICAS PARA O BLOCO SPOTIFY DO POST */}
       <SpotifySearchModal
         isOpen={Boolean(spotifySearchForBlockId)}
-        onClose={() => setSpotifySearchForBlockId(null)}
+        initialQuery={spotifyInitialQuery}
+        onClose={() => {
+          setSpotifySearchForBlockId(null);
+          setSpotifyInitialQuery('');
+        }}
         onSelectTrack={(trackQuery) => {
           if (spotifySearchForBlockId) {
             updateBlock(spotifySearchForBlockId, { spotifyTrackId: trackQuery });

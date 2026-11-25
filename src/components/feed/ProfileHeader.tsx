@@ -10,6 +10,7 @@ import { Profile } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
+import { moderateNow } from '@/components/moderation/ModerationHost';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
@@ -1065,6 +1066,8 @@ export function ProfileHeader({
         : { avatar_url: finalPublicUrl };
 
     await supabase.from('profiles').update(updatePayload).eq('id', profile.id);
+    // foto de perfil/capa passa pela moderação (bloqueada volta ao padrão)
+    await moderateNow('profile', profile.id);
     if (onProfileUpdated) onProfileUpdated();
   }
 
@@ -1085,6 +1088,7 @@ export function ProfileHeader({
       })
       .eq('id', profile.id);
 
+    if (!error) await moderateNow('profile', profile.id);
     setSavingProfile(false);
 
     if (!error) {

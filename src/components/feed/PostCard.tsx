@@ -1,6 +1,10 @@
 'use client';
 
-import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { ModerationBanner } from '@/components/moderation/ModerationBanner';
+import { moderateNow } from '@/components/moderation/ModerationHost';
+import { MediaCarousel } from '@/components/media/MediaCarousel';
+import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
@@ -31,6 +35,7 @@ import {
   Repeat2,
   Heart,
   Share2,
+  Bookmark,
   Trash2,
   Pencil,
   Pin,
@@ -60,7 +65,49 @@ interface PostCardProps {
 }
 
 // HTML de usuário passa pelo DOMPurify (lista branca); o filtro por regex anterior era contornável
-const sanitizeBlockHtml = sanitizeUserHtml;
+const sanitizeBlockHtml = (html?: string | null) => linkifyMentionsHtml(sanitizeUserHtml(html));
+
+/** Mídia que pode entrar no carrossel: imagem/vídeo/GIF ocupando a linha toda, sem spoiler. */
+function isCarouselMedia(b: PostBlock) {
+  const full = !b.gridSpan || b.gridSpan >= 12;
+  const media = (b.type === 'image' && Boolean(b.imageUrl)) || ((b.type === 'video' || b.type === 'gif') && Boolean(b.videoUrl));
+  return media && full && !b.spoiler;
+}
+
+function isBlankText(b: PostBlock) {
+  return b.type === 'paragraph' && !b.spoiler && !(b.html || '').replace(/<[^>]*>|&nbsp;|\s/g, '');
+}
+
+type BlockRun = { kind: 'block'; block: PostBlock; index: number } | { kind: 'carousel'; blocks: PostBlock[]; start: number };
+
+/** Duas ou mais mídias seguidas viram um carrossel (estilo Instagram). */
+function groupMediaRuns(blocks: PostBlock[]): BlockRun[] {
+  const out: BlockRun[] = [];
+  for (let i = 0; i < blocks.length; ) {
+    if (isCarouselMedia(blocks[i])) {
+      // junta as mídias seguidas, pulando parágrafos vazios entre elas
+      const media: PostBlock[] = [blocks[i]];
+      let end = i + 1;
+      let k = i + 1;
+      while (k < blocks.length) {
+        if (isCarouselMedia(blocks[k])) {
+          media.push(blocks[k]);
+          end = ++k;
+        } else if (isBlankText(blocks[k])) {
+          k++;
+        } else break;
+      }
+      if (media.length >= 2) {
+        out.push({ kind: 'carousel', blocks: media, start: i });
+        i = end;
+        continue;
+      }
+    }
+    out.push({ kind: 'block', block: blocks[i], index: i });
+    i++;
+  }
+  return out;
+}
 
 function getProfileHref(_profileId?: string | null, username?: string | null) {
   if (username) return `/u/${encodeURIComponent(username)}`;
@@ -177,18 +224,76 @@ export function PostCard({
   // Usuário logado vem do provedor global (uma consulta para o site todo) e
   // curtida/repost são buscados em lote com os outros cartões da tela.
   const { viewer } = useNitro();
+  // moderação: status e +18 (atualizados ao vivo quando o veredito chega)
+  const [modStatus, setModStatus] = useState(post.moderation_status || 'approved');
+  const [isNsfw, setIsNsfw] = useState(Boolean(post.is_nsfw));
+  const [modReason, setModReason] = useState(post.moderation_reason || null);
+  useEffect(() => {
+    setModStatus(post.moderation_status || 'approved');
+    setIsNsfw(Boolean(post.is_nsfw));
+    setModReason(post.moderation_reason || null);
+  }, [post.id, post.moderation_status, post.is_nsfw, post.moderation_reason]);
+  useEffect(() => {
+    const onUpdate = (e: Event) => {
+      const o = (e as CustomEvent<{ entityType?: string; kind?: string; entityId?: string; id?: string; status?: string; verdict?: string; isNsfw?: boolean; reason?: string }>).detail;
+      if ((o?.entityType || o?.kind) !== 'post' || (o?.entityId || o?.id) !== post.id) return;
+      const st = o.status || (o.verdict === 'BLOCK' ? 'blocked' : o.verdict === 'REVIEW' ? 'review' : 'approved');
+      setModStatus(st as typeof modStatus);
+      setIsNsfw(Boolean(o.isNsfw ?? o.verdict === 'NSFW'));
+      if (o.reason) setModReason(o.reason);
+    };
+    window.addEventListener('insight-moderation-updated', onUpdate);
+    return () => window.removeEventListener('insight-moderation-updated', onUpdate);
+  }, [post.id]);
+  const isPostOwner = Boolean(viewer && (viewer.id === post.author_id || viewer.id === post.profile_id));
+  // o próprio autor ainda pendente: pede o veredito (se o editor não pediu)
+  useEffect(() => {
+    if (isPostOwner && modStatus === 'pending') {
+      const t = setTimeout(() => void moderateNow('post', post.id), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [isPostOwner, modStatus, post.id]);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [savingPost, setSavingPost] = useState(false);
+
+  // Salvar para ler depois (lista privada em "Sua atividade" → Salvos)
+  async function handleToggleSave() {
+    if (!viewer) {
+      window.location.href = '/login';
+      return;
+    }
+    if (savingPost) return;
+    const next = !hasSaved;
+    setHasSaved(next);
+    setSavingPost(true);
+    setPostFlag(post.id, viewer.id, { saved: next });
+    const supabase = createClient();
+    const { error } = next
+      ? await supabase.from('post_saves').insert({ post_id: post.id, profile_id: viewer.id })
+      : await supabase.from('post_saves').delete().eq('post_id', post.id).eq('profile_id', viewer.id);
+    if (error && !/duplicate/i.test(error.message)) {
+      setHasSaved(!next);
+      setPostFlag(post.id, viewer.id, { saved: !next });
+    } else {
+      window.dispatchEvent(new CustomEvent('insight-saves-changed'));
+    }
+    setSavingPost(false);
+  }
+
   useEffect(() => {
     let active = true;
     setLoggedUserProfile(viewer);
     if (!viewer) {
       setHasLiked(false);
       setHasReposted(false);
+      setHasSaved(false);
       return;
     }
     getPostFlags(post.id, viewer.id).then((f) => {
       if (!active) return;
       setHasLiked(f.liked);
       setHasReposted(f.reposted);
+      setHasSaved(f.saved);
     });
     return () => {
       active = false;
@@ -466,7 +571,7 @@ export function PostCard({
   const renderBlock = (b: PostBlock, idx: number): React.ReactNode => {
             const fontCls = getFontClass(b.fontStyle);
             const alignStyle = { textAlign: b.align || 'left' } as const;
-            const cellStyle = gridCellStyle(b.gridSpan, b.gridStart);
+            const cellStyle = gridCellStyle(b.gridSpan, b.gridStart, b.blockHeight);
 
             if (b.type === 'divider') {
               return (
@@ -532,7 +637,7 @@ export function PostCard({
                   key={b.id || idx}
                   style={cellStyle}
                   className="p-3.5 rounded-xl bg-elevated border border-border font-mono text-xs text-primary overflow-x-auto whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeUserHtml(b.html) }}
                 />
               );
             }
@@ -931,6 +1036,7 @@ export function PostCard({
     <article
       ref={articleRef}
       id={`post-${post.id}`}
+      data-post-view={post.id}
       className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
         isHighlightedFromUrl
           ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
@@ -1066,13 +1172,27 @@ export function PostCard({
             }}
           />
         </div>
-      ) : hasRichBlocks ? (
+      ) : (
+        <NsfwGate active={isNsfw && !isPostOwner}>
+        {hasRichBlocks ? (
         <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
-          {blocksState.map((b, idx) => {
+          {groupMediaRuns(blocksState).map((item) => {
+            if (item.kind === 'carousel') {
+              return (
+                <MediaCarousel
+                  key={`car-${item.blocks[0].id || item.start}`}
+                  slides={item.blocks.map((m, k) => ({
+                    key: m.id || `m-${item.start + k}`,
+                    node: renderBlock({ ...m, imageWidth: '100%', videoWidth: '100%', gridSpan: 12, gridStart: 0 }, item.start + k),
+                  }))}
+                />
+              );
+            }
+            const { block: b, index: idx } = item;
             const rendered = renderBlock(b, idx);
             // o wrapper assume a célula do grid; dentro dele a posição do bloco é ignorada
             return b.spoiler && rendered ? (
-              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart)}>
+              <SpoilerBlock key={`sp-${b.id || idx}`} style={gridCellStyle(b.gridSpan, b.gridStart, b.blockHeight)}>
                 {rendered}
               </SpoilerBlock>
             ) : (
@@ -1117,6 +1237,17 @@ export function PostCard({
             </div>
           )}
         </>
+      )}
+        </NsfwGate>
+      )}
+
+      {isPostOwner && !isEditing && isNsfw && modStatus === 'approved' && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 px-2.5 py-1 text-[11px] font-bold text-amber-500">
+          +18 · aparece borrado para os outros
+        </p>
+      )}
+      {isPostOwner && !isEditing && (
+        <ModerationBanner kind="post" id={post.id} status={modStatus} reason={modReason} onAppealed={() => setModStatus('appealed')} />
       )}
 
       {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}
@@ -1238,6 +1369,18 @@ export function PostCard({
           >
             <Share2 className="w-4 h-4" />
             <span className="hidden sm:inline">Compartilhar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleSave}
+            aria-pressed={hasSaved}
+            aria-label={hasSaved ? 'Remover dos salvos' : 'Salvar Insight'}
+            title={hasSaved ? 'Remover dos salvos' : 'Salvar para ler depois'}
+            className={`flex items-center gap-1.5 py-1 transition-colors ${hasSaved ? 'text-accent font-semibold' : 'hover:text-primary'}`}
+          >
+            <Bookmark className={`w-4 h-4 ${hasSaved ? 'fill-accent text-accent' : ''}`} />
+            <span className="hidden sm:inline">{hasSaved ? 'Salvo' : 'Salvar'}</span>
           </button>
         </div>
 

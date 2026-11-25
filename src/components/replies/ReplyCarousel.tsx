@@ -116,7 +116,9 @@ export function ReplyCarousel({ replies, likedIds, onSelect, onToggleLike, autho
               </div>
 
               <p className="text-sm text-primary leading-relaxed break-words line-clamp-4 flex-1">
-                {reply.content ||
+                {reply.is_nsfw ? (
+                  <span className="inline-flex items-center gap-1.5 text-amber-500 font-semibold">+18 · Conteúdo sensível — abra a conversa para ver</span>
+                ) : reply.content ||
                   (reply.spotify_track_id ? (
                     <span className="inline-flex items-center gap-1.5 text-secondary">
                       <Music className="w-3.5 h-3.5 text-[#1DB954]" /> Compartilhou uma faixa

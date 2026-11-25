@@ -1,4 +1,6 @@
 import { ReplyBlock } from '@/types/database';
+import { MentionText } from '@/components/mentions/MentionText';
+import { CustomSpotifyPlayer } from '@/components/feed/CustomSpotifyPlayer';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 
 /** Renderiza o corpo em blocos de uma resposta (texto puro, sem HTML do usuário). */
@@ -10,7 +12,7 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
           case 'quote':
             return (
               <blockquote key={b.id || i} className="pl-3 border-l-2 border-accent/60 text-secondary italic whitespace-pre-line">
-                {b.text}
+                <MentionText text={b.text} />
               </blockquote>
             );
           case 'code':
@@ -26,7 +28,9 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
                   .split('\n')
                   .filter((l) => l.trim())
                   .map((l, k) => (
-                    <li key={k}>{l}</li>
+                    <li key={k}>
+                      <MentionText text={l} />
+                    </li>
                   ))}
               </ul>
             );
@@ -58,6 +62,10 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
               </div>
             ) : null;
           case 'spotify':
+            // faixa escolhida pela pesquisa (iTunes): player do Insight
+            if (b.trackId && /^it\d{3,15}$/.test(b.trackId)) {
+              return <CustomSpotifyPlayer key={b.id || i} trackId={b.trackId} />;
+            }
             return b.trackId && /^[A-Za-z0-9]{10,40}$/.test(b.trackId) ? (
               <iframe
                 key={b.id || i}
@@ -74,7 +82,7 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
           default:
             return (
               <p key={b.id || i} className="whitespace-pre-line">
-                {b.text}
+                <MentionText text={b.text} />
               </p>
             );
         }

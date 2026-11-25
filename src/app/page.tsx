@@ -13,6 +13,8 @@ import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/com
 import dynamic from 'next/dynamic';
 import { useProgressiveList } from '@/lib/useProgressiveList';
 // o editor só é baixado quando a pessoa abre o compositor
+import { WeeklyRankingCard } from '@/components/feed/WeeklyRankingCard';
+import { DonorThanksBar } from '@/components/feed/DonorThanksBar';
 const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import {
@@ -412,6 +414,9 @@ function CommunityHomeFeed() {
 
   return (
     <div className="w-full min-h-screen bg-background">
+      {/* Agradecimento à doação mais recente (cada pessoa vê uma vez) */}
+      <DonorThanksBar />
+
       {/* 1. CABEÇALHO UNIFICADO: 1 LINHA LIMPA NO MOBILE + BUSCA EXPANSÍVEL */}
       <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border">
         <div className="px-4 sm:px-6 flex items-center justify-between gap-2">
@@ -627,6 +632,9 @@ function CommunityHomeFeed() {
           })}
         </div>
       )}
+
+      {/* Domingo: ranking semanal de contribuição */}
+      {activeTab !== 'members' && activeTab !== 'news' && !search.trim() && <WeeklyRankingCard />}
 
       {/* 4. CONTEÚDO COM ANIMAÇÃO DO ASTERISCO GIRANDO */}
       {loading || tabSwitching ? (

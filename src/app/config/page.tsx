@@ -1,5 +1,7 @@
 'use client';
 
+import { applyWarmOverlay, PREFS_EVENT } from '@/lib/nightLight';
+
 import { autoFocusModeEnabled, setAutoFocusModeEnabled } from '@/lib/useAutoFocusMode';
 import { PasswordStrength, validateNewPassword } from '@/components/account/PasswordStrength';
 import { VerifiedBadge } from '@/components/account/VerifiedBadge';
@@ -51,6 +53,10 @@ interface UserPreferences {
   readingMode: boolean;
   readingFont: ReadingFontOption;
   warmFilter: number;
+  nightLight: boolean;
+  nightStart: string;
+  nightEnd: string;
+  nightStrength: number;
   accentColor: string;
   reduceMotion: boolean;
 }
@@ -137,6 +143,10 @@ const DEFAULT_PREFS: UserPreferences = {
   readingMode: false,
   readingFont: 'sans',
   warmFilter: 0,
+  nightLight: false,
+  nightStart: '21:00',
+  nightEnd: '06:00',
+  nightStrength: 25,
   accentColor: '#2563eb',
   reduceMotion: false,
 };
@@ -306,10 +316,7 @@ export default function ConfigPage() {
 
     root.style.setProperty('--accent', nextPrefs.accentColor);
     root.style.setProperty('--accent-hover', nextPrefs.accentColor);
-    root.style.setProperty(
-      '--warm-overlay-opacity',
-      (nextPrefs.warmFilter / 100).toFixed(2)
-    );
+    applyWarmOverlay(nextPrefs);
   }
 
   useEffect(() => {
@@ -329,6 +336,10 @@ export default function ConfigPage() {
           readingMode: Boolean(parsed.readingMode),
           readingFont: parsed.readingFont || 'sans',
           warmFilter: typeof parsed.warmFilter === 'number' ? parsed.warmFilter : 0,
+          nightLight: Boolean(parsed.nightLight),
+          nightStart: parsed.nightStart || '21:00',
+          nightEnd: parsed.nightEnd || '06:00',
+          nightStrength: typeof parsed.nightStrength === 'number' ? parsed.nightStrength : 25,
           accentColor: parsed.accentColor || '#2563eb',
           reduceMotion: Boolean(parsed.reduceMotion),
         };
@@ -452,11 +463,24 @@ export default function ConfigPage() {
     };
   }, [newUsername, myProfile, supabase]);
 
+  // atalho Ctrl+Shift+L muda o modo leitura de qualquer tela: mantém o switch em dia
+  useEffect(() => {
+    function sync(e: Event) {
+      const d = (e as CustomEvent<Partial<UserPreferences>>).detail;
+      if (d && typeof d.readingMode === 'boolean') {
+        setPrefs((p) => (p.readingMode === d.readingMode ? p : { ...p, readingMode: Boolean(d.readingMode) }));
+      }
+    }
+    window.addEventListener(PREFS_EVENT, sync);
+    return () => window.removeEventListener(PREFS_EVENT, sync);
+  }, []);
+
   function updatePreferences(patch: Partial<UserPreferences>) {
     const nextPrefs = { ...prefs, ...patch };
     setPrefs(nextPrefs);
     localStorage.setItem('insight-preferences', JSON.stringify(nextPrefs));
     applyPreferencesToDOM(nextPrefs);
+    window.dispatchEvent(new CustomEvent(PREFS_EVENT, { detail: nextPrefs }));
   }
 
   function handleResetVisualPreferences() {
@@ -1015,7 +1039,7 @@ export default function ConfigPage() {
               Plano de fundo
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {[
                 {
                   id: 'light' as ThemeOption,
@@ -1092,6 +1116,24 @@ export default function ConfigPage() {
                   </button>
                 );
               })}
+
+              {/* Insight Nitro: mais fundos (temas) — borda arco-íris */}
+              <Link
+                href={nitroActive ? '/nitro' : '/nitro/assinar'}
+                className="nitro-rainbow-border group block h-16 rounded-xl p-[2px] transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span className="h-full w-full rounded-[10px] bg-surface flex items-center gap-2.5 px-3">
+                  <NitroZap className="w-5 h-5 text-fuchsia-400 shrink-0" />
+                  <span className="min-w-0 leading-tight">
+                    <span className="block text-xs sm:text-sm font-extrabold bg-gradient-to-r from-sky-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent truncate">
+                      {nitroActive ? 'Acessar Nitro' : 'Assinar Nitro'}
+                    </span>
+                    <span className="block text-[10px] text-muted truncate">
+                      {nitroActive ? 'Seus temas e fundos' : 'Para obter mais fundos'}
+                    </span>
+                  </span>
+                </span>
+              </Link>
             </div>
 
             {/* Opções de Leitura Confortável e Filtro Quente integradas sem cards */}
@@ -1141,6 +1183,60 @@ export default function ConfigPage() {
                   }
                   className="w-full accent-accent cursor-pointer h-1.5 bg-elevated rounded-lg"
                 />
+              </div>
+
+              {/* Luz noturna laranja agendada */}
+              <div className="space-y-3 rounded-xl border border-border bg-elevated/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">Luz noturna automática</p>
+                    <p className="text-xs text-muted">Liga o filtro laranja sozinho no horário escolhido</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    aria-label="Ativar luz noturna automática"
+                    className="w-4 h-4 accent-accent cursor-pointer"
+                    checked={Boolean(mounted && prefs.nightLight)}
+                    onChange={() => updatePreferences({ nightLight: !prefs.nightLight })}
+                  />
+                </div>
+                {mounted && prefs.nightLight && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-secondary">
+                      <label className="flex items-center gap-2">
+                        Das
+                        <input
+                          type="time"
+                          value={prefs.nightStart}
+                          onChange={(e) => e.target.value && updatePreferences({ nightStart: e.target.value })}
+                          className="bg-surface border border-border rounded-md px-2 py-1 text-primary"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2">
+                        às
+                        <input
+                          type="time"
+                          value={prefs.nightEnd}
+                          onChange={(e) => e.target.value && updatePreferences({ nightEnd: e.target.value })}
+                          className="bg-surface border border-border rounded-md px-2 py-1 text-primary"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted shrink-0">Intensidade</span>
+                      <input
+                        type="range"
+                        min={10}
+                        max={40}
+                        step={5}
+                        value={prefs.nightStrength}
+                        onChange={(e) => updatePreferences({ nightStrength: Number(e.target.value) })}
+                        className="flex-1 accent-accent cursor-pointer h-1.5 bg-elevated rounded-lg"
+                      />
+                      <span className="text-xs font-mono font-bold text-accent w-9 text-right">{prefs.nightStrength}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Tipografia das Publicações */}

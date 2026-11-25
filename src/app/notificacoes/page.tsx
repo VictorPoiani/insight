@@ -21,11 +21,16 @@ import {
   Trash2,
   Settings2,
   BarChart3,
+  AtSign,
+  ListChecks,
+  Square,
+  CheckSquare,
+  X,
 } from 'lucide-react';
 import { NotificationSettings } from '@/components/notifications/NotificationSettings';
 
 type MainBoxTab = 'inbox' | 'official';
-type InteractionFilter = 'all' | 'like' | 'reply' | 'poll_vote' | 'follow' | 'repost' | 'new_post';
+type InteractionFilter = 'all' | 'like' | 'reply' | 'mention' | 'poll_vote' | 'follow' | 'repost' | 'new_post';
 
 interface NotificationItem {
   id: string;
@@ -77,6 +82,8 @@ export default function NotificationsPage() {
   const [lastReadOfficialAt, setLastReadOfficialAt] = useState<number>(0);
 
   const [loading, setLoading] = useState(true);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const loadAllNotifications = useCallback(async () => {
     setLoading(true);
@@ -245,6 +252,37 @@ export default function NotificationsPage() {
       .eq('is_read', true);
   }
 
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
+
+  async function handleDeleteSelected() {
+    if (!myProfile || selected.size === 0) return;
+    const ids = Array.from(selected);
+    const label = ids.length === 1 ? 'esta notificação' : `estas ${ids.length} notificações`;
+    if (!window.confirm(`Apagar ${label}?`)) return;
+    setNotifications((prev) => prev.filter((n) => !selected.has(n.id)));
+    exitSelectMode();
+    for (let i = 0; i < ids.length; i += 100) {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('recipient_id', myProfile.id)
+        .in('id', ids.slice(i, i + 100));
+    }
+    window.dispatchEvent(new Event('insight-notifications-updated'));
+  }
+
   const unreadInboxCount = useMemo(
     () => notifications.filter((n) => !n.is_read).length,
     [notifications]
@@ -276,6 +314,12 @@ export default function NotificationsPage() {
           icon: MessageCircle,
           iconClass: 'text-accent',
           actionText: 'respondeu ao seu insight',
+        };
+      case 'mention':
+        return {
+          icon: AtSign,
+          iconClass: 'text-violet-400',
+          actionText: 'mencionou você',
         };
       case 'poll_vote':
         return {
@@ -314,6 +358,7 @@ export default function NotificationsPage() {
     { id: 'all', label: 'Todas' },
     { id: 'like', label: 'Curtidas' },
     { id: 'reply', label: 'Respostas' },
+    { id: 'mention', label: 'Menções' },
     { id: 'poll_vote', label: 'Enquetes' },
     { id: 'follow', label: 'Seguidores' },
     { id: 'repost', label: 'Reposts' },
@@ -362,7 +407,22 @@ export default function NotificationsPage() {
               </button>
             )}
 
-            {mainTab === 'inbox' && notifications.some((n) => n.is_read) && (
+            {mainTab === 'inbox' && myProfile && notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+                title={selectMode ? 'Cancelar seleção' : 'Selecionar notificações para apagar'}
+                aria-label={selectMode ? 'Cancelar seleção' : 'Selecionar notificações'}
+                aria-pressed={selectMode}
+                className={`p-2 rounded-full transition-colors ${
+                  selectMode ? 'text-accent bg-surface' : 'text-muted hover:text-primary hover:bg-surface'
+                }`}
+              >
+                {selectMode ? <X className="w-4 h-4" /> : <ListChecks className="w-4 h-4" />}
+              </button>
+            )}
+
+            {mainTab === 'inbox' && !selectMode && notifications.some((n) => n.is_read) && (
               <button
                 type="button"
                 onClick={handleClearReadNotifications}
@@ -570,6 +630,32 @@ export default function NotificationsPage() {
       ) : (
         /* LISTA DE INTERAÇÕES EM MINHA CAIXA */
         <div className="divide-y divide-border">
+          {selectMode && (() => {
+            const allSelected = filteredInbox.length > 0 && filteredInbox.every((n) => selected.has(n.id));
+            return (
+              <div className="sticky top-[118px] z-20 px-4 sm:px-6 py-2.5 bg-surface/95 backdrop-blur border-b border-border flex items-center justify-between gap-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelected(allSelected ? new Set() : new Set(filteredInbox.map((n) => n.id)))
+                  }
+                  className="inline-flex items-center gap-2 font-bold text-primary"
+                >
+                  {allSelected ? <CheckSquare className="w-4 h-4 text-accent" /> : <Square className="w-4 h-4 text-muted" />}
+                  {allSelected ? 'Desmarcar todas' : 'Selecionar todas'}
+                </button>
+                <span className="text-muted">{selected.size} selecionada{selected.size === 1 ? '' : 's'}</span>
+                <button
+                  type="button"
+                  disabled={selected.size === 0}
+                  onClick={handleDeleteSelected}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-danger/10 text-danger font-bold disabled:opacity-40"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Apagar
+                </button>
+              </div>
+            );
+          })()}
           {filteredInbox.map((notif) => {
             const meta = getNotificationMeta(notif);
             const Icon = meta.icon;
@@ -587,17 +673,42 @@ export default function NotificationsPage() {
                 ? `/post/${notif.post_id}`
                 : `/u/${encodeURIComponent(actorHandle)}`;
 
-            return (
-              <Link
-                key={notif.id}
-                href={targetHref}
-                onClick={() => {
-                  if (!notif.is_read) handleMarkSingleRead(notif.id);
-                }}
-                className={`px-4 sm:px-6 py-4 flex items-start gap-3.5 transition-colors hover:bg-surface/40 ${
-                  !notif.is_read ? 'bg-accent/[0.06]' : ''
-                }`}
-              >
+            const isSelected = selected.has(notif.id);
+            const rowClass = `px-4 sm:px-6 py-4 flex items-start gap-3.5 transition-colors hover:bg-surface/40 ${
+              isSelected ? 'bg-accent-soft' : !notif.is_read ? 'bg-accent/[0.06]' : ''
+            }`;
+            const renderRow = (children: React.ReactNode) =>
+              selectMode ? (
+                <button
+                  key={notif.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isSelected}
+                  onClick={() => toggleSelected(notif.id)}
+                  className={`w-full text-left ${rowClass}`}
+                >
+                  {isSelected ? (
+                    <CheckSquare className="w-5 h-5 text-accent shrink-0 mt-2.5" />
+                  ) : (
+                    <Square className="w-5 h-5 text-muted shrink-0 mt-2.5" />
+                  )}
+                  {children}
+                </button>
+              ) : (
+                <Link
+                  key={notif.id}
+                  href={targetHref}
+                  onClick={() => {
+                    if (!notif.is_read) handleMarkSingleRead(notif.id);
+                  }}
+                  className={rowClass}
+                >
+                  {children}
+                </Link>
+              );
+
+            return renderRow(
+              <>
                 {/* Avatar com selo do tipo de interação */}
                 <div className="relative shrink-0">
                   <img
@@ -634,7 +745,7 @@ export default function NotificationsPage() {
                 {!notif.is_read && (
                   <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-2" />
                 )}
-              </Link>
+              </>
             );
           })}
         </div>

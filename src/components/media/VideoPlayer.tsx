@@ -338,6 +338,7 @@ export function VideoPlayer({
           setPlaying(true);
           setStarted(true);
           if (!gif) window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id.current }));
+          if (!gif && !started) window.dispatchEvent(new CustomEvent('insight-activity', { detail: { kind: 'video' } }));
           poke();
         }}
         onPause={() => {

@@ -9,6 +9,9 @@ import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getTopicLimit } from '@/lib/contributorLevels';
 import { TopicWorkspaceView } from './TopicWorkspaceView';
+import { NsfwGate } from '@/components/moderation/NsfwGate';
+import { ModerationBanner } from '@/components/moderation/ModerationBanner';
+import { moderateNow } from '@/components/moderation/ModerationHost';
 import {
   CustomTopic,
   PostBlock,
@@ -201,6 +204,9 @@ export function buildInitialWorkspaceData(template: TopicTemplateType): TopicWor
           },
         ],
       };
+
+    case 'writing':
+      return { writings: [] };
 
     case 'diet':
       return {
@@ -449,6 +455,7 @@ export function TopicTabsManager({
   ];
 
   const currentTab = allTabs.find((t) => t.id === activeTabId) || baseDefaultTabs[0];
+  const currentTopicRow = customTopics.find((ct) => ct.id === currentTab.id) || null;
 
   const templatesCatalog = useMemo(
     () => [
@@ -499,6 +506,14 @@ export function TopicTabsManager({
         subtitle: 'Controlo diário de refeições, macronutrientes e hidratação.',
         defaultIcon: 'nutrition' as TopicIconKey,
         defaultColor: '#f59e0b',
+      },
+      {
+        type: 'writing' as TopicTemplateType,
+        section: 'models',
+        title: 'Poemas & Livros',
+        subtitle: 'Mural de poemas, crônicas e capítulos ligado ao My Notebook.',
+        defaultIcon: 'book' as TopicIconKey,
+        defaultColor: '#d97706',
       },
       {
         type: 'agenda' as TopicTemplateType,
@@ -670,6 +685,9 @@ export function TopicTabsManager({
     };
 
     setCustomTopics((prev) => [...prev, created]);
+    void moderateNow('topic', created.id).then((o) => {
+      if (o) setCustomTopics((prev) => prev.map((ct) => (ct.id === created.id ? { ...ct, moderation_status: o.status as CustomTopic['moderation_status'], is_nsfw: o.isNsfw, moderation_reason: o.reason || null } : ct)));
+    });
     setSelectedTemplate(null);
     setName('');
     setTag('');
@@ -1306,6 +1324,34 @@ export function TopicTabsManager({
                           </button>
                         )}
 
+                        {modelItems.some((i) => i.type === 'writing') && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChooseTemplate(
+                                'writing',
+                                'Poemas & Livros',
+                                'book',
+                                '#d97706',
+                                'Poemas, crônicas e capítulos — escritos aqui ou trazidos do My Notebook.'
+                              )
+                            }
+                            className="group rounded-2xl bg-amber-700/[0.08] hover:bg-amber-700/[0.14] border border-amber-600/25 hover:border-amber-600/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
+                          >
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">Poemas & Livros</h3>
+                              <p className="text-xs text-secondary mt-1">
+                                Mural de escritos ligado ao My Notebook.
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-background/60 border border-border p-3 font-serif text-[11px] italic text-secondary leading-relaxed">
+                              <p className="not-italic font-bold text-primary text-xs mb-1">Soneto do recomeço</p>
+                              <p>De tudo, ao meu post serei atento</p>
+                              <p>antes, e com tal zelo, e sempre, e tanto…</p>
+                            </div>
+                          </button>
+                        )}
+
                         {modelItems.some((i) => i.type === 'diet') && (
                           <button
                             type="button"
@@ -1706,10 +1752,16 @@ export function TopicTabsManager({
             </div>
           )}
 
+          {/* Moderação do tópico: aviso para o dono */}
+          {currentTopicRow && viewer?.id === currentTopicRow.profile_id && (
+            <ModerationBanner kind="topic" id={currentTopicRow.id} status={currentTopicRow.moderation_status} reason={currentTopicRow.moderation_reason} />
+          )}
+
           {/* 4. Painel de Workspace do Tópico */}
           {!currentTab.isDefault &&
             currentTab.templateType &&
             currentTab.templateType !== 'blank_page' && (
+              <NsfwGate active={Boolean(currentTopicRow?.is_nsfw) && viewer?.id !== currentTopicRow?.profile_id}>
               <TopicWorkspaceView
                 topicId={currentTab.id}
                 topicColor={currentTab.color}
@@ -1727,6 +1779,7 @@ export function TopicTabsManager({
                   );
                 }}
               />
+              </NsfwGate>
             )}
         </>
       )}

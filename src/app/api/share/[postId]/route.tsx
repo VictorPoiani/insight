@@ -33,10 +33,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
   });
   const { data: post } = await supabase
     .from('posts')
-    .select('id, content, blocks, tags, created_at, profile_id, author_id, visibility, is_draft')
+    .select('id, content, blocks, tags, created_at, profile_id, author_id, visibility, is_draft, moderation_status, is_nsfw')
     .eq('id', postId)
     .maybeSingle();
-  if (!post || post.visibility === 'private' || post.is_draft) {
+  // retido pela moderação ou +18: sem imagem de prévia
+  if (!post || post.visibility === 'private' || post.is_draft || post.moderation_status !== 'approved' || post.is_nsfw) {
     return new Response('Post não encontrado', { status: 404 });
   }
   const { data: author } = await supabase

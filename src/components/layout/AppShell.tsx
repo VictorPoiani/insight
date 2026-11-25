@@ -7,9 +7,12 @@ import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { ModerationHost } from '@/components/moderation/ModerationHost';
+import { ActivityPanelHost, openActivityPanel } from '@/components/activity/ActivityPanel';
+import { ActivityTracker } from '@/components/activity/ActivityTracker';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { PresenceProvider } from '@/components/presence/PresenceProvider';
-import { Menu, X, Heart, Info, FileText, Shield, Sparkles } from 'lucide-react';
+import { Menu, X, Heart, Info, FileText, Shield, Sparkles, BarChart3, GraduationCap, Bookmark } from 'lucide-react';
 import { MobileNotificationBell } from '@/components/notifications/MobileNotificationBell';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
@@ -44,6 +47,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <NitroProvider>
         <PresenceProvider>
+          <ActivityTracker />
+      <ActivityPanelHost />
+      <ModerationHost />
           <main className="w-full min-h-screen">{children}</main>
         </PresenceProvider>
       </NitroProvider>
@@ -54,6 +60,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <NitroProvider>
     <PresenceProvider>
     <>
+      <ActivityTracker />
+      <ActivityPanelHost />
+      <ModerationHost />
       {/* Barra superior compacta exclusiva do mobile (acesso a Apoie, Sobre e Termos) */}
       <div className="md:hidden w-full bg-background border-b border-border px-4 h-12 flex items-center justify-between relative z-40">
         <Link href="/" className="inline-flex items-center">
@@ -75,6 +84,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {menuOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-surface/95 backdrop-blur-xl border border-border shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               <Link
+                href="/tutorial"
+                className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors"
+              >
+                <GraduationCap className="w-4 h-4 text-accent" />
+                <span>Tutorial</span>
+              </Link>
+              <Link
                 href="/atualizacoes"
                 className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors"
               >
@@ -82,6 +98,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span>Atualizações</span>
               </Link>
               <NotebookNavItem variant="menu" onNavigate={() => setMenuOpen(false)} />
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  openActivityPanel();
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors text-left"
+              >
+                <BarChart3 className="w-4 h-4 text-accent" />
+                <span>Sua atividade</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  openActivityPanel('saved');
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors text-left"
+              >
+                <Bookmark className="w-4 h-4 text-accent" />
+                <span>Salvos</span>
+              </button>
               <div className="my-1 border-t border-border/70" />
               <Link
                 href="/apoie"

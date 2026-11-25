@@ -183,10 +183,12 @@ export async function POST(req: NextRequest) {
       const admin = createAdminClient();
       const { data: post } = await admin
         .from('posts')
-        .select('id, profile_id, author_id, content, visibility, is_draft')
+        .select('id, profile_id, author_id, content, visibility, is_draft, moderation_status, is_nsfw')
         .eq('id', postId)
         .maybeSingle();
-      if (!post || post.visibility === 'private' || post.is_draft) return NextResponse.json({ sent: 0 });
+      // só conteúdo aprovado pela moderação gera aviso; +18 vai sem o texto
+      if (!post || post.visibility === 'private' || post.is_draft || post.moderation_status !== 'approved') return NextResponse.json({ sent: 0 });
+      if (post.is_nsfw) post.content = '[Conteúdo +18]';
       const { data: author } = await admin
         .from('profiles')
         .select('id, user_id, display_name, full_name, username')

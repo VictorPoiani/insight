@@ -650,6 +650,8 @@ export async function POST(request: Request) {
       const { data: latestPost } = await supabase
         .from('posts')
         .select('content, tags, created_at')
+        .eq('moderation_status', 'approved')
+        .eq('is_nsfw', false)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(1)
@@ -788,10 +790,11 @@ export async function POST(request: Request) {
       const admin = createAdminClient();
       const { data: post } = await admin
         .from('posts')
-        .select('id, profile_id, author_id, content, blocks, tags, is_pinned, visibility, is_draft')
+        .select('id, profile_id, author_id, content, blocks, tags, is_pinned, visibility, is_draft, moderation_status, is_nsfw')
         .eq('id', postId)
         .maybeSingle();
-      if (!post || post.visibility === 'private' || post.is_draft) {
+      // e-mail só com conteúdo aprovado e sem +18
+      if (!post || post.visibility === 'private' || post.is_draft || post.moderation_status !== 'approved' || post.is_nsfw) {
         return NextResponse.json({ ok: true, sent: 0 });
       }
       const ownerId = post.profile_id || post.author_id;

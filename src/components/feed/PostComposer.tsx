@@ -584,6 +584,8 @@ export function PostComposer({
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dragOverBlockId, setDragOverBlockId] = useState<string | null>(null);
+  // soltar na borda esquerda/direita de outro bloco = ficar lado a lado
+  const [dragSide, setDragSide] = useState<'left' | 'right' | null>(null);
   const [dragHoverCol, setDragHoverCol] = useState<number | null>(null);
   const [resizingState, setResizingState] = useState<{
     blockId: string;
@@ -1161,6 +1163,9 @@ export function PostComposer({
     e.preventDefault();
     if (draggedBlockId && draggedBlockId !== targetId) {
       setDragOverBlockId(targetId);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = (e.clientX - rect.left) / Math.max(1, rect.width);
+      setDragSide(x < 0.28 ? 'left' : x > 0.72 ? 'right' : null);
     }
   }
 
@@ -1172,6 +1177,29 @@ export function PostComposer({
     const draggedBlk = blocks.find((b) => b.id === draggedBlockId);
     const span = draggedBlk?.gridSpan || 12;
     const newCol = computeTargetColumn(e.clientX, span);
+    const side = targetId && targetId !== draggedBlockId ? dragSide : null;
+
+    if (side && targetId) {
+      // lado a lado: divide a linha entre o bloco alvo e o arrastado
+      setBlocks((prev) => {
+        const target = prev.find((b) => b.id === targetId);
+        if (!target) return prev;
+        const targetSpan = normalizeGridSpan(target.gridSpan);
+        const nextTargetSpan = targetSpan >= 9 ? 6 : targetSpan;
+        const draggedSpan = Math.max(3, Math.min(12 - nextTargetSpan, normalizeGridSpan(draggedBlk?.gridSpan)));
+        const rest = prev.filter((b) => b.id !== draggedBlockId);
+        const moved = { ...(draggedBlk as PostBlock), gridSpan: draggedSpan, gridStart: 0 };
+        const out = rest.map((b) => (b.id === targetId ? { ...b, gridSpan: nextTargetSpan, gridStart: 0 } : b));
+        const at = out.findIndex((b) => b.id === targetId);
+        out.splice(side === 'left' ? at : at + 1, 0, moved);
+        return out;
+      });
+      setDraggedBlockId(null);
+      setDragOverBlockId(null);
+      setDragSide(null);
+      setDragHoverCol(null);
+      return;
+    }
 
     setBlocks((prev) => {
       const updated = prev.map((b) =>
@@ -1917,7 +1945,10 @@ export function PostComposer({
               draggable={!draggingMindNode}
               onDragStart={(e) => handleDragStart(e, block.id)}
               onDragOver={(e) => handleBlockDragOver(e, block.id)}
-              onDragLeave={() => setDragOverBlockId(null)}
+              onDragLeave={() => {
+                setDragOverBlockId(null);
+                setDragSide(null);
+              }}
               onDrop={(e) => handleGridDrop(e, block.id)}
               style={gridCellStyle(span, start)}
               className={`group relative flex flex-col gap-1.5 rounded-xl p-2 transition-all border min-w-0 ${
@@ -1928,6 +1959,15 @@ export function PostComposer({
                   : 'border-transparent hover:bg-elevated/40'
               }`}
             >
+              {isDragOver && dragSide && (
+                <div
+                  aria-hidden
+                  className={`absolute top-1 bottom-1 w-1 rounded-full bg-accent shadow-[0_0_12px_var(--accent)] z-30 pointer-events-none ${
+                    dragSide === 'left' ? '-left-1.5' : '-right-1.5'
+                  }`}
+                />
+              )}
+
               {/* ALÇA LATERAL DIREITA PARA REDIMENSIONAR ARRASTANDO */}
               <div
                 title="Arraste para os lados para ajustar a largura da célula"
@@ -1964,7 +2004,7 @@ export function PostComposer({
                   </button>
 
                   <div
-                    title="Arraste verticalmente ou horizontalmente"
+                    title="Arraste para reordenar · solte na borda esquerda ou direita de outro bloco para ficarem lado a lado"
                     className="p-1 rounded cursor-grab active:cursor-grabbing hover:bg-elevated text-secondary hover:text-primary shrink-0"
                   >
                     <GripVertical className="w-3.5 h-3.5" />

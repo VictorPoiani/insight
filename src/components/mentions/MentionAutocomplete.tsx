@@ -216,7 +216,7 @@ export function MentionAutocomplete() {
           onMouseDown={(e) => e.preventDefault()}
           onMouseEnter={() => setIndex(i)}
           onClick={() => choose(c)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 text-left ${i === index ? 'bg-accent/15' : ''}`}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 text-left ${i === index ? 'bg-accent-soft' : ''}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={c.avatar_url || '/assets/net/default-perfil'} alt="" className="w-7 h-7 rounded-full object-cover bg-elevated border border-border shrink-0" />

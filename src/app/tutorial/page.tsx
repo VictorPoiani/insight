@@ -228,7 +228,7 @@ export default function TutorialPage() {
             key={s.id}
             href={`#${s.id}`}
             className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-              done.includes(s.id) ? 'bg-accent/15 border-accent/40 text-accent' : 'border-border text-secondary hover:text-primary'
+              done.includes(s.id) ? 'bg-accent-soft border-accent text-accent' : 'border-border text-secondary hover:text-primary'
             }`}
           >
             {i + 1}. {s.title}
@@ -241,9 +241,9 @@ export default function TutorialPage() {
           const Icon = s.icon;
           const isDone = done.includes(s.id);
           return (
-            <li key={s.id} id={s.id} className={`scroll-mt-20 rounded-2xl border p-5 transition-colors ${isDone ? 'border-accent/40 bg-accent/[0.04]' : 'border-border bg-surface/40'}`}>
+            <li key={s.id} id={s.id} className={`scroll-mt-20 rounded-2xl border p-5 transition-colors ${isDone ? 'border-accent bg-accent-soft' : 'border-border bg-surface/40'}`}>
               <div className="flex items-start gap-3">
-                <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <span className="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
                   <Icon className="w-4.5 h-4.5" />
                 </span>
                 <div className="flex-1 min-w-0">

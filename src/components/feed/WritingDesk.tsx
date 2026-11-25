@@ -177,7 +177,7 @@ export function WritingDesk({
 
       {/* Editor */}
       {editing && (
-        <div className="rounded-2xl border border-accent/40 bg-surface p-4 space-y-3">
+        <div className="rounded-2xl border border-accent bg-surface p-4 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             {(Object.keys(KIND_LABEL) as WritingPiece['kind'][]).map((k) => (
               <button

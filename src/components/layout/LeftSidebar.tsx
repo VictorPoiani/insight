@@ -309,16 +309,14 @@ export function LeftSidebar() {
           key={item.href}
           aria-disabled="true"
           title={`${item.name} — em breve`}
-          className={`flex items-center rounded-lg text-sm font-medium text-secondary opacity-60 cursor-not-allowed ${layout}`}
+          className={`flex items-center rounded-lg text-sm font-medium text-secondary opacity-60 cursor-not-allowed ${isCollapsed ? layout : 'gap-3 px-3 py-1.5'}`}
         >
           <Icon className="w-5 h-5 shrink-0" />
           {!isCollapsed && (
-            <>
-              <span className="truncate flex-1">{item.name}</span>
-              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-elevated text-muted border border-border">
-                Em breve
-              </span>
-            </>
+            <span className="flex-1 min-w-0 leading-tight">
+              <span className="block truncate">{item.name}</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted">Em breve</span>
+            </span>
           )}
         </span>
       );

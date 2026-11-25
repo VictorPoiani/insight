@@ -1110,6 +1110,17 @@ export function PostComposer({
     setActiveBlockId(newBlk.id);
     setMenuOpenForBlockId(null);
     setCellConfigOpenForId(null);
+    // leva o cursor para o bloco novo assim que ele aparecer
+    let tries = 0;
+    const focusNew = () => {
+      const el = document.querySelector<HTMLElement>(`[data-block-id="${newBlk.id}"] .notion-editable`);
+      if (el) {
+        el.focus();
+        return;
+      }
+      if (++tries < 10) requestAnimationFrame(focusNew);
+    };
+    requestAnimationFrame(focusNew);
   }
 
   function removeBlock(id: string) {
@@ -1942,6 +1953,7 @@ export function PostComposer({
           return (
             <div
               key={block.id}
+              data-block-id={block.id}
               draggable={!draggingMindNode}
               onDragStart={(e) => handleDragStart(e, block.id)}
               onDragOver={(e) => handleBlockDragOver(e, block.id)}

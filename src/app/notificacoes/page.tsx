@@ -675,7 +675,7 @@ export default function NotificationsPage() {
 
             const isSelected = selected.has(notif.id);
             const rowClass = `px-4 sm:px-6 py-4 flex items-start gap-3.5 transition-colors hover:bg-surface/40 ${
-              isSelected ? 'bg-accent/[0.12]' : !notif.is_read ? 'bg-accent/[0.06]' : ''
+              isSelected ? 'bg-accent-soft' : !notif.is_read ? 'bg-accent/[0.06]' : ''
             }`;
             const renderRow = (children: React.ReactNode) =>
               selectMode ? (

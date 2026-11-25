@@ -170,7 +170,7 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
                     >
                       <div
                         style={{ height: `${Math.max(d.screen_seconds ? 3 : 0, (d.screen_seconds / max) * 100)}%` }}
-                        className={`w-full rounded-t-[4px] transition-colors ${hover === i ? 'bg-accent' : 'bg-accent/70'}`}
+                        className={`w-full rounded-t-[4px] transition-colors ${hover === i ? 'bg-accent' : 'bg-accent opacity-70'}`}
                       />
                     </div>
                   ))}

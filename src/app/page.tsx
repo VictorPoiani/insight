@@ -13,6 +13,7 @@ import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/com
 import dynamic from 'next/dynamic';
 import { useProgressiveList } from '@/lib/useProgressiveList';
 // o editor só é baixado quando a pessoa abre o compositor
+import { WeeklyRankingCard } from '@/components/feed/WeeklyRankingCard';
 import { DonorThanksBar } from '@/components/feed/DonorThanksBar';
 const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -631,6 +632,9 @@ function CommunityHomeFeed() {
           })}
         </div>
       )}
+
+      {/* Domingo: ranking semanal de contribuição */}
+      {activeTab !== 'members' && activeTab !== 'news' && !search.trim() && <WeeklyRankingCard />}
 
       {/* 4. CONTEÚDO COM ANIMAÇÃO DO ASTERISCO GIRANDO */}
       {loading || tabSwitching ? (

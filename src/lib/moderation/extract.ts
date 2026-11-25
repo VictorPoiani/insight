@@ -21,6 +21,22 @@ const IGNORE_KEYS = new Set([
   'ownerProfileId', 'notebookId', 'updatedAt', 'createdAt', 'kind', 'previewUrl', 'fileR2Key', 'videoR2Key',
   'imageR2Key', 'banner_r2_key', 'quoteId', 'nodeId', 'parentId', 'from', 'to', 'source', 'target',
 ]);
+// campos que só contam no bloco do tipo certo
+const TYPE_FIELDS: Record<string, string[]> = {
+  tableData: ['table'],
+  chartData: ['chart'],
+  pollQuestion: ['poll'],
+  pollOptions: ['poll'],
+  mindMapNodes: ['mindmap'],
+  roadmapSteps: ['roadmap'],
+  imageUrl: ['image'],
+  imageCaption: ['image'],
+  videoUrl: ['video', 'gif'],
+  videoCaption: ['video', 'gif'],
+  videoFrames: ['video', 'gif'],
+  fileUrl: ['file'],
+  fileName: ['file'],
+};
 const TRUSTED_MEDIA = /^https:\/\/(media\d*\.giphy\.com|i\.giphy\.com|giphy\.com)\//i; // GIPHY já filtrado (rating G)
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|avif|bmp)(\?|$)/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v)(\?|$)/i;
@@ -51,7 +67,14 @@ function walk(node: unknown, out: { texts: string[]; images: Set<string>; videos
     return;
   }
   if (typeof node === 'object') {
-    for (const [k, v] of Object.entries(node as Record<string, unknown>)) walk(v, out, node as Record<string, unknown>, k);
+    const obj = node as Record<string, unknown>;
+    const blockType = typeof obj.type === 'string' ? obj.type : null;
+    for (const [k, v] of Object.entries(obj)) {
+      // cada bloco carrega dados-modelo de outros tipos (tabela, enquete...): só vale o do próprio tipo
+      const owner = TYPE_FIELDS[k];
+      if (blockType && owner && !owner.includes(blockType)) continue;
+      walk(v, out, obj, k);
+    }
   }
 }
 
@@ -67,9 +90,9 @@ export function collect(...parts: unknown[]): ModerationInput {
 
 /** Colunas lidas de cada tabela. */
 export const ENTITY_SELECT: Record<EntityType, { table: string; columns: string }> = {
-  post: { table: 'posts', columns: 'id, profile_id, author_id, content, blocks, tags, image_url, moderation_status, is_nsfw, moderation_hash, created_at' },
-  reply: { table: 'replies', columns: 'id, post_id, profile_id, content, blocks, image_url, moderation_status, is_nsfw, moderation_hash, created_at' },
-  topic: { table: 'custom_topics', columns: 'id, profile_id, name, tag, banner_url, description_blocks, workspace_data, moderation_status, is_nsfw, moderation_hash' },
+  post: { table: 'posts', columns: 'id, profile_id, author_id, content, blocks, tags, image_url, moderation_status, moderation_reason, is_nsfw, moderation_hash, created_at' },
+  reply: { table: 'replies', columns: 'id, post_id, profile_id, content, blocks, image_url, moderation_status, moderation_reason, is_nsfw, moderation_hash, created_at' },
+  topic: { table: 'custom_topics', columns: 'id, profile_id, name, tag, banner_url, description_blocks, workspace_data, moderation_status, moderation_reason, is_nsfw, moderation_hash' },
   profile: { table: 'profiles', columns: 'id, username, display_name, full_name, nickname, bio, avatar_url, cover_url, banner_url' },
 };
 

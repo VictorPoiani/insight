@@ -1,25 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { EyeOff, Eye, Lock } from 'lucide-react';
 import { useNitro } from '@/components/nitro/NitroProvider';
+import { createClient } from '@/lib/supabase/client';
 
-const AGE_KEY = 'insight-age-confirmed';
-
-function ageConfirmed() {
-  try {
-    return localStorage.getItem(AGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Conteúdo +18: aparece borrado, com aviso, até a pessoa confirmar.
- * A 1ª vez pede a confirmação de idade (lembrada neste aparelho); depois,
- * cada post +18 ainda exige um toque em "Mostrar".
- */
-/** Idade pela data de nascimento do perfil (null = não informada). */
+/** Idade pela data de nascimento 'AAAA-MM-DD' (null = não informada/inválida). */
 function ageFrom(birthday?: string | null): number | null {
   if (!birthday) return null;
   const b = new Date(`${birthday.slice(0, 10)}T12:00:00`);
@@ -30,13 +17,24 @@ function ageFrom(birthday?: string | null): number | null {
   return age;
 }
 
+// data salva nesta sessão (contas antigas que informam agora), compartilhada entre os posts
+let sessionBirthday: string | null = null;
+
+/**
+ * Conteúdo +18: aparece borrado até a pessoa tocar em "Mostrar".
+ * A idade vem da data de nascimento da conta (obrigatória no cadastro), não de
+ * uma autodeclaração: visitante sem conta precisa entrar; menor de 18 nunca vê;
+ * conta antiga sem data informa uma vez (depois só o suporte altera).
+ */
 export function NsfwGate({ active, children, compact = false }: { active: boolean; children: React.ReactNode; compact?: boolean }) {
-  const { viewer } = useNitro();
-  // conta com data de nascimento de menor de 18: nunca libera (ECA / ECA Digital)
-  const age = ageFrom(viewer?.birthday);
-  const minor = age !== null && age < 18;
+  const { viewer, ready } = useNitro();
+  const [savedBirthday, setSavedBirthday] = useState<string | null>(sessionBirthday);
+  const age = ageFrom(viewer?.birthday || savedBirthday);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active) setRevealed(false);
@@ -62,59 +60,101 @@ export function NsfwGate({ active, children, compact = false }: { active: boolea
     );
   }
 
+  async function saveBirthday() {
+    if (!viewer) return;
+    const a = ageFrom(draft);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft) || a === null || a < 0 || a > 120) {
+      setErr('Informe uma data válida.');
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    const { error } = await createClient().from('profiles').update({ birthday: draft }).eq('id', viewer.id);
+    setSaving(false);
+    if (error) {
+      setErr('Não foi possível salvar. Tente de novo.');
+      return;
+    }
+    sessionBirthday = draft;
+    setSavedBirthday(draft);
+    setAsking(false);
+    if (a >= 18) setRevealed(true);
+  }
+
+  let panel: React.ReactNode;
+  if (!ready) {
+    panel = null;
+  } else if (!viewer) {
+    panel = (
+      <div className="space-y-2.5">
+        <span className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-amber-500 text-amber-500 text-sm font-black">+18</span>
+        <p className="text-sm font-bold text-primary">Conteúdo sensível</p>
+        <p className="text-xs text-secondary max-w-xs">Entre na sua conta para ver conteúdo para maiores de 18 anos.</p>
+        <Link href="/login" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500 text-black text-xs font-extrabold hover:bg-amber-400">
+          Entrar
+        </Link>
+      </div>
+    );
+  } else if (age !== null && age < 18) {
+    panel = (
+      <div className="space-y-2.5">
+        <Lock className="w-6 h-6 mx-auto text-muted" />
+        <p className="text-sm font-bold text-primary">Conteúdo para maiores de 18 anos</p>
+        <p className="text-xs text-secondary max-w-xs">Pela data de nascimento da sua conta, este conteúdo não está disponível para você.</p>
+      </div>
+    );
+  } else if (asking) {
+    panel = (
+      <div role="dialog" aria-label="Data de nascimento" className="space-y-3 max-w-xs">
+        <p className="text-sm font-bold text-primary">Qual é a sua data de nascimento?</p>
+        <p className="text-xs text-secondary">Fica salva na sua conta e só o suporte pode alterar depois.</p>
+        <input
+          type="date"
+          value={draft}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setDraft(e.target.value)}
+          className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
+        />
+        {err && <p className="text-[11px] font-semibold text-danger">{err}</p>}
+        <div className="flex justify-center gap-2">
+          <button type="button" onClick={() => setAsking(false)} className="px-3 py-1.5 rounded-full border border-border text-xs font-bold text-secondary">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={saving || !draft}
+            onClick={saveBirthday}
+            className="px-3 py-1.5 rounded-full bg-amber-500 text-black text-xs font-extrabold disabled:opacity-50"
+          >
+            {saving ? 'Salvando…' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    );
+  } else {
+    panel = (
+      <div className="space-y-2.5">
+        <span className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-amber-500 text-amber-500 text-sm font-black">+18</span>
+        <p className="text-sm font-bold text-primary">Conteúdo sensível</p>
+        <p className="text-xs text-secondary max-w-xs">Este Insight pode conter nudez ou conteúdo sexual.</p>
+        <button
+          type="button"
+          onClick={() => (age === null ? setAsking(true) : setRevealed(true))}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500 text-black text-xs font-extrabold hover:bg-amber-400"
+        >
+          <Eye className="w-3.5 h-3.5" /> Mostrar conteúdo +18
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="relative mt-3 rounded-xl overflow-hidden border border-border" onClick={(e) => e.stopPropagation()}>
       {/* conteúdo borrado por baixo: sem foco, sem clique, sem leitor de tela */}
       <div aria-hidden inert className={`pointer-events-none select-none blur-2xl saturate-50 ${compact ? 'max-h-40' : 'max-h-[420px]'} overflow-hidden`}>
         {children}
       </div>
-      <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm p-4 text-center">
-        {minor ? (
-          <div className="space-y-2.5">
-            <Lock className="w-6 h-6 mx-auto text-muted" />
-            <p className="text-sm font-bold text-primary">Conteúdo para maiores de 18 anos</p>
-            <p className="text-xs text-secondary max-w-xs">Pela data de nascimento do seu perfil, este conteúdo não está disponível para você.</p>
-          </div>
-        ) : !asking ? (
-          <div className="space-y-2.5">
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-amber-500 text-amber-500 text-sm font-black">+18</span>
-            <p className="text-sm font-bold text-primary">Conteúdo sensível</p>
-            <p className="text-xs text-secondary max-w-xs">Este Insight pode conter nudez ou conteúdo sexual.</p>
-            <button
-              type="button"
-              onClick={() => (ageConfirmed() ? setRevealed(true) : setAsking(true))}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500 text-black text-xs font-extrabold hover:bg-amber-400"
-            >
-              <Eye className="w-3.5 h-3.5" /> Mostrar conteúdo +18
-            </button>
-          </div>
-        ) : (
-          <div role="dialog" aria-label="Confirmação de idade" className="space-y-3 max-w-xs">
-            <p className="text-sm font-bold text-primary">Você tem 18 anos ou mais?</p>
-            <p className="text-xs text-secondary">Conteúdo adulto só pode ser visto por maiores de idade.</p>
-            <div className="flex justify-center gap-2">
-              <button type="button" onClick={() => setAsking(false)} className="px-3 py-1.5 rounded-full border border-border text-xs font-bold text-secondary">
-                Não
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    localStorage.setItem(AGE_KEY, '1');
-                  } catch {
-                    /* modo privado: pergunta de novo da próxima vez */
-                  }
-                  setAsking(false);
-                  setRevealed(true);
-                }}
-                className="px-3 py-1.5 rounded-full bg-amber-500 text-black text-xs font-extrabold"
-              >
-                Sim, tenho 18+
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm p-4 text-center">{panel}</div>
     </div>
   );
 }

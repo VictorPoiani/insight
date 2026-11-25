@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  CalendarDays,
 } from 'lucide-react';
 
 // ============================================================================
@@ -176,6 +177,19 @@ function ExtrudedAsterisk3D({
   );
 }
 
+/** Idade completa em anos a partir de 'AAAA-MM-DD' (null se inválida). */
+function ageFromDate(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const b = new Date(y, m - 1, d);
+  if (b.getFullYear() !== y || b.getMonth() !== m - 1 || b.getDate() !== d) return null;
+  const now = new Date();
+  if (b > now) return null;
+  let age = now.getFullYear() - y;
+  if (now.getMonth() < m - 1 || (now.getMonth() === m - 1 && now.getDate() < d)) age--;
+  return age > 120 ? null : age;
+}
+
 export default function LoginPage() {
   const supabase = createClient();
 
@@ -191,6 +205,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [birthday, setBirthday] = useState('');
 
   const [usernameStatus, setUsernameStatus] = useState<
     'idle' | 'checking' | 'available' | 'taken' | 'invalid'
@@ -327,6 +342,16 @@ export default function LoginPage() {
 
     if (RESERVED_USERNAMES.has(cleanUsername)) {
       setError('Este @username é reservado pelo sistema. Escolha outro.');
+      return;
+    }
+
+    const age = ageFromDate(birthday);
+    if (age === null) {
+      setError('Informe sua data de nascimento completa e válida.');
+      return;
+    }
+    if (age < 13) {
+      setError('O Insight é para pessoas com 13 anos ou mais.');
       return;
     }
 
@@ -486,12 +511,22 @@ export default function LoginPage() {
             username: cleanUsername,
             // o banco valida e consome o convite na criação da conta
             invite_code: IS_CLOSED_BETA ? cleanCode : undefined,
+            // obrigatória: o banco recusa a conta sem data válida ou com menos de 13 anos
+            birthday,
           },
         },
       });
 
       if (signUpError) {
         const low = signUpError.message.toLowerCase();
+        if (low.includes('birthday_underage')) {
+          setSignupStep(1);
+          throw new Error('O Insight é para pessoas com 13 anos ou mais.');
+        }
+        if (low.includes('birthday_required')) {
+          setSignupStep(1);
+          throw new Error('Informe sua data de nascimento completa e válida.');
+        }
         if (low.includes('database error saving new user') || low.includes('invite_required')) {
           throw new Error('Código de convite inválido, expirado ou já utilizado.');
         }
@@ -767,6 +802,10 @@ export default function LoginPage() {
                 {username})
               </p>
               <p>
+                Nascimento:{' '}
+                <b className={isDark ? 'text-white' : 'text-slate-900'}>{birthday.split('-').reverse().join('/')}</b>
+              </p>
+              <p>
                 E-mail vinculado:{' '}
                 <b className={isDark ? 'text-white' : 'text-slate-900'}>{email}</b>
               </p>
@@ -950,6 +989,29 @@ export default function LoginPage() {
                         }`}
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Data de Nascimento</label>
+                    <div className="relative">
+                      <CalendarDays
+                        className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${
+                          isDark ? 'text-zinc-500' : 'text-slate-400'
+                        }`}
+                      />
+                      <input
+                        type="date"
+                        required
+                        min="1900-01-01"
+                        max={new Date().toISOString().slice(0, 10)}
+                        value={birthday}
+                        onChange={(e) => setBirthday(e.target.value)}
+                        className={`${inputClass} ${isDark ? '[color-scheme:dark]' : ''}`}
+                      />
+                    </div>
+                    <p className={`mt-1 text-[11px] ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
+                      Obrigatória. É preciso ter 13 anos ou mais.
+                    </p>
                   </div>
                 </>
               )}

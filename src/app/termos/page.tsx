@@ -159,9 +159,11 @@ export default function TermosPage() {
           </p>
           <p>
             <strong>3.1-A. Conteúdo +18 e menores:</strong> Conteúdo marcado como +18 é exclusivo para
-            maiores de 18 anos. A Plataforma bloqueia esse conteúdo quando a data de nascimento do
-            perfil indica menos de 18 anos e pede confirmação de idade nos demais casos. Informar data
-            de nascimento falsa para acessar conteúdo adulto viola estes Termos. Os responsáveis podem
+            maiores de 18 anos. A data de nascimento é obrigatória no cadastro, e contas com menos de
+            13 anos não são criadas. O conteúdo +18 só é exibido a contas cuja data de nascimento
+            indica 18 anos ou mais; visitantes sem conta não o veem. Depois de informada, a data só
+            pode ser corrigida pelo suporte. Informar data de nascimento falsa viola estes Termos e
+            pode levar à suspensão da conta. Os responsáveis podem
             pedir, pelo canal da Cláusula 12, o bloqueio ou a exclusão da conta de um adolescente.
           </p>
           <p>

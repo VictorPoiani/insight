@@ -289,6 +289,16 @@ export default function AboutPage() {
   const [stats, setStats] = useState({ posts: 0, members: 0, topics: 0, updates: 0 });
   const [founder, setFounder] = useState<{ avatar_url?: string | null; display_name?: string | null } | null>(null);
 
+  // página imersiva: recolhe as barras laterais ao abrir e devolve ao sair
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 767px)').matches) return;
+    const emit = (collapse: boolean) => {
+      window.dispatchEvent(new CustomEvent('insight-toggle-focus-mode', { detail: { collapse, auto: true } }));
+    };
+    emit(true);
+    return () => emit(false);
+  }, []);
+
   useEffect(() => {
     const id = setInterval(() => setWord((w) => (w + 1) % WORDS.length), 2200);
     return () => clearInterval(id);

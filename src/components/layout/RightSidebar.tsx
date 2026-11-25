@@ -20,6 +20,7 @@ import {
   BarChart3,
   GraduationCap,
   Sparkles,
+  Info,
 } from 'lucide-react';
 
 const SUPPORT_EMAIL = 'contato.insightproject@gmail.com';
@@ -254,6 +255,15 @@ export function RightSidebar() {
             className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
           >
             <Sparkles className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/about"
+            title="Sobre o Insight"
+            aria-label="Sobre o Insight"
+            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
+          >
+            <Info className="w-4 h-4" />
           </Link>
 
           <a

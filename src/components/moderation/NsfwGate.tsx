@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EyeOff, Eye } from 'lucide-react';
+import { EyeOff, Eye, Lock } from 'lucide-react';
+import { useNitro } from '@/components/nitro/NitroProvider';
 
 const AGE_KEY = 'insight-age-confirmed';
 
@@ -18,7 +19,22 @@ function ageConfirmed() {
  * A 1ª vez pede a confirmação de idade (lembrada neste aparelho); depois,
  * cada post +18 ainda exige um toque em "Mostrar".
  */
+/** Idade pela data de nascimento do perfil (null = não informada). */
+function ageFrom(birthday?: string | null): number | null {
+  if (!birthday) return null;
+  const b = new Date(`${birthday.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+  return age;
+}
+
 export function NsfwGate({ active, children, compact = false }: { active: boolean; children: React.ReactNode; compact?: boolean }) {
+  const { viewer } = useNitro();
+  // conta com data de nascimento de menor de 18: nunca libera (ECA / ECA Digital)
+  const age = ageFrom(viewer?.birthday);
+  const minor = age !== null && age < 18;
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
 
@@ -53,7 +69,13 @@ export function NsfwGate({ active, children, compact = false }: { active: boolea
         {children}
       </div>
       <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm p-4 text-center">
-        {!asking ? (
+        {minor ? (
+          <div className="space-y-2.5">
+            <Lock className="w-6 h-6 mx-auto text-muted" />
+            <p className="text-sm font-bold text-primary">Conteúdo para maiores de 18 anos</p>
+            <p className="text-xs text-secondary max-w-xs">Pela data de nascimento do seu perfil, este conteúdo não está disponível para você.</p>
+          </div>
+        ) : !asking ? (
           <div className="space-y-2.5">
             <span className="inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-amber-500 text-amber-500 text-sm font-black">+18</span>
             <p className="text-sm font-bold text-primary">Conteúdo sensível</p>

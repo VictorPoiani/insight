@@ -1,8 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Clock, Eye, Film, Heart, MessageCircle, Repeat2, FileText, HeartHandshake, X, Loader2 } from 'lucide-react';
+import { BarChart3, Clock, Eye, Film, Heart, MessageCircle, Repeat2, FileText, HeartHandshake, X, Loader2, Bookmark, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useNitro } from '@/components/nitro/NitroProvider';
+import { ActivityPostList, type ActivityListKind } from './ActivityPostList';
+
+export type ActivityTab = 'summary' | ActivityListKind;
+const TABS: { id: ActivityTab; label: string }[] = [
+  { id: 'summary', label: 'Resumo' },
+  { id: 'saved', label: 'Salvos' },
+  { id: 'liked', label: 'Curtidos' },
+  { id: 'posted', label: 'Publicados' },
+];
 
 interface DayRow {
   day: string;
@@ -33,7 +43,26 @@ const weekday = (iso: string) =>
 const dayMonth = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
 /** Botão "gráfico" + painel com a atividade de quem está logado. */
-export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ActivityPanel({ open, onClose, initialTab = 'summary' }: { open: boolean; onClose: () => void; initialTab?: ActivityTab }) {
+  const { viewer } = useNitro();
+  const [tab, setTab] = useState<ActivityTab>(initialTab);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
+  // total de salvos (todas as datas) para o bloco do resumo
+  useEffect(() => {
+    if (!open || !viewer?.id) return;
+    const load = () =>
+      createClient()
+        .from('post_saves')
+        .select('post_id', { count: 'exact', head: true })
+        .eq('profile_id', viewer.id)
+        .then(({ count }) => setSavedCount(count ?? 0));
+    load();
+    window.addEventListener('insight-saves-changed', load);
+    return () => window.removeEventListener('insight-saves-changed', load);
+  }, [open, viewer?.id]);
   const [period, setPeriod] = useState<7 | 30>(7);
   const [data, setData] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(false);
@@ -90,14 +119,15 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
   const max = Math.max(60, ...days.map((d) => d.screen_seconds));
   const avg = days.length ? totals.screen / days.length : 0;
 
-  const tiles = [
+  const tiles: { icon: typeof Eye; label: string; value: number | string; to?: ActivityListKind }[] = [
     { icon: Eye, label: 'Posts vistos', value: totals.views },
-    { icon: Heart, label: 'Curtidas dadas', value: totals.likes },
+    { icon: Heart, label: 'Curtidas dadas', value: totals.likes, to: 'liked' },
     { icon: MessageCircle, label: 'Comentários', value: totals.replies },
     { icon: Film, label: 'Vídeos assistidos', value: totals.videos },
     { icon: Repeat2, label: 'Reposts', value: totals.reposts },
-    { icon: FileText, label: 'Insights publicados', value: totals.posts },
+    { icon: FileText, label: 'Insights publicados', value: totals.posts, to: 'posted' },
     { icon: HeartHandshake, label: 'Curtidas recebidas', value: data?.likes_received ?? 0 },
+    { icon: Bookmark, label: 'Salvos', value: savedCount ?? '–', to: 'saved' },
   ];
 
   return (
@@ -114,7 +144,7 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
             <BarChart3 className="w-4 h-4 text-accent" /> Sua atividade
           </h2>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-full border border-border p-0.5 text-[11px] font-bold">
+            <div className={`flex rounded-full border border-border p-0.5 text-[11px] font-bold ${tab === 'summary' ? '' : 'invisible'}`}>
               {([7, 30] as const).map((p) => (
                 <button
                   key={p}
@@ -133,8 +163,34 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </div>
 
+        {!needsLogin && (
+          <div role="tablist" aria-label="Seções da atividade" className="mt-4 flex gap-1 border-b border-border">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative px-3 py-2 text-xs font-bold transition-colors ${tab === t.id ? 'text-primary' : 'text-muted hover:text-secondary'}`}
+              >
+                {t.label}
+                {tab === t.id && <span className="absolute left-2 right-2 -bottom-px h-[2px] rounded-full bg-accent" />}
+              </button>
+            ))}
+          </div>
+        )}
+
         {needsLogin ? (
           <p className="py-12 text-center text-xs text-muted">Entre na sua conta para ver sua atividade.</p>
+        ) : tab !== 'summary' ? (
+          viewer?.id ? (
+            <ActivityPostList kind={tab} profileId={viewer.id} onNavigate={onClose} />
+          ) : (
+            <div className="py-12 flex justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-accent" />
+            </div>
+          )
         ) : loading && !data ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="w-5 h-5 animate-spin text-accent" />
@@ -195,14 +251,32 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
 
             {/* Interações */}
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {tiles.map(({ icon: Icon, label, value }) => (
-                <div key={label} className="rounded-xl border border-border bg-elevated/40 px-3 py-2.5">
-                  <p className="flex items-center gap-1.5 text-[11px] text-muted">
-                    <Icon className="w-3.5 h-3.5" /> {label}
-                  </p>
-                  <p className="mt-0.5 text-lg font-extrabold text-primary">{value}</p>
-                </div>
-              ))}
+              {tiles.map(({ icon: Icon, label, value, to }) => {
+                const inner = (
+                  <>
+                    <p className="flex items-center gap-1.5 text-[11px] text-muted">
+                      <Icon className="w-3.5 h-3.5" /> {label}
+                      {to && <ChevronRight className="w-3 h-3 ml-auto opacity-60 group-hover:opacity-100 group-hover:text-accent" />}
+                    </p>
+                    <p className="mt-0.5 text-lg font-extrabold text-primary">{value}</p>
+                  </>
+                );
+                return to ? (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setTab(to)}
+                    title={`Ver lista: ${label.toLowerCase()}`}
+                    className="group text-left rounded-xl border border-border bg-elevated/40 px-3 py-2.5 hover:border-accent transition-colors"
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={label} className="rounded-xl border border-border bg-elevated/40 px-3 py-2.5">
+                    {inner}
+                  </div>
+                );
+              })}
             </div>
             <p className="mt-4 text-[10px] text-muted leading-relaxed">
               Tempo de tela conta só com o Insight aberto e em uso. Começou a ser medido em 25/11/2026; os números são só seus.
@@ -215,15 +289,21 @@ export function ActivityPanel({ open, onClose }: { open: boolean; onClose: () =>
 }
 
 export const OPEN_ACTIVITY_EVENT = 'insight-open-activity';
-export const openActivityPanel = () => window.dispatchEvent(new Event(OPEN_ACTIVITY_EVENT));
+export const openActivityPanel = (tab: ActivityTab = 'summary') =>
+  window.dispatchEvent(new CustomEvent(OPEN_ACTIVITY_EVENT, { detail: typeof tab === 'string' ? tab : 'summary' }));
 
 /** Fica montado no AppShell; qualquer botão abre o painel com openActivityPanel(). */
 export function ActivityPanelHost() {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<ActivityTab>('summary');
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = (e: Event) => {
+      const d = (e as CustomEvent<ActivityTab>).detail;
+      setTab(d === 'saved' || d === 'liked' || d === 'posted' ? d : 'summary');
+      setOpen(true);
+    };
     window.addEventListener(OPEN_ACTIVITY_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_ACTIVITY_EVENT, onOpen);
   }, []);
-  return <ActivityPanel open={open} onClose={() => setOpen(false)} />;
+  return <ActivityPanel open={open} initialTab={tab} onClose={() => setOpen(false)} />;
 }

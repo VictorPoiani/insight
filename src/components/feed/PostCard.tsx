@@ -32,6 +32,7 @@ import {
   Repeat2,
   Heart,
   Share2,
+  Bookmark,
   Trash2,
   Pencil,
   Pin,
@@ -220,18 +221,47 @@ export function PostCard({
   // Usuário logado vem do provedor global (uma consulta para o site todo) e
   // curtida/repost são buscados em lote com os outros cartões da tela.
   const { viewer } = useNitro();
+  const [hasSaved, setHasSaved] = useState(false);
+  const [savingPost, setSavingPost] = useState(false);
+
+  // Salvar para ler depois (lista privada em "Sua atividade" → Salvos)
+  async function handleToggleSave() {
+    if (!viewer) {
+      window.location.href = '/login';
+      return;
+    }
+    if (savingPost) return;
+    const next = !hasSaved;
+    setHasSaved(next);
+    setSavingPost(true);
+    setPostFlag(post.id, viewer.id, { saved: next });
+    const supabase = createClient();
+    const { error } = next
+      ? await supabase.from('post_saves').insert({ post_id: post.id, profile_id: viewer.id })
+      : await supabase.from('post_saves').delete().eq('post_id', post.id).eq('profile_id', viewer.id);
+    if (error && !/duplicate/i.test(error.message)) {
+      setHasSaved(!next);
+      setPostFlag(post.id, viewer.id, { saved: !next });
+    } else {
+      window.dispatchEvent(new CustomEvent('insight-saves-changed'));
+    }
+    setSavingPost(false);
+  }
+
   useEffect(() => {
     let active = true;
     setLoggedUserProfile(viewer);
     if (!viewer) {
       setHasLiked(false);
       setHasReposted(false);
+      setHasSaved(false);
       return;
     }
     getPostFlags(post.id, viewer.id).then((f) => {
       if (!active) return;
       setHasLiked(f.liked);
       setHasReposted(f.reposted);
+      setHasSaved(f.saved);
     });
     return () => {
       active = false;
@@ -1294,6 +1324,18 @@ export function PostCard({
           >
             <Share2 className="w-4 h-4" />
             <span className="hidden sm:inline">Compartilhar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleSave}
+            aria-pressed={hasSaved}
+            aria-label={hasSaved ? 'Remover dos salvos' : 'Salvar Insight'}
+            title={hasSaved ? 'Remover dos salvos' : 'Salvar para ler depois'}
+            className={`flex items-center gap-1.5 py-1 transition-colors ${hasSaved ? 'text-accent font-semibold' : 'hover:text-primary'}`}
+          >
+            <Bookmark className={`w-4 h-4 ${hasSaved ? 'fill-accent text-accent' : ''}`} />
+            <span className="hidden sm:inline">{hasSaved ? 'Salvo' : 'Salvar'}</span>
           </button>
         </div>
 

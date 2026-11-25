@@ -255,6 +255,7 @@ const CHAPTERS: Chapter[] = [
             <><strong className="text-primary">Responder:</strong> as respostas aceitam texto, citação, código, lista, imagens, GIF, vídeo e música.</>,
             <><strong className="text-primary">Repostar:</strong> o botão de repost oferece “Repostar” (direto) ou “Repostar com comentário”, que mostra seu texto com o post original embaixo.</>,
             <><strong className="text-primary">Curtir</strong> funciona em posts e em respostas. Quem você segue aparece na aba Seguindo.</>,
+            <><strong className="text-primary">Salvar:</strong> o marcador ao lado de Compartilhar guarda o Insight para ler depois. Só você vê os seus salvos.</>,
           ]}
         />
       </>
@@ -339,7 +340,7 @@ const CHAPTERS: Chapter[] = [
           <Figure n="8.2" onOpen={open} tilt={0.6} fig={FIGS['activity']} />
         </div>
         <P>
-          O painel abre pelo ícone de gráfico na barra direita (no celular, em “Sua atividade”, no menu ☰). O tempo de tela só conta enquanto o Insight está aberto e em uso, e os números são só seus.
+          O painel abre pelo ícone de gráfico na barra direita (no celular, em “Sua atividade”, no menu ☰). Além do resumo, ele tem as abas <strong className="text-primary">Salvos</strong>, <strong className="text-primary">Curtidos</strong> e <strong className="text-primary">Publicados</strong>; tocar em “Curtidas dadas”, “Insights publicados” ou “Salvos” abre a lista correspondente. O tempo de tela só conta enquanto o Insight está aberto e em uso, e os números são só seus.
         </P>
       </>
     ),

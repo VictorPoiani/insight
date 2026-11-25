@@ -11,7 +11,7 @@ import { ActivityPanelHost, openActivityPanel } from '@/components/activity/Acti
 import { ActivityTracker } from '@/components/activity/ActivityTracker';
 import { NitroProvider } from '@/components/nitro/NitroProvider';
 import { PresenceProvider } from '@/components/presence/PresenceProvider';
-import { Menu, X, Heart, Info, FileText, Shield, Sparkles, BarChart3, GraduationCap } from 'lucide-react';
+import { Menu, X, Heart, Info, FileText, Shield, Sparkles, BarChart3, GraduationCap, Bookmark } from 'lucide-react';
 import { MobileNotificationBell } from '@/components/notifications/MobileNotificationBell';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
@@ -105,6 +105,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <BarChart3 className="w-4 h-4 text-accent" />
                 <span>Sua atividade</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  openActivityPanel('saved');
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-elevated transition-colors text-left"
+              >
+                <Bookmark className="w-4 h-4 text-accent" />
+                <span>Salvos</span>
               </button>
               <div className="my-1 border-t border-border/70" />
               <Link

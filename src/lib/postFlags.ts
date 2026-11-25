@@ -3,13 +3,13 @@
 import { createClient } from '@/lib/supabase/client';
 
 /**
- * Curtidas/reposts de quem está logado, buscados EM LOTE.
+ * Curtidas/reposts/salvos de quem está logado, buscados EM LOTE.
  *
  * Antes cada cartão de Insight fazia as próprias consultas ao montar (sessão,
  * perfil, curtida, repost) — dezenas de requisições num feed ou perfil. Aqui os
  * pedidos do mesmo instante viram 2 consultas com `in(...)`.
  */
-type Flags = { liked: boolean; reposted: boolean };
+type Flags = { liked: boolean; reposted: boolean; saved: boolean };
 
 let pending = new Map<string, ((f: Flags) => void)[]>();
 let pendingProfile: string | null = null;
@@ -27,17 +27,20 @@ async function flush() {
   const supabase = createClient();
   const liked = new Set<string>();
   const reposted = new Set<string>();
+  const saved = new Set<string>();
   for (let i = 0; i < ids.length; i += 150) {
     const chunk = ids.slice(i, i + 150);
-    const [likes, reposts] = await Promise.all([
+    const [likes, reposts, saves] = await Promise.all([
       supabase.from('post_likes').select('post_id').eq('profile_id', profileId).in('post_id', chunk),
       supabase.from('post_reposts').select('post_id').eq('profile_id', profileId).in('post_id', chunk),
+      supabase.from('post_saves').select('post_id').eq('profile_id', profileId).in('post_id', chunk),
     ]);
+    for (const r of saves.data || []) saved.add((r as { post_id: string }).post_id);
     for (const r of likes.data || []) liked.add((r as { post_id: string }).post_id);
     for (const r of reposts.data || []) reposted.add((r as { post_id: string }).post_id);
   }
   for (const [id, cbs] of batch) {
-    const f = { liked: liked.has(id), reposted: reposted.has(id) };
+    const f = { liked: liked.has(id), reposted: reposted.has(id), saved: saved.has(id) };
     cache.set(`${profileId}:${id}`, f);
     for (const cb of cbs) cb(f);
   }
@@ -59,6 +62,6 @@ export function getPostFlags(postId: string, profileId: string): Promise<Flags> 
 /** Atualiza o cache depois de curtir/repostar (evita mostrar estado antigo ao remontar). */
 export function setPostFlag(postId: string, profileId: string, patch: Partial<Flags>) {
   const key = `${profileId}:${postId}`;
-  const cur = cache.get(key) || { liked: false, reposted: false };
+  const cur = cache.get(key) || { liked: false, reposted: false, saved: false };
   cache.set(key, { ...cur, ...patch });
 }

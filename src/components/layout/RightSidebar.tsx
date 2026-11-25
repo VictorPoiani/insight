@@ -230,7 +230,7 @@ export function RightSidebar() {
 
           <button
             type="button"
-            onClick={openActivityPanel}
+            onClick={() => openActivityPanel()}
             title="Sua atividade"
             aria-label="Sua atividade"
             className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-surface transition-colors"
@@ -282,7 +282,7 @@ export function RightSidebar() {
 
               <button
                 type="button"
-                onClick={openActivityPanel}
+                onClick={() => openActivityPanel()}
                 title="Sua atividade"
                 aria-label="Sua atividade"
                 className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-surface border border-transparent hover:border-border transition-colors shrink-0 order-last"

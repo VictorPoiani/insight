@@ -1,5 +1,8 @@
 {
-  "crons": [{ "path": "/api/news/ingest", "schedule": "17 9 * * *" }],
+  "crons": [
+    { "path": "/api/news/ingest", "schedule": "17 9 * * *" },
+    { "path": "/api/admin/nitro-refunds", "schedule": "43 11 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

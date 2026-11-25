@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { syncNitroForProfile } from '@/lib/nitro/mercadopago';
+import { processLevel5Refunds, syncNitroForProfile } from '@/lib/nitro/mercadopago';
 
 /**
  * Confere a assinatura de quem está logado direto no Mercado Pago e atualiza o
@@ -23,6 +23,9 @@ export async function POST() {
     .maybeSingle();
   if (!profile) return NextResponse.json({ synced: false });
 
-  const result = await syncNitroForProfile(createAdminClient(), token, profile.id);
-  return NextResponse.json(result);
+  const admin = createAdminClient();
+  const result = await syncNitroForProfile(admin, token, profile.id);
+  // Nível 5 alcançado (inclusive por doação manual): encerra e reembolsa a assinatura
+  const refunds = await processLevel5Refunds(admin, token, profile.id).catch(() => []);
+  return NextResponse.json({ ...result, level5Refunds: refunds.length });
 }

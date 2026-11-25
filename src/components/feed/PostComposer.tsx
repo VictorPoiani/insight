@@ -499,9 +499,15 @@ function RichBlockEditable({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === 'Enter' && !e.shiftKey && block.type !== 'code') {
+    if (e.key === 'Enter' && block.type !== 'code') {
+      // Ctrl/Cmd+Enter cria outro bloco; Enter só pula linha (títulos continuam criando bloco)
+      const newBlock = e.ctrlKey || e.metaKey || ((block.type === 'h1' || block.type === 'h2') && !e.shiftKey);
       e.preventDefault();
-      onEnterPressed();
+      if (newBlock) {
+        onEnterPressed();
+      } else if (!document.execCommand('insertLineBreak')) {
+        document.execCommand('insertHTML', false, '<br><br>');
+      }
     } else if (e.key === 'Backspace') {
       const plain = e.currentTarget.innerText.replace(/\n/g, '').trim();
       if (plain.length === 0) {

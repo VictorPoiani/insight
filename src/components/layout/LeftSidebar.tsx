@@ -22,7 +22,6 @@ import {
   Zap,
   MessageCircle,
 } from 'lucide-react';
-import { useNitro } from '@/components/nitro/NitroProvider';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
 import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
@@ -67,7 +66,6 @@ export function LeftSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const { hasAccess: hasNitroAccess } = useNitro();
 
   const sidebarRef = useRef<HTMLElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -420,11 +418,6 @@ export function LeftSidebar() {
                 <span className="truncate flex-1 bg-gradient-to-r from-sky-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
                   Insight Nitro
                 </span>
-                {!hasNitroAccess && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30">
-                    Novo
-                  </span>
-                )}
               </>
             )}
           </Link>

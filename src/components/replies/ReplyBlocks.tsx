@@ -1,5 +1,6 @@
 import { ReplyBlock } from '@/types/database';
 import { MentionText } from '@/components/mentions/MentionText';
+import { CustomSpotifyPlayer } from '@/components/feed/CustomSpotifyPlayer';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 
 /** Renderiza o corpo em blocos de uma resposta (texto puro, sem HTML do usuário). */
@@ -61,6 +62,10 @@ export function ReplyBlocks({ blocks }: { blocks: ReplyBlock[] }) {
               </div>
             ) : null;
           case 'spotify':
+            // faixa escolhida pela pesquisa (iTunes): player do Insight
+            if (b.trackId && /^it\d{3,15}$/.test(b.trackId)) {
+              return <CustomSpotifyPlayer key={b.id || i} trackId={b.trackId} />;
+            }
             return b.trackId && /^[A-Za-z0-9]{10,40}$/.test(b.trackId) ? (
               <iframe
                 key={b.id || i}

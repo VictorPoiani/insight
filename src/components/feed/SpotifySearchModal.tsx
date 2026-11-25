@@ -6,10 +6,13 @@ import { Search, Music, X, Loader2 } from 'lucide-react';
 interface SpotifySearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectTrack: (trackQuery: string) => void;
+  /** trackQuery = "título artista" (posts); song traz o ID do iTunes (respostas usam "it<ID>"). */
+  onSelectTrack: (trackQuery: string, song: TrackSearchResult) => void;
+  /** Texto já digitado pela pessoa (abre a busca com ele). */
+  initialQuery?: string;
 }
 
-interface TrackSearchResult {
+export interface TrackSearchResult {
   id: string;
   title: string;
   artist: string;
@@ -20,8 +23,12 @@ export function SpotifySearchModal({
   isOpen,
   onClose,
   onSelectTrack,
+  initialQuery,
 }: SpotifySearchModalProps) {
   const [query, setQuery] = useState('');
+  useEffect(() => {
+    if (isOpen) setQuery(initialQuery || '');
+  }, [isOpen, initialQuery]);
   const [results, setResults] = useState<TrackSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -123,7 +130,7 @@ export function SpotifySearchModal({
                   key={song.id}
                   type="button"
                   onClick={() => {
-                    onSelectTrack(`${song.title} ${song.artist}`);
+                    onSelectTrack(`${song.title} ${song.artist}`, song);
                     onClose();
                   }}
                   className="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl bg-elevated/50 hover:bg-elevated border border-border hover:border-[#1DB954]/60 text-left transition-all group"

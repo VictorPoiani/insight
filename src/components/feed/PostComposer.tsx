@@ -579,6 +579,7 @@ export function PostComposer({
   const [showHighlighterMenu, setShowHighlighterMenu] = useState(false);
   const [showGridLines, setShowGridLines] = useState(true);
   const [spotifySearchForBlockId, setSpotifySearchForBlockId] = useState<string | null>(null);
+  const [spotifyInitialQuery, setSpotifyInitialQuery] = useState('');
 
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
@@ -3675,8 +3676,15 @@ export function PostComposer({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                const id = extractSpotifyTrackId(e.currentTarget.value);
-                                if (id) updateBlock(block.id, { spotifyTrackId: id });
+                                const value = e.currentTarget.value.trim();
+                                const id = /spotify/i.test(value) ? extractSpotifyTrackId(value) : null;
+                                if (id) {
+                                  updateBlock(block.id, { spotifyTrackId: id });
+                                } else if (value) {
+                                  // nome da música: abre a pesquisa já com o texto
+                                  setSpotifyInitialQuery(value);
+                                  setSpotifySearchForBlockId(block.id);
+                                }
                               }
                             }}
                             className="flex-1 min-w-0 bg-transparent text-xs text-primary placeholder:text-muted focus:outline-none"
@@ -4045,7 +4053,11 @@ export function PostComposer({
       {/* MODAL DE PESQUISA DE MÚSICAS PARA O BLOCO SPOTIFY DO POST */}
       <SpotifySearchModal
         isOpen={Boolean(spotifySearchForBlockId)}
-        onClose={() => setSpotifySearchForBlockId(null)}
+        initialQuery={spotifyInitialQuery}
+        onClose={() => {
+          setSpotifySearchForBlockId(null);
+          setSpotifyInitialQuery('');
+        }}
         onSelectTrack={(trackQuery) => {
           if (spotifySearchForBlockId) {
             updateBlock(spotifySearchForBlockId, { spotifyTrackId: trackQuery });

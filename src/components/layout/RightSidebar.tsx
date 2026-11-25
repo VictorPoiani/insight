@@ -18,6 +18,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   BarChart3,
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react';
 
 const SUPPORT_EMAIL = 'contato.insightproject@gmail.com';
@@ -236,6 +238,23 @@ export function RightSidebar() {
             <BarChart3 className="w-4 h-4" />
           </button>
 
+          <Link
+            href="/tutorial"
+            title="Tutorial"
+            aria-label="Tutorial"
+            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
+          >
+            <GraduationCap className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/atualizacoes"
+            title="Atualizações"
+            aria-label="Atualizações"
+            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-surface transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+          </Link>
 
           <a
             href="https://github.com/VictorPoiani"
@@ -430,7 +449,15 @@ export function RightSidebar() {
           </div>
 
           {/* 6. Rodapé  Compacto */}
-          <footer className="px-1 pt-2 space-y-1 text-[10px] text-muted leading-tight shrink-0">
+          <footer className="px-1 pt-2 space-y-1.5 text-[10px] text-muted leading-tight shrink-0">
+            <div className="flex items-center gap-3 text-[11px]">
+              <Link href="/tutorial" className="inline-flex items-center gap-1 hover:text-accent transition-colors">
+                <GraduationCap className="w-3.5 h-3.5" /> Tutorial
+              </Link>
+              <Link href="/atualizacoes" className="inline-flex items-center gap-1 hover:text-accent transition-colors">
+                <Sparkles className="w-3.5 h-3.5" /> Atualizações
+              </Link>
+            </div>
             <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
               <Link href="/privacidade" className="hover:text-secondary transition-colors">
                 Privacidade (LGPD)

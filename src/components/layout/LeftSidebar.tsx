@@ -8,8 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 import {
   House,
   Bell,
-  Sparkles,
-  Info,
   Heart,
   Settings,
   LogOut,
@@ -20,8 +18,6 @@ import {
   MoreHorizontal,
   User,
   Zap,
-  MessageCircle,
-  GraduationCap,
 } from 'lucide-react';
 import { CosmeticAvatar } from '@/components/nitro/Cosmetics';
 import type { NitroCosmetics } from '@/lib/nitro/catalog';
@@ -29,19 +25,15 @@ import { NotebookNavItem } from '@/components/notebook/NotebookNavItem';
 
 type NavItem = { name: string; href: string; icon: typeof House; showBadge?: boolean; soon?: boolean };
 
-// Ordem: Início, My Notebook, Notificações, Mensagens, Apoie, Configurações, Insight Nitro
+// Ordem: Início, My Notebook, Notificações, Apoie, Configurações, Insight Nitro
+// (Tutorial, Atualizações e Sobre ficam na barra direita)
 const HOME_ITEM: NavItem = { name: 'Início', href: '/', icon: House };
 const MAIN_ITEMS: NavItem[] = [
   { name: 'Notificações', href: '/notificacoes', icon: Bell, showBadge: true },
-  { name: 'Mensagens', href: '/mensagens', icon: MessageCircle, soon: true },
   { name: 'Apoie', href: '/apoie', icon: Heart },
   { name: 'Configurações', href: '/config', icon: Settings },
 ];
-const EXTRA_ITEMS: NavItem[] = [
-  { name: 'Tutorial', href: '/tutorial', icon: GraduationCap },
-  { name: 'Atualizações', href: '/atualizacoes', icon: Sparkles },
-  { name: 'Sobre', href: '/about', icon: Info },
-];
+
 
 const DEFAULT_WIDTH = 248;
 const MIN_WIDTH = 180;
@@ -422,7 +414,6 @@ export function LeftSidebar() {
             )}
           </Link>
 
-          {EXTRA_ITEMS.map(renderNavItem)}
         </nav>
       </div>
 

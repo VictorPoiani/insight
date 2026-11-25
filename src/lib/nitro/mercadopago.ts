@@ -95,8 +95,8 @@ async function latestApprovedPayment(
   preapprovalId: string,
   profileId: string
 ): Promise<{ id: string; amount: number } | null> {
-  // 1) faturas da assinatura
-  try {
+  // 1) faturas da assinatura (só com um ID de verdade: ID vazio listaria pagamentos de outras pessoas)
+  if (preapprovalId) try {
     const res = await fetch(`${MP}/authorized_payments/search?preapproval_id=${encodeURIComponent(preapprovalId)}`, {
       headers: headers(token),
       cache: 'no-store',
@@ -145,6 +145,21 @@ async function refundPayment(token: string, paymentId: string, idem: string): Pr
  * Processa a fila do Nível 5: cancela a assinatura e reembolsa a última
  * mensalidade. Idempotente (chave por perfil+assinatura) e com até 5 tentativas.
  */
+/** Assinaturas Nitro do perfil; lança erro se o Mercado Pago não responder (para tentar de novo). */
+async function findNitroPreapprovalsStrict(token: string, profileId: string): Promise<MpPreapproval[]> {
+  const url = `${MP}/preapproval/search?external_reference=${encodeURIComponent(`nitro:${profileId}`)}&limit=20`;
+  const res = await fetch(url, { headers: headers(token), cache: 'no-store' });
+  if (!res.ok) throw new Error(`preapproval_search_${res.status}`);
+  const data = await res.json();
+  const list: MpPreapproval[] = Array.isArray(data?.results) ? data.results : [];
+  return list
+    .filter((p) => p.external_reference === `nitro:${profileId}`)
+    .sort((a, b) => String(b.date_created || '').localeCompare(String(a.date_created || '')));
+}
+
+/** Marcador usado na fila quando o perfil não tem o ID da assinatura gravado. */
+export const LEVEL5_LOOKUP = 'lookup';
+
 export async function processLevel5Refunds(admin: SupabaseClient, token: string, onlyProfileId?: string) {
   let q = admin
     .from('nitro_level5_refunds')
@@ -160,10 +175,20 @@ export async function processLevel5Refunds(admin: SupabaseClient, token: string,
   for (const row of rows || []) {
     try {
       await admin.from('nitro_level5_refunds').update({ attempts: row.attempts + 1 }).eq('id', row.id);
-      await cancelPreapproval(token, row.subscription_id);
-      const pay = await latestApprovedPayment(token, row.subscription_id, row.profile_id);
+
+      // assinaturas vivas deste perfil: a gravada e/ou as encontradas no Mercado Pago
+      const found = await findNitroPreapprovalsStrict(token, row.profile_id);
+      const live = found.filter((p) => p.status === 'authorized' || p.status === 'paused').map((p) => String(p.id));
+      const ids = Array.from(new Set([...(row.subscription_id !== LEVEL5_LOOKUP ? [row.subscription_id] : []), ...live]));
+      for (const id of ids) await cancelPreapproval(token, id);
+
+      // reembolsa a última mensalidade (da assinatura mais recente; senão, pela referência nitro:<perfil>)
+      const mainId = ids[0] ?? (found[0] ? String(found[0].id) : '');
+      const pay = await latestApprovedPayment(token, mainId, row.profile_id);
       let status: 'refunded' | 'canceled_no_payment' = 'canceled_no_payment';
       if (pay) {
+        // trava: só reembolsa o valor de uma mensalidade do Nitro (qualquer coisa acima vai para revisão manual)
+        if (pay.amount > NITRO_PRICE_BRL + 0.01) throw new Error(`refund_amount_unexpected ${pay.id} ${pay.amount}`);
         const ok = await refundPayment(token, pay.id, `nitro-l5-${row.profile_id}-${pay.id}`);
         if (!ok) throw new Error(`refund_failed ${pay.id}`);
         status = 'refunded';
@@ -172,6 +197,7 @@ export async function processLevel5Refunds(admin: SupabaseClient, token: string,
         .from('nitro_level5_refunds')
         .update({
           status,
+          subscription_id: mainId || row.subscription_id,
           processed_at: new Date().toISOString(),
           refunded_payment_id: pay?.id ?? null,
           amount: pay?.amount ?? null,

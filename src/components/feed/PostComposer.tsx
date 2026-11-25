@@ -317,7 +317,14 @@ function resolveInitialVisibility(post?: Post | null): PostVisibility {
   return 'public';
 }
 
+/** Mídia nova entra com metade da largura no desktop (evita fotos gigantes no feed); dá para ampliar até 100%. */
+function defaultMediaWidth(): ImageWidthType {
+  if (typeof window === 'undefined') return '100%';
+  return window.matchMedia('(min-width: 768px)').matches ? '50%' : '100%';
+}
+
 function createNewBlock(type: PostBlockType = 'paragraph'): PostBlock {
+  const mediaWidth = type === 'image' || type === 'video' || type === 'gif' ? defaultMediaWidth() : '100%';
   const uid = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const cId = `node-c-${uid}`;
   const n1Id = `node-1-${uid}`;
@@ -334,12 +341,12 @@ function createNewBlock(type: PostBlockType = 'paragraph'): PostBlock {
     gridStart: 0,
     imageUrl: null,
     imageCaption: '',
-    imageWidth: '100%',
+    imageWidth: mediaWidth,
     imageAlign: 'center',
     videoUrl: null,
     r2Key: null,
     videoCaption: '',
-    videoWidth: '100%',
+    videoWidth: mediaWidth,
     videoAlign: 'center',
     isGif: type === 'gif',
     spotifyTrackId: null,
@@ -433,6 +440,7 @@ function buildInitialBlocksFromPost(post?: Post | null): PostBlock[] {
   if (post.image_url) {
     const imgBlock = createNewBlock('image');
     imgBlock.imageUrl = post.image_url;
+    imgBlock.imageWidth = '100%'; // post antigo: mantém como era
     converted.push(imgBlock);
   }
   if (post.spotify_track_id) {

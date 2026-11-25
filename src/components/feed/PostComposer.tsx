@@ -2125,7 +2125,7 @@ export function PostComposer({
                     spellCheckEnabled={spellCheckEnabled}
                     placeholder={
                       index === 0 && block.type === 'paragraph' && span === 12
-                        ? "Apenas poste... (Digite '/' para inserir blocos ou selecione o texto para realçar)"
+                        ? "Compartilhe seu Insight... (Digite '/' para inserir blocos ou selecione o texto para realçar)"
                         : block.type === 'h1'
                         ? 'Título...'
                         : block.type === 'h2'

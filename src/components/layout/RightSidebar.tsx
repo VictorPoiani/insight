@@ -31,6 +31,7 @@ const DEFAULT_TOPICS = [
   'artigue',
 ];
 
+const SIDEBAR_KEY = 'insight-right-sidebar-v2';
 const DEFAULT_WIDTH = 256;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -46,17 +47,22 @@ export function RightSidebar() {
 
   // Estados de Redimensionamento e Recolhimento
   const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Padrão: recolhida (a esquerda vem aberta). Quem abrir, fica aberta.
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
-      const savedLayout = localStorage.getItem('insight-right-sidebar');
+      const savedLayout = localStorage.getItem(SIDEBAR_KEY);
       if (savedLayout) {
         const parsed = JSON.parse(savedLayout);
         if (typeof parsed.width === 'number') setWidth(parsed.width);
         if (typeof parsed.isCollapsed === 'boolean') setIsCollapsed(parsed.isCollapsed);
+      } else {
+        // versão anterior: aproveita só a largura (todos começam com a barra recolhida)
+        const old = JSON.parse(localStorage.getItem('insight-right-sidebar') || 'null');
+        if (typeof old?.width === 'number') setWidth(old.width);
       }
     } catch {
       // Mantém padrão
@@ -97,7 +103,7 @@ export function RightSidebar() {
   function saveSidebarState(nextWidth: number, nextCollapsed: boolean) {
     try {
       localStorage.setItem(
-        'insight-right-sidebar',
+        SIDEBAR_KEY,
         JSON.stringify({ width: nextWidth, isCollapsed: nextCollapsed })
       );
     } catch {

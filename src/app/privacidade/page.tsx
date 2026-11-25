@@ -165,9 +165,11 @@ export default function PrivacidadePage() {
               apoiar de forma anônima, peça pelo canal da Seção 8.
             </li>
             <li>
-              <strong className="text-primary">Data de nascimento e idade:</strong> quando informada
-              no perfil, usamos a data de nascimento para bloquear conteúdo +18 a menores de 18 anos.
-              A confirmação &ldquo;tenho 18 anos ou mais&rdquo; fica salva apenas no seu navegador.
+              <strong className="text-primary">Data de nascimento e idade:</strong> obrigatória no
+              cadastro. Usamos para confirmar a idade mínima de 13 anos, aplicar as proteções para
+              adolescentes e liberar conteúdo +18 apenas a maiores de 18 anos (base legal: cumprimento
+              de obrigação legal e proteção de menores, ECA e Lei 15.211/2025). No perfil público
+              aparecem só o dia e o mês; depois de informada, só o suporte altera a data.
             </li>
             <li>
               <strong className="text-primary">Notificações push:</strong> se você ativar, guardamos o
@@ -344,8 +346,8 @@ export default function PrivacidadePage() {
             O Insight* não é destinado a menores de 13 anos. Contas de adolescentes (13 a 17 anos)
             exigem ciência e autorização dos responsáveis. Para essas contas, o tratamento de dados
             segue o melhor interesse do adolescente (Art. 14 da LGPD): não há publicidade, perfilamento
-            para anúncios nem venda de dados, e o conteúdo marcado como +18 fica bloqueado quando a data
-            de nascimento indica menos de 18 anos. Se você souber de uma conta de criança ou de
+            para anúncios nem venda de dados, e o conteúdo marcado como +18 fica bloqueado. A data de
+            nascimento é pedida no cadastro, e contas com menos de 13 anos não são criadas. Se você souber de uma conta de criança ou de
             conteúdo que envolva menores, denuncie pelo botão de denúncia ou pelo canal da Seção 8.
           </p>
         </section>

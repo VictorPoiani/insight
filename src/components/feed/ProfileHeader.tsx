@@ -1083,7 +1083,8 @@ export function ProfileHeader({
         nickname: nickname.trim(),
         nickname_color: nicknameColor,
         location: location.trim(),
-        birthday: birthday || null,
+        // trava no banco: depois de informada, só o suporte altera
+        ...(profile.birthday ? {} : { birthday: birthday || null }),
         bio: bio.trim(),
       })
       .eq('id', profile.id);
@@ -1185,8 +1186,11 @@ export function ProfileHeader({
     }, 2500);
   }
 
+  // para os outros, só dia e mês (a idade não fica pública)
   const formattedBirthday = birthday
-    ? birthday.split('-').reverse().join('/')
+    ? isOwnProfile
+      ? birthday.split('-').reverse().join('/')
+      : birthday.slice(5, 10).split('-').reverse().join('/')
     : null;
 
   const formattedJoinDate = useMemo(() => {
@@ -1705,8 +1709,14 @@ export function ProfileHeader({
                   type="date"
                   value={birthday}
                   onChange={(e) => setBirthday(e.target.value)}
-                  className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent"
+                  disabled={!!profile.birthday}
+                  max={new Date().toISOString().slice(0, 10)}
+                  title={profile.birthday ? 'A data de nascimento só pode ser corrigida pelo suporte.' : undefined}
+                  className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent disabled:opacity-60 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-muted">
+                  {profile.birthday ? 'Para corrigir, fale com o suporte.' : 'Depois de salva, só o suporte altera.'}
+                </p>
               </div>
             </div>
 

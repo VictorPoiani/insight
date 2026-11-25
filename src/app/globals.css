@@ -251,3 +251,17 @@ body {
 .notion-content a[data-mention]:hover {
   text-decoration: underline;
 }
+
+/* Borda arco-íris animada (atalho do Nitro em Ajustes) */
+.nitro-rainbow-border {
+  background: linear-gradient(90deg, #ff4d4d, #ffb84d, #f9f871, #4dff88, #4dd2ff, #8a6bff, #ff5ce1, #ff4d4d);
+  background-size: 300% 100%;
+  animation: nitro-rainbow-shift 6s linear infinite;
+}
+@keyframes nitro-rainbow-shift {
+  to { background-position: 300% 0; }
+}
+[data-reduce-motion='true'] .nitro-rainbow-border { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .nitro-rainbow-border { animation: none; }
+}

@@ -1039,7 +1039,7 @@ export default function ConfigPage() {
               Plano de fundo
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {[
                 {
                   id: 'light' as ThemeOption,
@@ -1116,6 +1116,24 @@ export default function ConfigPage() {
                   </button>
                 );
               })}
+
+              {/* Insight Nitro: mais fundos (temas) — borda arco-íris */}
+              <Link
+                href={nitroActive ? '/nitro' : '/nitro/assinar'}
+                className="nitro-rainbow-border group block h-16 rounded-xl p-[2px] transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span className="h-full w-full rounded-[10px] bg-surface flex items-center gap-2.5 px-3">
+                  <NitroZap className="w-5 h-5 text-fuchsia-400 shrink-0" />
+                  <span className="min-w-0 leading-tight">
+                    <span className="block text-xs sm:text-sm font-extrabold bg-gradient-to-r from-sky-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent truncate">
+                      {nitroActive ? 'Acessar Nitro' : 'Assinar Nitro'}
+                    </span>
+                    <span className="block text-[10px] text-muted truncate">
+                      {nitroActive ? 'Seus temas e fundos' : 'Para obter mais fundos'}
+                    </span>
+                  </span>
+                </span>
+              </Link>
             </div>
 
             {/* Opções de Leitura Confortável e Filtro Quente integradas sem cards */}

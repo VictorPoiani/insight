@@ -39,13 +39,13 @@ export default function PrivacidadePage() {
         </p>
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-muted">
           <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 23 de novembro de 2026
+            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 25 de novembro de 2026
           </span>
           <span className="flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 2.0 (Corporativa)
+            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 3.0
           </span>
           <span className="flex items-center gap-1.5">
-            <FileCheck className="w-3.5 h-3.5 text-accent" /> Conformidade: Lei nº 13.709/2018
+            <FileCheck className="w-3.5 h-3.5 text-accent" /> LGPD · Marco Civil · ECA
           </span>
         </div>
       </header>
@@ -72,7 +72,16 @@ export default function PrivacidadePage() {
           <strong className="text-primary">
             Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018 — LGPD)
           </strong>{' '}
-          e ao <strong className="text-primary">Marco Civil da Internet (Lei nº 12.965/2014)</strong>.
+          , ao <strong className="text-primary">Marco Civil da Internet (Lei nº 12.965/2014)</strong>, ao{' '}
+          <strong className="text-primary">Estatuto da Criança e do Adolescente (Lei nº 8.069/1990)</strong>, à{' '}
+          <strong className="text-primary">Lei nº 15.211/2025 (ECA Digital)</strong> e ao{' '}
+          <strong className="text-primary">Código de Defesa do Consumidor (Lei nº 8.078/1990)</strong>.
+        </p>
+        <p>
+          <strong>Em resumo:</strong> não vendemos seus dados, não usamos anúncios nem rastreadores de
+          publicidade, o conteúdo passa por uma moderação automática de segurança antes de ser
+          publicado e você pode pedir revisão humana de qualquer decisão, além de acessar, corrigir,
+          exportar ou excluir seus dados.
         </p>
       </div>
 
@@ -130,6 +139,42 @@ export default function PrivacidadePage() {
               são sensíveis (Art. 11 da LGPD): só os registre se quiser, e prefira abas privadas.
             </li>
             <li>
+              <strong className="text-primary">Dados de moderação:</strong> o texto, as imagens e
+              alguns quadros dos vídeos que você publica são analisados automaticamente antes de
+              aparecer para outras pessoas (veja a Seção 4-A). Guardamos o resultado (aprovado, +18,
+              em análise ou bloqueado), as categorias e notas de risco, um trecho de até 500
+              caracteres e os endereços das mídias analisadas, para auditoria e para atender pedidos
+              de revisão.
+            </li>
+            <li>
+              <strong className="text-primary">Atividade de uso (&ldquo;Sua atividade&rdquo;):</strong>{' '}
+              tempo de tela com o site aberto e em uso, quantidade de Insights vistos e de vídeos
+              assistidos, por dia. Esses números só são mostrados para você, no painel &ldquo;Sua
+              atividade&rdquo;, e não são usados para publicidade nem para ordenar o feed.
+            </li>
+            <li>
+              <strong className="text-primary">Insights salvos, curtidas e menções:</strong> a lista
+              do que você salvou é privada; curtidas, reposts e menções (@) são visíveis conforme a
+              visibilidade do Insight. Quem você marca recebe uma notificação.
+            </li>
+            <li>
+              <strong className="text-primary">Apoio financeiro:</strong> nome de exibição do
+              apoiador (ou o nome informado na doação), valor, data e situação do pagamento. O nome e a
+              pontuação de quem apoia aparecem publicamente no ranking de contribuição, no ranking de
+              domingo e na faixa de agradecimento do feed (o valor não aparece na faixa). Se preferir
+              apoiar de forma anônima, peça pelo canal da Seção 8.
+            </li>
+            <li>
+              <strong className="text-primary">Data de nascimento e idade:</strong> quando informada
+              no perfil, usamos a data de nascimento para bloquear conteúdo +18 a menores de 18 anos.
+              A confirmação &ldquo;tenho 18 anos ou mais&rdquo; fica salva apenas no seu navegador.
+            </li>
+            <li>
+              <strong className="text-primary">Notificações push:</strong> se você ativar, guardamos o
+              endereço técnico de entrega do seu navegador para enviar avisos. Você pode desativar a
+              qualquer momento em Configurações.
+            </li>
+            <li>
               <strong className="text-primary">Mídias enviadas:</strong> imagens, GIFs, vídeos e
               arquivos que você anexa a Insights e respostas. Vídeos e imagens são comprimidos no seu
               próprio aparelho antes do envio; o arquivo original não é enviado aos nossos servidores.
@@ -172,6 +217,15 @@ export default function PrivacidadePage() {
               <p className="text-xs text-muted">
                 Monitoramento de desempenho, prevenção a ataques cibernéticos (spam, DDoS, injeções),
                 melhoria contínua de usabilidade e métricas agregadas.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="text-xs font-bold text-primary flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-accent" /> Segurança e Proteção de Menores (Art. 7º, IX e Art. 14)
+              </div>
+              <p className="text-xs text-muted">
+                Moderação automática de conteúdo, limites de publicação contra abuso e bloqueio de
+                conteúdo +18 a menores, no melhor interesse de crianças e adolescentes.
               </p>
             </div>
             <div className="p-4 rounded-xl bg-surface border border-border space-y-1">
@@ -249,6 +303,53 @@ export default function PrivacidadePage() {
           </p>
         </section>
 
+        {/* Seção 4-A */}
+        <section className="space-y-3">
+          <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
+            4-A. Da Moderação Automática e das Decisões Automatizadas (Art. 20 da LGPD)
+          </h2>
+          <p>
+            <strong>4-A.1. Como funciona:</strong> antes de um Insight, resposta, tópico ou alteração
+            de perfil aparecer para outras pessoas, o conteúdo passa por regras automáticas e por um
+            classificador de segurança (OpenAI Moderation). O resultado pode ser: liberado; liberado com
+            aviso +18 (aparece borrado); em análise (oculto até revisão humana); ou bloqueado (fica
+            retido e visível só para você).
+          </p>
+          <p>
+            <strong>4-A.2. O que é enviado ao classificador:</strong> o texto do conteúdo e os
+            endereços das imagens e dos quadros extraídos dos vídeos. Não enviamos seu e-mail, nome de
+            usuário ou outros dados de cadastro. Pelas regras da OpenAI para a API, esses dados não são
+            usados para treinar modelos e podem ser guardados por até 30 dias apenas para prevenção de
+            abuso.
+          </p>
+          <p>
+            <strong>4-A.3. Seu direito à revisão:</strong> toda decisão automática que retém ou bloqueia
+            um conteúdo pode ser revista por uma pessoa da equipe. Use o botão &ldquo;Pedir revisão&rdquo;
+            no próprio conteúdo ou o canal da Seção 8. Você também pode pedir informações sobre os
+            critérios usados, respeitado o segredo necessário para que a moderação não seja burlada.
+          </p>
+          <p>
+            <strong>4-A.4. Registros de auditoria:</strong> cada decisão gera um registro (data,
+            resultado, categorias, trecho e mídias), acessível apenas à equipe de moderação. Quando a
+            conta é excluída, esses registros deixam de estar ligados ao seu perfil.
+          </p>
+        </section>
+
+        {/* Seção 4-B */}
+        <section className="space-y-3">
+          <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
+            4-B. De Crianças e Adolescentes
+          </h2>
+          <p>
+            O Insight* não é destinado a menores de 13 anos. Contas de adolescentes (13 a 17 anos)
+            exigem ciência e autorização dos responsáveis. Para essas contas, o tratamento de dados
+            segue o melhor interesse do adolescente (Art. 14 da LGPD): não há publicidade, perfilamento
+            para anúncios nem venda de dados, e o conteúdo marcado como +18 fica bloqueado quando a data
+            de nascimento indica menos de 18 anos. Se você souber de uma conta de criança ou de
+            conteúdo que envolva menores, denuncie pelo botão de denúncia ou pelo canal da Seção 8.
+          </p>
+        </section>
+
         {/* Seção 5 */}
         <section className="space-y-3">
           <h2 className="text-base sm:text-lg font-bold text-primary border-b border-border/60 pb-1.5">
@@ -282,6 +383,15 @@ export default function PrivacidadePage() {
               criptografia SSL/TLS;
             </li>
             <li>
+              <strong className="text-primary">OpenAI, L.L.C.:</strong> Classificação de segurança do
+              texto e das imagens publicadas (moderação automática), sem envio de dados de cadastro;
+            </li>
+            <li>
+              <strong className="text-primary">Apple (iTunes Search) e GIPHY:</strong> Busca de músicas
+              e de GIFs. A busca de músicas é feita diretamente do seu navegador, que informa o termo
+              pesquisado e o seu endereço IP a esses serviços;
+            </li>
+            <li>
               <strong className="text-primary">Resend Inc. & Google LLC (Gmail SMTP):</strong>{' '}
               Infraestrutura de transporte e entrega autenticada de e-mails transacionais e boletins
               da Newsletter.
@@ -309,7 +419,15 @@ export default function PrivacidadePage() {
             sensíveis em ambiente isolado de produção.
           </p>
           <p>
-            <strong>6.2. Retenção e Descarte:</strong> Os dados pessoais são mantidos apenas pelo
+            <strong>6.2. Prazos de guarda:</strong> registros de acesso (IP, data e hora): 6 meses, como
+            exige o Art. 15 do Marco Civil; conteúdos, perfil, Insights salvos e atividade de uso:
+            enquanto a conta existir; registros de moderação e de denúncias: enquanto forem necessários
+            para segurança, defesa em processos e cumprimento de ordens de autoridades, desvinculados do
+            perfil após a exclusão da conta; dados de pagamento e doações: pelo prazo exigido pela
+            legislação fiscal e de defesa do consumidor.
+          </p>
+          <p>
+            <strong>6.3. Retenção e Descarte:</strong> Os dados pessoais são mantidos apenas pelo
             período necessário ao cumprimento das finalidades para as quais foram coletados. Caso o
             Usuário solicite a exclusão de sua conta ou o cancelamento de sua inscrição na
             Newsletter, seus dados serão eliminados ou anonimizados, ressalvada a conservação
@@ -341,10 +459,22 @@ export default function PrivacidadePage() {
               de dados desnecessários ou tratados mediante consentimento;
             </li>
             <li>
+              <strong>Portabilidade e Informação sobre Compartilhamento:</strong> Receber seus dados em
+              formato estruturado e saber com quais operadores eles são compartilhados (Seção 5);
+            </li>
+            <li>
+              <strong>Revisão de Decisões Automatizadas:</strong> Pedir que uma pessoa revise decisões
+              tomadas apenas de forma automática, como as da moderação (Art. 20 e Seção 4-A);
+            </li>
+            <li>
               <strong>Revogação do Consentimento:</strong> Desativar o recebimento de comunicações da
-              Newsletter a qualquer momento (opt-out).
+              Newsletter e de notificações push a qualquer momento (opt-out).
             </li>
           </ul>
+          <p>
+            Respondemos às solicitações em até 15 (quinze) dias. Se não ficar satisfeito, você pode
+            reclamar à Autoridade Nacional de Proteção de Dados (ANPD), em gov.br/anpd.
+          </p>
         </section>
 
         {/* Seção 8 */}

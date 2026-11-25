@@ -38,10 +38,10 @@ export default function TermosPage() {
         </p>
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-muted">
           <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 23 de novembro de 2026
+            <Calendar className="w-3.5 h-3.5 text-accent" /> Última atualização: 25 de novembro de 2026
           </span>
           <span className="flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 2.1
+            <Shield className="w-3.5 h-3.5 text-accent" /> Versão 3.0
           </span>
           <span className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-accent" /> Vigência: Imediata
@@ -109,6 +109,15 @@ export default function TermosPage() {
               tag ou link submetido ou publicado na Plataforma.
             </li>
             <li>
+              <strong className="text-primary">Conteúdo +18:</strong> Conteúdo adulto legal e
+              consensual (como nudez artística ou conteúdo sexual entre adultos) que é publicado com
+              aviso e aparece borrado até a pessoa confirmar que quer ver.
+            </li>
+            <li>
+              <strong className="text-primary">Moderação:</strong> Conjunto de verificações automáticas
+              e humanas aplicadas ao conteúdo antes e depois da publicação (Cláusula 8).
+            </li>
+            <li>
               <strong className="text-primary">Assinante (Subscriber):</strong> Usuário que cadastra
               voluntariamente seu endereço de correio eletrônico para o recebimento automatizado de
               publicações, destaques e comunicados do Mural Oficial.
@@ -147,6 +156,13 @@ export default function TermosPage() {
             entre 13 (treze) e 18 (dezoito) anos incompletos, a utilização da Plataforma pressupõe a
             ciência, supervisão e autorização expressa de seus pais ou representantes legais, que
             responderão solidariamente pelos atos praticados, nos termos do Código Civil Brasileiro.
+          </p>
+          <p>
+            <strong>3.1-A. Conteúdo +18 e menores:</strong> Conteúdo marcado como +18 é exclusivo para
+            maiores de 18 anos. A Plataforma bloqueia esse conteúdo quando a data de nascimento do
+            perfil indica menos de 18 anos e pede confirmação de idade nos demais casos. Informar data
+            de nascimento falsa para acessar conteúdo adulto viola estes Termos. Os responsáveis podem
+            pedir, pelo canal da Cláusula 12, o bloqueio ou a exclusão da conta de um adolescente.
           </p>
           <p>
             <strong>3.2. Veracidade e Atualização Cadastral:</strong> O Usuário compromete-se a
@@ -222,6 +238,39 @@ export default function TermosPage() {
               penal no ordenamento jurídico brasileiro;
             </li>
             <li>
+              <strong>Crimes graves e exploração:</strong> Qualquer conteúdo sexual envolvendo crianças
+              ou adolescentes (inclusive desenhos e montagens), exploração sexual, tráfico de pessoas,
+              terrorismo ou sua apologia, ameaças, incitação à violência, violência gráfica, tortura e
+              crueldade contra animais. Esse conteúdo é bloqueado, a conta é encerrada e, quando a lei
+              exigir, o caso é comunicado às autoridades;
+            </li>
+            <li>
+              <strong>Discurso de ódio e assédio:</strong> Ataques a pessoas ou grupos por raça, cor,
+              etnia, religião, origem, gênero, orientação sexual, deficiência ou qualquer outra
+              característica protegida (Lei nº 7.716/1989), além de perseguição, intimidação ou
+              exposição de dados pessoais de terceiros (doxxing);
+            </li>
+            <li>
+              <strong>Automutilação e suicídio:</strong> Incentivo, instruções ou apologia. Quem estiver
+              passando por isso encontra apoio no CVV, pelo telefone 188 (24h, gratuito) ou em
+              cvv.org.br;
+            </li>
+            <li>
+              <strong>Nudez sem consentimento e conteúdo +18 fora das regras:</strong> Divulgar imagens
+              íntimas de alguém sem autorização (Art. 21 do Marco Civil e Art. 218-C do Código Penal);
+              publicar conteúdo adulto sem que ele esteja marcado como +18; ou usar conteúdo adulto em
+              foto de perfil, capa, nome ou bio;
+            </li>
+            <li>
+              <strong>Atividades ilegais:</strong> Venda ou instruções para obter drogas, armas, dados
+              de cartão, contas ou documentos falsos, e golpes ou fraudes de qualquer tipo;
+            </li>
+            <li>
+              <strong>Burla da moderação:</strong> Disfarçar palavras ou imagens (caracteres ocultos,
+              trocas de letras, cortes) para escapar das verificações, ou criar contas para contornar
+              bloqueios;
+            </li>
+            <li>
               <strong>Infração de Propriedade Intelectual:</strong> Plagiar, reproduzir ou
               distribuir materiais protegidos por direitos autorais, segredos comerciais ou marcas de
               terceiros sem a devida licença ou citação legal;
@@ -283,6 +332,12 @@ export default function TermosPage() {
             valores irretratáveis e não reembolsáveis, exceto em hipótese de erro operacional
             comprovado.
           </p>
+          <p>
+            <strong>7.3. Reconhecimento público:</strong> O nome de exibição e a pontuação de quem apoia
+            aparecem no ranking de contribuição, no ranking semanal exibido aos domingos e, uma vez para
+            cada membro, na faixa de agradecimento do feed (sem o valor). Quem preferir apoiar de forma
+            anônima pode pedir pelo canal da Cláusula 12.
+          </p>
         </section>
 
         {/* Cláusula 7-A */}
@@ -329,18 +384,44 @@ export default function TermosPage() {
             8. Da Moderação, Suspensão e Regime de Responsabilidade Civil
           </h2>
           <p>
-            <strong>8.1. Poder de Moderação:</strong> O Operador reserva-se o direito de, a seu
-            exclusivo critério técnico e jurídico, ocultar, remover ou restringir o acesso a
-            qualquer publicação, comentário ou conta de Usuário que viole estes Termos, comprometa
-            a estabilidade da Plataforma ou infrinja a legislação vigente, sem prejuízo das medidas
-            judiciais cabíveis.
+            <strong>8.1. Moderação automática antes da publicação:</strong> Insights, respostas,
+            reposts com comentário, tópicos e alterações de perfil passam por verificações automáticas
+            antes de aparecer para outras pessoas. O conteúdo pode ser: liberado; liberado com aviso
+            +18; colocado em análise (oculto até revisão humana); ou bloqueado (retido, visível só para
+            o autor). O autor recebe uma mensagem explicando o motivo.
           </p>
           <p>
-            <strong>8.2. Responsabilidade por Conteúdo de Terceiros:</strong> Em estrita observância
-            ao <strong>Artigo 19 do Marco Civil da Internet (Lei nº 12.965/2014)</strong>, as
-            opiniões, comentários e conteúdos publicados por Usuários e terceiros nas threads de
-            discussão são de responsabilidade exclusiva de seus respectivos autores, não refletindo
-            necessariamente o posicionamento oficial da Plataforma.
+            <strong>8.2. Revisão humana:</strong> O autor pode pedir a revisão de qualquer conteúdo
+            retido pelo botão &ldquo;Pedir revisão&rdquo;. A equipe pode liberar, liberar como +18,
+            manter o bloqueio ou excluir o conteúdo, e o autor é avisado da decisão. A moderação pode
+            errar; por isso a revisão é sempre possível (Art. 20 da LGPD).
+          </p>
+          <p>
+            <strong>8.3. Medidas contra abuso:</strong> Para proteger a comunidade, a Plataforma limita
+            a quantidade de publicações em curtos intervalos, pausa temporariamente quem tem vários
+            conteúdos bloqueados em sequência e pode suspender ou encerrar contas que violem estes
+            Termos de forma grave ou repetida. Alterações de perfil que violem as regras voltam
+            automaticamente ao valor anterior.
+          </p>
+          <p>
+            <strong>8.4. Denúncias:</strong> Qualquer pessoa pode denunciar um conteúdo pelo botão de
+            denúncia ou pelo canal da Cláusula 12. Imagens íntimas divulgadas sem consentimento são
+            retiradas após a notificação da pessoa exposta ou de seu representante, como determina o
+            Art. 21 do Marco Civil da Internet.
+          </p>
+          <p>
+            <strong>8.5. Responsabilidade pelo conteúdo:</strong> Cada autor responde pelo que publica.
+            A Plataforma atua de forma diligente para impedir e retirar conteúdo ilícito, inclusive
+            após notificação, observando o Marco Civil da Internet (Lei nº 12.965/2014) e o
+            entendimento do Supremo Tribunal Federal sobre a responsabilidade das plataformas (Temas
+            533 e 987). As opiniões publicadas não refletem necessariamente o posicionamento oficial da
+            Plataforma.
+          </p>
+          <p>
+            <strong>8.6. Cooperação com autoridades:</strong> A Plataforma preserva registros e fornece
+            dados a autoridades apenas mediante ordem judicial ou nas hipóteses previstas em lei, e
+            comunica às autoridades competentes os casos de exploração sexual de crianças e
+            adolescentes.
           </p>
         </section>
 
@@ -378,6 +459,12 @@ export default function TermosPage() {
             informação a qualquer momento no menu de status do próprio perfil.
           </p>
           <p>
+            <strong>8-A.5-A. Menções, salvos e atividade:</strong> Ao marcar alguém com @, a pessoa
+            recebe uma notificação. Os Insights salvos e o painel &ldquo;Sua atividade&rdquo; (tempo de
+            tela, Insights vistos, curtidas e outros números de uso) são privados e visíveis apenas para
+            o próprio Usuário.
+          </p>
+          <p>
             <strong>8-A.6. Áreas de organização pessoal:</strong> Abas de tópicos como plano
             nutricional, metas, hábitos e agenda seguem a visibilidade do perfil e da aba. Não
             publique nessas áreas dados de saúde ou outras informações sensíveis que não queira
@@ -413,7 +500,9 @@ export default function TermosPage() {
             (hospedagem em nuvem e rede de borda), <strong className="text-primary">Resend / Google SMTP</strong>{' '}
             (disparo transacional de e-mails), <strong className="text-primary">Spotify API</strong>{' '}
             (incorporação de mídia de áudio), <strong className="text-primary">GIPHY / Tenor</strong>{' '}
-            (busca de GIFs), <strong className="text-primary">Mercado Pago</strong> (pagamentos da
+            (busca de GIFs), <strong className="text-primary">OpenAI</strong> (moderação automática de
+            conteúdo), <strong className="text-primary">Apple iTunes Search</strong> (busca de músicas),{' '}
+            <strong className="text-primary">Mercado Pago</strong> (pagamentos de doações e da
             assinatura Nitro) e portais de notícias de terceiros (feeds públicos RSS/Atom e Google
             Notícias). O Operador não se responsabiliza por instabilidades,
             interrupções ou alterações políticas originadas exclusivamente nos servidores desses
@@ -481,8 +570,9 @@ export default function TermosPage() {
             <strong>12.1. Regência Legal:</strong> Estes Termos são regidos e interpretados
             exclusivamente em conformidade com as leis da{' '}
             <strong className="text-primary">República Federativa do Brasil</strong>, em especial o
-            Código Civil (Lei nº 10.406/2002), o Marco Civil da Internet (Lei nº 12.965/2014) e a
-            LGPD (Lei nº 13.709/2018).
+            Código Civil (Lei nº 10.406/2002), o Código de Defesa do Consumidor (Lei nº 8.078/1990), o
+            Marco Civil da Internet (Lei nº 12.965/2014), a LGPD (Lei nº 13.709/2018), o Estatuto da
+            Criança e do Adolescente (Lei nº 8.069/1990) e a Lei nº 15.211/2025 (ECA Digital).
           </p>
           <p>
             <strong>12.2. Eleição de Foro:</strong> Para dirimir quaisquer controvérsias, dúvidas ou
@@ -492,7 +582,8 @@ export default function TermosPage() {
               Comarca de Rio Paranaíba, Estado de Minas Gerais
             </strong>
             , com renúncia expressa a qualquer outro, por mais privilegiado que seja, ressalvadas as
-            hipóteses de competência legal absoluta.
+            hipóteses de competência legal absoluta e o direito do consumidor de propor ação no foro
+            do próprio domicílio (Art. 101, I, do Código de Defesa do Consumidor).
           </p>
 
           {/* Card de Contato Oficial */}

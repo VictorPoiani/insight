@@ -1,5 +1,6 @@
 'use client';
 
+import { WritingDesk } from './WritingDesk';
 import { DietPlanner } from './DietPlanner';
 import { usePanZoom, PanZoomControls, boundsFromPercent } from '@/components/canvas/PanZoom';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -55,6 +56,7 @@ import {
   Download,
   ArrowRight,
   ArrowLeft,
+  Feather,
 } from 'lucide-react';
 
 interface TopicWorkspaceViewProps {
@@ -482,6 +484,7 @@ export function TopicWorkspaceView({
           {templateType === 'roadmap' && <Compass className="w-4 h-4 text-[#38bdf8]" />}
           {templateType === 'mindmap' && <Network className="w-4 h-4 text-[#a855f7]" />}
           {templateType === 'diet' && <Apple className="w-4 h-4 text-[#f59e0b]" />}
+          {templateType === 'writing' && <Feather className="w-4 h-4 text-amber-600" />}
           {templateType === 'agenda' && <Calendar className="w-4 h-4 text-[#E63946]" />}
           {templateType === 'blank_db' && <Table2 className="w-4 h-4 text-accent" />}
 
@@ -492,6 +495,7 @@ export function TopicWorkspaceView({
             {templateType === 'roadmap' && 'Roadmap de Arquitetura & Entregas'}
             {templateType === 'mindmap' && 'Estúdio 2D · Arquitetura & Brainstorm'}
             {templateType === 'diet' && 'Plano Nutricional & Macronutrientes'}
+            {templateType === 'writing' && 'Poemas & Livros · My Notebook'}
             {templateType === 'agenda' && 'Agenda Técnica & Cronograma'}
             {templateType === 'blank_db' && 'Base de Dados Estruturada'}
           </span>
@@ -2540,6 +2544,7 @@ export function TopicWorkspaceView({
           6. PLANO NUTRICIONAL & MACRONUTRIENTES (DIET)
          ===================================================================== */}
       {templateType === 'diet' && <DietPlanner data={data} isAdmin={isAdmin} persist={persistWorkspace} />}
+      {templateType === 'writing' && <WritingDesk data={data} isAdmin={isAdmin} persist={persistWorkspace} />}
 
       {/* =====================================================================
           7. AGENDA TÉCNICA & CRONOGRAMA (AGENDA)

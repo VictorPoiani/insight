@@ -97,7 +97,8 @@ export type TopicTemplateType =
   | 'diet'
   | 'agenda'
   | 'roadmap'
-  | 'mindmap';
+  | 'mindmap'
+  | 'writing';
 
 export interface MindMapChecklistItem {
   id: string;
@@ -207,7 +208,18 @@ export interface MindMapEdgeItem {
   label?: string;
 }
 
+/** Escrito do modelo "Poemas & Livros" (texto puro; pode vir do My Notebook). */
+export interface WritingPiece {
+  id: string;
+  kind: 'poem' | 'chapter' | 'text';
+  title: string;
+  body: string;
+  notebookId?: string;
+  updatedAt: string;
+}
+
 export interface TopicWorkspaceData {
+  writings?: WritingPiece[];
   goals?: GoalItem[];
   habits?: HabitItem[];
   habitColumns?: string[];

@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { accountEmailHtml, sendAccountEmail, siteUrl } from '@/lib/account/mailer';
 
 const MAX_PER_HOUR = 3;
+/** por IP: impede usar o site para disparar e-mails em massa para endereços alheios */
+const MAX_PER_IP_HOUR = 10;
 const GENERIC = {
   ok: true,
   message: 'Se existir uma conta com esse e-mail, enviamos um link para redefinir a senha.',
@@ -30,7 +32,21 @@ export async function POST(req: NextRequest) {
     .eq('kind', 'recovery')
     .gte('sent_at', since);
   if ((count ?? 0) >= MAX_PER_HOUR) return NextResponse.json(GENERIC);
-  await admin.from('account_email_log').insert({ email_hash: emailHash, kind: 'recovery' });
+
+  const ip = (req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0] || '').trim();
+  const ipHash = ip ? crypto.createHash('sha256').update(`ip:${ip}`).digest('hex') : null;
+  if (ipHash) {
+    const { count: ipCount } = await admin
+      .from('account_email_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('ip_hash', ipHash)
+      .eq('kind', 'recovery')
+      .gte('sent_at', since);
+    if ((ipCount ?? 0) >= MAX_PER_IP_HOUR) {
+      return NextResponse.json({ error: 'Muitas solicitações. Tente de novo mais tarde.' }, { status: 429 });
+    }
+  }
+  await admin.from('account_email_log').insert({ email_hash: emailHash, kind: 'recovery', ip_hash: ipHash });
 
   const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
   const tokenHash = data?.properties?.hashed_token;

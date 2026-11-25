@@ -142,12 +142,11 @@ const DEFAULT_PREFS: UserPreferences = {
 };
 
 function generateRandomBetaCode(): string {
+  // gerador criptográfico e 12 caracteres aleatórios (~60 bits): inviável adivinhar
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const pick = (len: number) =>
-    Array.from({ length: len }, () =>
-      chars.charAt(Math.floor(Math.random() * chars.length))
-    ).join('');
-  return `INSG-${pick(4)}-${pick(4)}`;
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const s = Array.from(bytes, (b) => chars.charAt(b % chars.length)).join('');
+  return `INSG-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
 }
 
 /**

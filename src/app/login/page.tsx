@@ -56,7 +56,7 @@ const RESERVED_USERNAMES = new Set([
 ]);
 
 function formatInviteCode(value: string) {
-  const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
   const parts = clean.match(/.{1,4}/g) || [];
   return parts.join('-');
 }
@@ -451,7 +451,7 @@ export default function LoginPage() {
 
       if (IS_CLOSED_BETA) {
         if (cleanCode.length < 14) {
-          throw new Error('Digite o código completo no formato XXXX-XXXX-XXXX.');
+          throw new Error('Digite o código de convite completo.');
         }
 
         // A lista de convites é privada: a validação acontece no banco
@@ -459,6 +459,10 @@ export default function LoginPage() {
           'check_invite_code',
           { p_code: cleanCode }
         );
+
+        if (inviteStatus === 'rate_limited') {
+          throw new Error('Muitas tentativas de código. Aguarde alguns minutos e tente de novo.');
+        }
 
         if (inviteErr || inviteStatus === 'invalid' || !inviteStatus) {
           throw new Error('Código de convite inválido ou não encontrado.');
@@ -731,7 +735,7 @@ export default function LoginPage() {
 
             <div>
               <label className={labelClass}>
-                Chave de Convite (Padrão XXXX-XXXX-XXXX)
+                Chave de Convite
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-accent absolute left-3.5 top-3" />
@@ -740,8 +744,8 @@ export default function LoginPage() {
                   required
                   value={inviteCode}
                   onChange={(e) => setInviteCode(formatInviteCode(e.target.value))}
-                  placeholder="INSG-2026-BETA"
-                  maxLength={14}
+                  placeholder="INSG-XXXX-XXXX-XXXX"
+                  maxLength={24}
                   className={`${inputClass} font-mono font-bold tracking-widest uppercase`}
                 />
               </div>

@@ -93,8 +93,9 @@ export function worst(...ds: Decision[]): Decision {
 /** Mensagem clara para quem publicou. */
 export function userMessage(d: Decision, kind: 'post' | 'reply' | 'topic' | 'profile' = 'post'): string {
   const what = kind === 'reply' ? 'Sua resposta' : kind === 'topic' ? 'Seu tópico' : kind === 'profile' ? 'A alteração no seu perfil' : 'Seu Insight';
-  if (d.verdict === 'ALLOW') return `${what} foi publicado.`;
-  if (d.verdict === 'NSFW') return `${what} foi publicado com o aviso +18: ele aparece borrado até a pessoa confirmar que quer ver.`;
+  const pub = kind === 'reply' ? 'publicada' : 'publicado';
+  if (d.verdict === 'ALLOW') return `${what} foi ${pub}.`;
+  if (d.verdict === 'NSFW') return `${what} foi ${pub} com o aviso +18: aparece borrado até a pessoa confirmar que quer ver.`;
   if (d.verdict === 'REVIEW') {
     if (d.reason === 'media_unverified') return `${what} está em análise: não conseguimos verificar a mídia automaticamente, então a equipe vai revisar antes de liberar.`;
     return `${what} está em análise pela moderação e só aparece no feed depois da revisão.`;
@@ -112,8 +113,12 @@ export function userMessage(d: Decision, kind: 'post' | 'reply' | 'topic' | 'pro
     media_unverified: 'A mídia não pôde ser verificada.',
     none: 'O conteúdo viola as regras da comunidade.',
   };
-  const tail = kind === 'profile' ? ' Os valores anteriores foram restaurados.' : ' Ele ficou retido e não aparece para ninguém. Se achar que foi um engano, peça uma revisão.';
-  return `${what} foi bloqueado. ${why[d.reason]}${tail}`;
+  if (kind === 'profile') {
+    return `A alteração no seu perfil foi bloqueada. ${why[d.reason]} O texto voltou ao anterior e a foto bloqueada foi trocada pela padrão.`;
+  }
+  const blocked = kind === 'reply' ? 'bloqueada' : 'bloqueado';
+  const held = kind === 'reply' ? 'Ela ficou retida' : 'Ele ficou retido';
+  return `${what} foi ${blocked}. ${why[d.reason]} ${held} e não aparece para ninguém. Se achar que foi um engano, peça uma revisão.`;
 }
 
 /** Rótulo curto para a interface (selo no post e painel da equipe). */

@@ -83,6 +83,7 @@ export type MenuState = {
 
 const CALLOUT_GLYPH: Record<string, GlyphName> = {
   nota: 'pen',
+  segredo: 'lock',
   ideia: 'idea',
   dica: 'sparkle',
   info: 'info',

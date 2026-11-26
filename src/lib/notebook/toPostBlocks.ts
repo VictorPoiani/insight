@@ -66,6 +66,8 @@ export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans'; 
       if (src) out.push({ id: uid(), type: 'image', imageUrl: src, imageCaption: (el as HTMLImageElement).alt || '', imageWidth: '100%', imageAlign: 'center' });
       return;
     }
+    // segredo do autor nunca sai do Notebook
+    if (el.classList.contains('nb-callout--secret') || el.getAttribute('data-secret') === 'true') return;
     if (el.classList.contains('nb-callout')) {
       return push('callout', el.textContent || '', { calloutIcon: '💡' });
     }

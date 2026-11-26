@@ -22,6 +22,8 @@ export interface NotebookTemplateDef {
   data?: () => NotebookItemData;
   /** modelo de workspace dos tópicos reaproveitado */
   workspace?: TopicTemplateType;
+  /** não aparece em "Novo a partir de modelo" (criado por outra tela) */
+  hidden?: boolean;
 }
 
 const fmtDate = (d: Date) =>
@@ -132,6 +134,19 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
         '',
         '#worldbuilding',
       ].join('\n'),
+  },
+
+  {
+    id: 'codex',
+    section: 'livro',
+    name: 'Verbete do Codex',
+    description: 'Um verbete do mundo, com Infobox e aparições.',
+    icon: 'codex',
+    color: '#94a3b8',
+    kind: 'note',
+    title: () => 'Novo verbete',
+    content: () => '',
+    hidden: true,
   },
 
   // ------------------------------------------------------------ modelos de texto

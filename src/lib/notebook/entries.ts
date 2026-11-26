@@ -22,6 +22,10 @@ export interface NotebookEntry {
   aliases: string[];
   category: EntryCategory | null;
   image_url: string | null;
+  /** categoria do Codex (Worldbuilding) */
+  codex_category_id?: string | null;
+  /** segredo do autor: o verbete inteiro fica fora de publicações */
+  is_secret?: boolean;
   created_at: string;
   updated_at: string;
 }

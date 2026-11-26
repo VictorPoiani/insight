@@ -129,6 +129,7 @@ export const CALLOUT_TYPES: { id: string; label: string }[] = [
   { id: 'perigo', label: 'Perigo' },
   { id: 'citacao', label: 'Citação' },
   { id: 'todo', label: 'A fazer' },
+  { id: 'segredo', label: 'Segredo do autor' },
 ];
 
 const CALLOUT_RE = /^ {0,3}> ?\[!([\w-]+)\][+-]?[ \t]*([^\n]*)(?:\n|$)((?: {0,3}>[^\n]*(?:\n|$))*)/;

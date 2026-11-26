@@ -10,6 +10,7 @@ export type NotebookTemplate =
   | 'chapter'
   | 'character'
   | 'world'
+  | 'codex'
   // modelos de texto
   | 'journal'
   | 'screenplay'

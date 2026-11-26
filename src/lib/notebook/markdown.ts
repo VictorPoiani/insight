@@ -46,6 +46,7 @@ const CALLOUTS: Record<string, { icon: string; cls: string; label: string }> = {
   todo: { icon: glyphSvg('todo'), cls: 'todo', label: 'A fazer' },
   ideia: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
   idea: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
+  segredo: { icon: glyphSvg('lock'), cls: 'secret', label: 'Segredo do autor' },
 };
 
 /** Inline: recebe texto CRU, devolve HTML seguro. */

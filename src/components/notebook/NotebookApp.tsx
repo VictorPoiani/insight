@@ -92,6 +92,12 @@ import { SplitPane, SPLIT_MIN, type SplitTarget } from './split/SplitPane';
 import { SessionPill, SessionStartDialog, SessionSummaryDialog, useWritingSession } from './session/WritingSession';
 import type { RightTab } from './RightPanel';
 import { extractHeadings } from '@/lib/notebook/markdown';
+import { useCodex } from '@/lib/notebook/useCodex';
+import { codexData, isEmptyValue, valueText } from '@/lib/notebook/codex';
+import { isWorld } from '@/lib/notebook/projects';
+import { WorldContext, useSecrets, type WorldTools } from './world/WorldContext';
+import { WorldHub } from './world/WorldHub';
+import { projectOf } from './entries/MentionContext';
 import './notebook.css';
 import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
@@ -261,6 +267,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [rightTabReq, setRightTabReq] = useState<{ tab: RightTab; at: number } | null>(null);
   const [sessionDialog, setSessionDialog] = useState(false);
   const session = useWritingSession(api, viewer.id);
+  const codex = useCodex(viewer.id);
+  const [secretsShown, setSecretsShown] = useSecrets();
   const restored = useRef(false);
 
   // ------------------------------------------------------------ layout salvo
@@ -555,9 +563,31 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       const full = item._full ? item : await api.loadFull(item.id);
       if (!full) return;
       const book = full.parent_id && api.items[full.parent_id]?.template === 'book' ? api.items[full.parent_id] : null;
-      setPublishing({ item: full, blocks: itemToPostBlocks(full, book, entriesApi.entries) });
+      let blocks = itemToPostBlocks(full, book, entriesApi.entries);
+      // verbete do Codex: Infobox vira tabela; segredos ficam de fora
+      const cx = full.template === 'codex' ? codexData(full.data) : null;
+      if (cx) {
+        const entry = entriesApi.entries[cx.entry];
+        if (entry?.is_secret) {
+          alert('Este verbete está marcado como segredo do autor e não pode ser publicado.');
+          return;
+        }
+        const cat = entry?.codex_category_id ? codex.cats[entry.codex_category_id] : null;
+        const parent = cat?.parent_id ? codex.cats[cat.parent_id] : null;
+        const fields = cat?.fields?.length ? cat.fields : parent?.fields || [];
+        const titleOf = (id: string) => (entriesApi.entries[id] && !entriesApi.entries[id].is_secret ? entriesApi.entries[id].title : null);
+        const rows = fields
+          .filter((f) => !isEmptyValue(cx.infobox[f.key]) && !cx.infobox[f.key]?.secret)
+          .map((f) => [f.label, valueText(cx.infobox[f.key], titleOf)])
+          .filter(([, v]) => v);
+        const lead: PostBlock[] = [];
+        if (entry?.summary) lead.push({ id: Math.random().toString(36).slice(2), type: 'paragraph', html: entry.summary.replace(/&/g, '&amp;').replace(/</g, '&lt;') });
+        if (rows.length) lead.push({ id: Math.random().toString(36).slice(2), type: 'table', tableData: rows });
+        blocks = [blocks[0], ...lead, ...blocks.slice(1)];
+      }
+      setPublishing({ item: full, blocks });
     },
-    [api, entriesApi.entries]
+    [api, entriesApi.entries, codex.cats]
   );
 
   const path = useMemo(() => {
@@ -634,6 +664,86 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     },
     [api, viewer.contributor_level, viewer.role]
   );
+  // ------------------------------------------------------------ mundo (Codex)
+  const codexFolders = useRef<Map<string, string>>(new Map());
+  const ensureCodexFolder = useCallback(
+    async (projectId: string) => {
+      const known = codexFolders.current.get(projectId);
+      if (known && api.items[known] && !api.items[known].archived_at) return known;
+      const found = Object.values(api.items).find((i) => i.parent_id === projectId && i.kind === 'folder' && !i.archived_at && i.data?.codexFolder);
+      if (found) {
+        codexFolders.current.set(projectId, found.id);
+        return found.id;
+      }
+      const f = await api.create({ template: 'folder', parentId: projectId, title: 'Codex' });
+      if (!f) return null;
+      api.update(f.id, { icon: 'codex', data: { ...(f.data || {}), codexFolder: true } });
+      codexFolders.current.set(projectId, f.id);
+      return f.id;
+    },
+    [api]
+  );
+  const worldTools: WorldTools = {
+    api,
+    entriesApi,
+    codex,
+    open,
+    openAside: (id) => setSplit({ kind: 'item', id }),
+    readMore,
+    openSummary: (pid, focus = null) => openSummary(pid, focus),
+    onNew: ({ parentId, template, title }) => void createAndOpen({ parentId, template, title }),
+    uploadImage: uploadEntryImage,
+    newVerbete: async (projectId, categoryId, title = 'Novo verbete') => {
+      const folder = await ensureCodexFolder(projectId);
+      if (!folder) return null;
+      const cat = categoryId ? codex.cats[categoryId] : null;
+      const it = await api.create({ template: 'codex', parentId: folder, title });
+      if (!it) return null;
+      const e = await entriesApi.create({
+        kind: 'elemento',
+        title: it.title,
+        summary: '',
+        target_id: it.id,
+        project_id: projectId,
+        category: cat?.kind ?? null,
+        // (categoria recém-criada pode ainda não estar no estado: usa o id)
+        codex_category_id: categoryId,
+      });
+      if (!e) {
+        void api.trash(it.id);
+        return null;
+      }
+      const data = { ...(it.data || {}), codex: { entry: e.id, infobox: {} } };
+      api.update(it.id, { data });
+      return { ...it, data };
+    },
+    promoteEntry: async (entry, categoryId) => {
+      const cat = categoryId ? codex.cats[categoryId] : null;
+      const target = entry.target_id ? api.items[entry.target_id] : null;
+      // já tem página (ficha, nota…): só entra no Codex
+      if (target && !target.archived_at) {
+        await entriesApi.update(entry.id, { codex_category_id: cat?.id ?? null, ...(cat ? { category: cat.kind } : {}) });
+        return target;
+      }
+      const folder = await ensureCodexFolder(entry.project_id || '');
+      if (!folder) return null;
+      const it = await api.create({ template: 'codex', parentId: folder, title: entry.title });
+      if (!it) return null;
+      const data = { ...(it.data || {}), codex: { entry: entry.id, infobox: {} } };
+      api.update(it.id, { data });
+      await entriesApi.update(entry.id, { target_id: it.id, codex_category_id: cat?.id ?? null, ...(cat ? { category: cat.kind } : {}) });
+      return { ...it, data };
+    },
+    removeVerbete: async (entry) => {
+      const t = entry.target_id ? api.items[entry.target_id] : null;
+      if (t?.template === 'codex') {
+        closeTab(t.id);
+        await api.trash(t.id);
+      }
+      await entriesApi.remove(entry.id);
+    },
+  };
+
   // ------------------------------------------------------------ tela dividida
   const promoteSplit = useCallback(() => {
     if (!split) return;
@@ -750,6 +860,29 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     session.state
       ? { id: 'session', group: 'Escrita', label: 'Encerrar sessão de escrita', icon: ic(Timer), keywords: 'meta cronometro', run: () => session.end(true) }
       : { id: 'session', group: 'Escrita', label: 'Iniciar sessão de escrita', icon: ic(Timer), keywords: 'meta cronometro pomodoro', run: () => setSessionDialog(true) },
+    ...(currentProjectId && isWorld(api.items[currentProjectId])
+      ? [
+          {
+            id: 'verbete',
+            group: 'Criar',
+            label: 'Novo verbete no Codex',
+            icon: ic(BookMarked),
+            keywords: 'worldbuilding mundo codex',
+            run: async () => {
+              const it = await worldTools.newVerbete(currentProjectId, null);
+              if (it) open(it.id);
+            },
+          },
+        ]
+      : []),
+    {
+      id: 'secrets',
+      group: 'Escrita',
+      label: secretsShown ? 'Esconder segredos do autor' : 'Mostrar segredos do autor',
+      icon: ic(Lock),
+      keywords: 'spoiler segredo',
+      run: () => setSecretsShown(!secretsShown),
+    },
     ...(book
       ? [
           {
@@ -897,7 +1030,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     <NotebookLinksContext.Provider value={linkCtx}>
     <ContextMenuProvider>
     <GlobalContextMenus actions={menuActions} />
-    <div className="nb-app" data-immersive={immersive} data-side-hidden={sideHidden} data-enter="true">
+    <WorldContext.Provider value={worldTools}>
+    <div className="nb-app" data-immersive={immersive} data-side-hidden={sideHidden} data-secrets={secretsShown ? 'shown' : 'hidden'} data-enter="true">
       <NotebookSplashExit />
       <div className="flex flex-1 min-h-0 flex-col md:flex-row relative">
         {/* RIBBON */}
@@ -1172,7 +1306,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     level={viewer.contributor_level}
                   />
                 ) : (
-                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' ? 'max-w-6xl' : 'max-w-3xl'}`}>
+                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' || active.template === 'codex' || isWorld(active) ? 'max-w-6xl' : 'max-w-3xl'}`}>
                     {/* trilha + ações */}
                     <div className="flex items-center gap-2 mb-4 min-h-[28px]">
                       <nav className="flex items-center gap-1 text-[12px] text-[var(--nb-ink-3)] min-w-0 flex-1" aria-label="Caminho">
@@ -1186,7 +1320,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                         ))}
                         <span className="truncate text-[var(--nb-ink-2)]">{active.kind === 'folder' ? (isProject(active) ? 'Projeto' : 'Seção') : getTemplate(active.template).name}</span>
                       </nav>
-                      {(active.template === 'markdown' || active.template === 'blocks' || ['journal', 'screenplay', 'study', 'idea', 'character', 'world', 'meeting', 'poem', 'article'].includes(active.template)) && (
+                      {(active.template === 'markdown' || active.template === 'blocks' || ['journal', 'screenplay', 'study', 'idea', 'character', 'world', 'meeting', 'poem', 'article', 'codex'].includes(active.template)) && (
                         <button
                           type="button"
                           onClick={() => void startPublish(active)}
@@ -1227,7 +1361,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     </div>
 
                     {/* título */}
-                    <TitleInput key={`t-${active.id}-${reloadKey}`} item={active} onRename={(t) => void rename(active.id, t)} />
+                    {active.template !== 'codex' && <TitleInput key={`t-${active.id}-${reloadKey}`} item={active} onRename={(t) => void rename(active.id, t)} />}
                     {active.published_post_id && (
                       <a href={`/post/${active.published_post_id}`} target="_blank" className="inline-flex items-center gap-1 mb-4 text-[11px] font-semibold text-purple-400 hover:underline">
                         <Sparkles className="w-3 h-3" /> publicado no Insight
@@ -1437,6 +1571,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         </div>
       )}
     </div>
+    </WorldContext.Provider>
     </ContextMenuProvider>
     </NotebookLinksContext.Provider>
   );
@@ -1480,6 +1615,8 @@ function NoteBody({
     },
     [api, item.id]
   );
+
+  if (item.kind === 'folder' && isWorld(item)) return <WorldHub project={item} />;
 
   if (item.kind === 'folder' && isProject(item)) {
     return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} onSummary={onSummary} onImport={onImport} />;
@@ -1559,7 +1696,7 @@ function NoteBody({
   }
 
   const EditorCmp = NOTEBOOK_FEATURES.richEditor ? NoteEditor : MarkdownEditor;
-  return (
+  const editor = (
     <EditorCmp
       item={item}
       titles={titles}
@@ -1573,6 +1710,13 @@ function NoteBody({
       jumpTo={jump}
     />
   );
+  // verbete do Codex: o texto entra na página do verbete, dentro do Mundo
+  if (item.template === 'codex') {
+    const pid = projectOf(api.items, item);
+    const project = pid ? api.items[pid] : null;
+    if (project && codexData(item.data)) return <WorldHub project={project} article={item} body={editor} />;
+  }
+  return editor;
 }
 
 /** Estúdio 2D: o mapa mental ocupa toda a área da direita. */

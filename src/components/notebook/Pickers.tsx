@@ -173,7 +173,7 @@ export function TemplatePicker({
   const [q, setQ] = useState('');
   const mine = Object.values(api.items).filter((i) => i.is_template && !i.archived_at);
   const qq = q.trim().toLowerCase();
-  const list = NOTEBOOK_TEMPLATES.filter((t) => !qq || t.name.toLowerCase().includes(qq) || t.description.toLowerCase().includes(qq));
+  const list = NOTEBOOK_TEMPLATES.filter((t) => !t.hidden).filter((t) => !qq || t.name.toLowerCase().includes(qq) || t.description.toLowerCase().includes(qq));
   const sections = (Object.keys(SECTION_LABELS) as TemplateSection[]).map((s) => ({ s, items: list.filter((t) => t.section === s) }));
 
   return (

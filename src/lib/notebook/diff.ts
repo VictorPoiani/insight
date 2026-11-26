@@ -34,6 +34,7 @@ const MARKDOWN_TEMPLATES = new Set([
   'poem',
   'article',
   'character',
+  'codex',
 ]);
 
 export function blockMode(template: string): BlockMode | null {

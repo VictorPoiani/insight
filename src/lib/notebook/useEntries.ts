@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { EntryCategory, EntryKind, EntryLink, EntryRel, NotebookEntry } from './entries';
 
-const COLS = 'id, profile_id, project_id, kind, title, summary, target_id, aliases, category, image_url, created_at, updated_at';
+const COLS = 'id, profile_id, project_id, kind, title, summary, target_id, aliases, category, image_url, codex_category_id, is_secret, created_at, updated_at';
 const LINK_COLS = 'id, profile_id, from_id, to_id, rel, label, created_at';
 
 /** Entradas do Sumário do usuário (todas: são poucas e leves). */
@@ -44,6 +44,7 @@ export function useEntries(profileId: string | null) {
       aliases?: string[];
       category?: EntryCategory | null;
       image_url?: string | null;
+      codex_category_id?: string | null;
     }) => {
       if (!profileId) return null;
       const { data, error } = await supabase
@@ -63,7 +64,7 @@ export function useEntries(profileId: string | null) {
   );
 
   const update = useCallback(
-    async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url'>>) => {
+    async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url' | 'codex_category_id' | 'is_secret'>>) => {
       setEntries((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
       const { error } = await supabase.from('notebook_entries').update(patch).eq('id', id);
       if (error) alert('Não foi possível salvar a entrada do Sumário.');

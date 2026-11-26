@@ -5,6 +5,7 @@ export type NotebookTemplate =
   // escrita livre
   | 'markdown'
   | 'blocks'
+  | 'canvas'
   // modo escritor
   | 'book'
   | 'chapter'

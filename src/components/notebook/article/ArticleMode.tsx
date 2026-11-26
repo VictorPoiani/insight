@@ -15,9 +15,12 @@ import { projectOf } from '../entries/MentionContext';
 import { EntryAvatar } from '../entries/MentionViews';
 import { SourceDialog } from './SourceDialog';
 import { RefText } from './RefText';
+import { CitationContext, insertCitation, type CitationTools } from '../editor/academic';
+import type { Editor } from '@tiptap/core';
+import 'katex/dist/katex.min.css';
 
 type Heading = { el: HTMLElement; level: number; text: string; num: string };
-type Caption = { kind: 'figura' | 'tabela'; text: string; el: HTMLElement };
+type Caption = { kind: 'figura' | 'tabela' | 'quadro' | 'grafico'; text: string; el: HTMLElement };
 type PanelTab = 'fontes' | 'trechos' | 'sumario';
 
 const PANELS_KEY = 'insight-notebook-article-panels';
@@ -55,7 +58,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
     }
   }, [panels]);
   const [tab, setTab] = useState<PanelTab>('fontes');
-  const [dialog, setDialog] = useState<{ source: Source | null } | null>(null);
+  const [dialog, setDialog] = useState<{ source: Source | null; title?: string } | null>(null);
   const [title, setTitle] = useState(live.title);
   useEffect(() => setTitle(live.title), [live.title]);
 
@@ -70,6 +73,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
   const [heads, setHeads] = useState<Heading[]>([]);
   const [caps, setCaps] = useState<Caption[]>([]);
   const [top, setTop] = useState<1 | 2>(2);
+  const [notes, setNotes] = useState<{ text: string; el: HTMLElement }[]>([]);
   useEffect(() => {
     const root = paperRef.current;
     if (!root) return;
@@ -90,13 +94,13 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
       setTop(topLevel as 1 | 2);
       setHeads(out);
       const c: Caption[] = [];
-      doc.querySelectorAll('figure, img, table').forEach((el) => {
-        if (el.tagName === 'IMG' && el.closest('figure')) return;
-        const kind = el.tagName === 'TABLE' ? 'tabela' : 'figura';
-        const text = el.tagName === 'FIGURE' ? el.querySelector('figcaption')?.textContent || '' : el.tagName === 'IMG' ? (el as HTMLImageElement).alt || '' : '';
-        c.push({ kind, text: text.trim(), el: el as HTMLElement });
+      doc.querySelectorAll('figure, p[data-caption]').forEach((el) => {
+        if (el.tagName === 'FIGURE') return void c.push({ kind: 'figura', text: (el.querySelector('figcaption')?.textContent || '').trim(), el: el as HTMLElement });
+        const k = el.getAttribute('data-caption');
+        if (k === 'figura' || k === 'tabela' || k === 'quadro' || k === 'grafico') c.push({ kind: k, text: (el.textContent || '').trim(), el: el as HTMLElement });
       });
       setCaps(c);
+      setNotes(Array.from(doc.querySelectorAll('sup[data-fn]')).map((el) => ({ text: el.getAttribute('data-fn') || '', el: el as HTMLElement })));
     };
     const later = () => {
       if (t) window.clearTimeout(t);
@@ -121,7 +125,9 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
   const cited = live.source_refs || [];
   const linkedIds = Array.from(new Set([...a.sources, ...cited]));
   const linked = linkedIds.map((id) => sourcesApi.sources[id]).filter((s): s is Source => !!s);
-  const references = sortReferences(linked, a.norm);
+  const citedSources = linked.filter((s) => cited.includes(s.id));
+  const references = sortReferences(a.onlyCited ? citedSources : linked, a.norm);
+  const uncited = linked.length - citedSources.length;
   const citeCount = (id: string) => (live.content.match(new RegExp(`\\]\\(cite:${id}`, 'g')) || []).length;
 
   const [q, setQ] = useState('');
@@ -137,6 +143,40 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
   const link = (id: string) => !a.sources.includes(id) && save({ sources: [...a.sources, id] }, 0);
   const unlink = (id: string) => save({ sources: a.sources.filter((x) => x !== id) }, 0);
 
+  // ------------------------------------------------------------ editor (inserir citação, trecho)
+  const editorOf = (): Editor | null => ((paperRef.current?.querySelector('.ProseMirror') as (HTMLElement & { editor?: Editor }) | null)?.editor as Editor) || null;
+  const citeNow = (id: string, page = '') => {
+    const ed = editorOf();
+    if (!ed) return;
+    link(id);
+    insertCitation(ed, id, page);
+  };
+  const quoteHtml = (x: { text: string; page: string | null; source_id: string }) => {
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const cite = `<span data-cite="${x.source_id}"${x.page ? ` data-page="${esc(x.page)}"` : ''}></span>`;
+    return x.text.length > 240 ? `<div data-callout="longa" data-title=""><p>${esc(x.text)} ${cite}</p></div><p></p>` : `<span>“${esc(x.text)}” </span>${cite}<span> </span>`;
+  };
+  const insertQuote = (x: { text: string; page: string | null; source_id: string }) => {
+    const ed = editorOf();
+    if (!ed) return;
+    link(x.source_id);
+    ed.chain().focus().insertContent(quoteHtml(x)).run();
+  };
+
+  // ------------------------------------------------------------ cadastro de fonte pedido de dentro do editor
+  const pending = useRef<((s: Source | null) => void) | null>(null);
+  const citeTools: CitationTools = {
+    sources: sourcesApi.sources,
+    linked: linkedIds,
+    norm: a.norm,
+    upperCase: a.upperCase,
+    requestSource: (t) =>
+      new Promise((resolve) => {
+        pending.current = resolve;
+        setDialog({ source: null, title: t });
+      }),
+  };
+
   const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => alert('Não foi possível copiar.'));
 
   // ------------------------------------------------------------ métricas
@@ -151,6 +191,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
     menu.open(
       e,
       [
+        { label: 'Citar no ponto do cursor', icon: <Plus className="w-3.5 h-3.5" />, run: () => citeNow(s.id) },
         { label: 'Editar fonte', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setDialog({ source: s }) },
         { label: `Copiar ${formatCitation(s, a.norm, { upperCase: a.upperCase })}`, icon: <Copy className="w-3.5 h-3.5" />, run: () => copy(formatCitation(s, a.norm, { upperCase: a.upperCase })) },
         { label: 'Copiar referência', icon: <Copy className="w-3.5 h-3.5" />, run: () => copy(formatReference(s, a.norm).map((x) => x.t).join('')) },
@@ -184,6 +225,16 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
           <input type="checkbox" checked={a.showPre} onChange={(e) => save({ showPre: e.target.checked }, 0)} />
           Elementos pré-textuais
         </label>
+        <label className="nb-art2-check" title="A NBR 6023 pede nas referências só os documentos citados no texto">
+          <input type="checkbox" checked={a.onlyCited} onChange={(e) => save({ onlyCited: e.target.checked }, 0)} />
+          Referências só das citadas
+        </label>
+        {a.norm === 'abnt' && (
+          <label className="nb-art2-check" title="Tradicional: (SILVA, 2025). A NBR 10520:2023 também aceita (Silva, 2025)">
+            <input type="checkbox" checked={a.upperCase} onChange={(e) => save({ upperCase: e.target.checked }, 0)} />
+            Autor em maiúsculas
+          </label>
+        )}
         <span className="flex-1" />
         <button type="button" aria-pressed={panels.outline} title="Estrutura" aria-label="Estrutura" onClick={() => setPanels((p) => ({ ...p, outline: !p.outline }))} className="nb-art2-toggle">
           <ListTree />
@@ -221,18 +272,18 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
             )}
             {caps.length > 0 && (
               <>
-                {(['figura', 'tabela'] as const).map((k) => {
+                {(['figura', 'tabela', 'quadro', 'grafico'] as const).map((k) => {
                   const list = caps.filter((c) => c.kind === k);
                   if (!list.length) return null;
                   return (
                     <div key={k} className="mt-5">
-                      <p className="nb-world-kicker mb-1.5">{k === 'figura' ? 'Figuras' : 'Tabelas'}</p>
+                      <p className="nb-world-kicker mb-1.5">{k === 'figura' ? 'Figuras' : k === 'tabela' ? 'Tabelas' : k === 'quadro' ? 'Quadros' : 'Gráficos'}</p>
                       <ol>
                         {list.map((c, i) => (
                           <li key={i}>
                             <button type="button" onClick={() => go(c.el)}>
                               <span className="nb-art2-num">{i + 1}</span>
-                              <span className="truncate">{c.text || (k === 'figura' ? 'Sem legenda' : 'Tabela')}</span>
+                              <span className="truncate">{c.text || 'Sem legenda'}</span>
                             </button>
                           </li>
                         ))}
@@ -301,8 +352,31 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
             </div>
           )}
 
-          <div className="nb-art2-body">{body}</div>
+          <div className="nb-art2-body">
+            <CitationContext.Provider value={citeTools}>{body}</CitationContext.Provider>
+          </div>
 
+          {notes.length > 0 && (
+            <section className="nb-art2-notes">
+              <h2>Notas</h2>
+              <ol>
+                {notes.map((n, i) => (
+                  <li key={i}>
+                    <button type="button" onClick={() => go(n.el)} className="nb-art2-num">
+                      {i + 1}
+                    </button>
+                    <span>{n.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {a.onlyCited && uncited > 0 && !references.length && (
+            <p className="nb-art2-refs-hint">
+              As referências aparecem aqui assim que você citar as fontes no texto (digite ^ ou use “Citar” no painel ao lado).
+            </p>
+          )}
           {references.length > 0 && (
             <section className="nb-art2-refs" id={`refs-${item.id}`}>
               <h2>{a.norm === 'editorial' ? 'Leituras e fontes' : a.norm === 'apa' ? 'Referências' : 'REFERÊNCIAS'}</h2>
@@ -367,6 +441,9 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
                             <span className="nb-art2-src-title">{s.title}</span>
                             <span className="nb-art2-src-meta">{n ? `citada ${n}×` : 'não citada'}</span>
                           </button>
+                          <button type="button" className="nb-art2-cite" onClick={() => citeNow(s.id)} title="Citar no ponto do cursor">
+                            Citar
+                          </button>
                           <button type="button" aria-label="Mais" className="nb-art2-more" onClick={(e) => sourceMenu(e, s)}>
                             <MoreHorizontal className="w-3.5 h-3.5" />
                           </button>
@@ -392,10 +469,23 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
                       if (!s) return null;
                       const cite = formatCitation(s, a.norm, { page: x.page || undefined, upperCase: a.upperCase });
                       return (
-                        <li key={x.id} className="group nb-art2-quote">
+                        <li
+                          key={x.id}
+                          className="group nb-art2-quote"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/html', quoteHtml(x));
+                            e.dataTransfer.setData('text/plain', `“${x.text}” ${cite}`);
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                          title="Arraste para o texto ou use Inserir"
+                        >
                           <p>“{x.text}”</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="flex-1 text-[11px] text-[var(--nb-ink-3)]">{cite}</span>
+                            <button type="button" onClick={() => insertQuote(x)} className="nb-art2-cite !static" title={x.text.length > 240 ? 'Inserir como citação longa' : 'Inserir entre aspas com a citação'}>
+                              Inserir
+                            </button>
                             <button type="button" title="Copiar com a citação" aria-label="Copiar com a citação" onClick={() => copy(`“${x.text}” ${cite}`)} className="p-1 text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]">
                               <Copy className="w-3.5 h-3.5" />
                             </button>
@@ -408,7 +498,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
                     })}
                   </ul>
                 ) : (
-                  <p className="text-[12px] leading-relaxed text-[var(--nb-ink-3)]">Salve trechos das fontes (com a página) ao editar cada fonte. Eles ficam aqui para consultar sem sair do texto.</p>
+                  <p className="text-[12px] leading-relaxed text-[var(--nb-ink-3)]">Salve trechos das fontes (com a página) ao editar cada fonte. Arraste um trecho para o texto: os curtos entram entre aspas e os longos como citação longa, já com a chamada.</p>
                 )}
               </div>
             )}
@@ -449,7 +539,8 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
         {read && <span title={`Índice de Flesch adaptado ao português: ${read.score}`}>legibilidade: {read.label}</span>}
         <span>
           {linked.length} {linked.length === 1 ? 'fonte' : 'fontes'}
-          {linked.length > 0 && cited.length < linked.length ? ` · ${linked.length - cited.filter((id) => linked.some((s) => s.id === id)).length} sem citação` : ''}
+          {uncited > 0 ? ` · ${uncited} sem citação` : ''}
+          {notes.length > 0 ? ` · ${notes.length} ${notes.length === 1 ? 'nota' : 'notas'}` : ''}
         </span>
         <span className="flex-1" />
         <button type="button" disabled title="Chega com o assistente de IA: coesão, clareza, tom formal e argumentação" className="nb-art2-ai">
@@ -460,11 +551,18 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
       {dialog && (
         <SourceDialog
           source={dialog.source}
+          initialTitle={dialog.title}
           projectId={projectId}
           sourcesApi={sourcesApi}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            setDialog(null);
+            pending.current?.(null);
+            pending.current = null;
+          }}
           onSaved={(s) => {
             if (!dialog.source) link(s.id);
+            pending.current?.(s);
+            pending.current = null;
           }}
         />
       )}

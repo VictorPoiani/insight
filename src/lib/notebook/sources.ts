@@ -559,18 +559,45 @@ export const shortLabel = (s: Source) => formatCitation(s, 'abnt').replace(/^\(|
 // ------------------------------------------------------------------ índice no texto
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const CITE_RE = new RegExp(`(?:\\]\\(cite:|data-cite=\\\\?")(${UUID})`, 'gi');
+const CITE_RE = new RegExp(`(?:\\]\\(cite:|data-cite=\\\\?"|data-apud=\\\\?"|apud:)((?:${UUID},?)+)`, 'gi');
+const ONE_ID = new RegExp(UUID, 'gi');
 
-/** Ids das fontes citadas num texto (markdown ou HTML). */
+/** Ids das fontes citadas num texto (markdown ou HTML), inclusive as de apud. */
 export function extractSourceRefs(...texts: (string | null | undefined)[]): string[] {
   const out = new Set<string>();
   for (const t of texts) {
     if (!t) continue;
     CITE_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = CITE_RE.exec(t))) out.add(m[1].toLowerCase());
+    while ((m = CITE_RE.exec(t))) (m[1].match(ONE_ID) || []).forEach((id) => out.add(id.toLowerCase()));
   }
   return Array.from(out).slice(0, 500);
+}
+
+export type CiteMode = 'paren' | 'narrative' | 'year';
+
+/**
+ * Chamada de uma citação com uma ou mais fontes:
+ *   (SILVA, 2020; SOUZA, 2021)        várias fontes
+ *   Silva (2020, p. 12)               narrativa (só uma fonte)
+ *   (2020, p. 12)                     só o ano (autor já escrito no texto)
+ *   (FREIRE, 2011 apud KLEIMAN, 2005) citação de citação
+ */
+export function formatCitationGroup(list: Source[], norm: CitationNorm, o: { page?: string; mode?: CiteMode; upperCase?: boolean; apud?: Source | null } = {}): string {
+  if (!list.length) return '(fonte removida)';
+  const year = (s: Source) => clean(s.year) || (norm === 'apa' ? 's.d.' : '[s. d.]');
+  const page = clean(o.page) ? `, p. ${clean(o.page).replace(/^p\.?\s*/i, '')}` : '';
+  const upperCase = o.upperCase ?? true;
+  const n = norm === 'editorial' ? 'apa' : norm;
+  if (o.mode === 'year' && list.length === 1) return `(${year(list[0])}${page})`;
+  if (o.mode === 'narrative' && list.length === 1) {
+    const base = `${citeName(list[0], n, false, upperCase)} (${year(list[0])}`;
+    if (o.apud) return `${base} apud ${citeName(o.apud, n, false, upperCase)}, ${year(o.apud)}${page})`;
+    return `${base}${page})`;
+  }
+  const parts = list.map((s) => `${citeName(s, n, true, upperCase)}, ${year(s)}`);
+  if (o.apud && list.length === 1) return `(${parts[0]} apud ${citeName(o.apud, n, true, upperCase)}, ${year(o.apud)}${page})`;
+  return `(${parts.join('; ')}${list.length === 1 ? page : ''})`;
 }
 
 // ------------------------------------------------------------------ legibilidade

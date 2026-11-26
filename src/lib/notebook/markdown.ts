@@ -47,6 +47,8 @@ const CALLOUTS: Record<string, { icon: string; cls: string; label: string }> = {
   ideia: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
   idea: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
   segredo: { icon: glyphSvg('lock'), cls: 'secret', label: 'Segredo do autor' },
+  checagem: { icon: glyphSvg('alert'), cls: 'warn', label: 'Aviso de checagem' },
+  longa: { icon: '', cls: 'long', label: '' },
 };
 
 /** Inline: recebe texto CRU, devolve HTML seguro. */
@@ -85,6 +87,16 @@ function inline(raw: string, ctx: RenderCtx): string {
       }</figure>`
     );
   });
+  // citação: [(SILVA, 2025)](cite:<ids> "p. 42") vira o texto da chamada
+  s = s.replace(/\[([^\]\n]*)\]\(cite:[0-9a-f,-]+(?:\s+"[^"\n]*")?\)/gi, (_, label) => keep(`<span class="nb-cite">${esc(label || '(citação)')}</span>`));
+  // nota de rodapé: ^[texto]
+  s = s.replace(/\^\[((?:\\\]|[^\]\n])*)\]/g, (_, text) => {
+    if (!ctx.notes) return '';
+    ctx.notes.push(String(text).replace(/\\\]/g, ']'));
+    return keep(`<sup class="nb-fn-ref">${ctx.notes.length}</sup>`);
+  });
+  // fórmula: $x^2$ (fica como código no texto publicado)
+  s = s.replace(/(^|[^\p{L}\p{N}$\\])\$(?=[^\s$])([^$\n]*?[^\s\\])\$(?![\p{N}])/gu, (_, pre, tex) => pre + keep(`<code class="nb-math-src">${esc(tex)}</code>`));
   // menção: [trecho](ref:<uuid> "tipo")
   s = s.replace(/\[([^\]\n]+)\]\(ref:([0-9a-f-]{36})(?:\s+"(elemento|nota_autor|aviso)")?\)/gi, (_, text, id, kind) =>
     keep(`<span class="nb-ref nb-ref--${kind || 'elemento'}" data-ref="${esc(id.toLowerCase())}" data-kind="${kind || 'elemento'}">${esc(text)}</span>`)
@@ -118,10 +130,23 @@ function inline(raw: string, ctx: RenderCtx): string {
 
 interface RenderCtx {
   titleExists?: (title: string) => boolean;
+  /** notas de rodapé encontradas (^[texto]) e contadores de legendas */
+  notes?: string[];
+  caps?: Record<string, number>;
 }
 
+const CAP_LABEL: Record<string, string> = { figura: 'Figura', tabela: 'Tabela', quadro: 'Quadro', grafico: 'Gráfico' };
+
 /** Markdown → HTML seguro. `taskLines` permite marcar tarefas no preview. */
-export function renderMarkdown(md: string, ctx: RenderCtx = {}): string {
+export function renderMarkdown(md: string, ctx0: RenderCtx = {}): string {
+  const root = !ctx0.notes;
+  const ctx: RenderCtx = root ? { ...ctx0, notes: [], caps: {} } : ctx0;
+  const html = renderBlocks(md, ctx);
+  if (!root || !ctx.notes!.length) return html;
+  return `${html}<ol class="nb-footnotes">${ctx.notes!.map((n) => `<li>${inline(n, ctx)}</li>`).join('')}</ol>`;
+}
+
+function renderBlocks(md: string, ctx: RenderCtx): string {
   const lines = md.replace(/\r\n?/g, '\n').split('\n');
   const out: string[] = [];
   let i = 0;
@@ -182,6 +207,29 @@ export function renderMarkdown(md: string, ctx: RenderCtx = {}): string {
       continue;
     }
 
+    // fórmula em bloco: $$ … $$
+    if (/^\s*\$\$/.test(line)) {
+      const buf: string[] = [line.replace(/^\s*\$\$/, '')];
+      i++;
+      while (i < lines.length && !/\$\$\s*$/.test(buf[buf.length - 1])) buf.push(lines[i++]);
+      const tex = buf.join('\n').replace(/\$\$\s*$/, '').trim();
+      out.push(`<pre class="nb-math-src nb-math-src--block">${esc(tex)}</pre>`);
+      continue;
+    }
+
+    // legenda padronizada: {{tabela}} Título  /  {{fonte}} Fonte: …
+    const cap = /^\{\{(figura|tabela|quadro|grafico|fonte)\}\}[ \t]*(.*)$/.exec(line);
+    if (cap) {
+      const kind = cap[1];
+      if (kind === 'fonte') out.push(`<p class="nb-cap nb-cap--fonte">${inline(cap[2], ctx)}</p>`);
+      else {
+        ctx.caps![kind] = (ctx.caps![kind] || 0) + 1;
+        out.push(`<p class="nb-cap nb-cap--${kind}"><strong>${CAP_LABEL[kind]} ${ctx.caps![kind]} –</strong> ${inline(cap[2], ctx)}</p>`);
+      }
+      i++;
+      continue;
+    }
+
     // linha horizontal / quebra de cena
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
       out.push('<hr class="nb-hr" />');
@@ -196,6 +244,11 @@ export function renderMarkdown(md: string, ctx: RenderCtx = {}): string {
       const c = buf[0]?.match(/^\[!([\w\p{L}]+)\]([+-]?)\s*(.*)$/u);
       if (c) {
         const key = c[1].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (key === 'longa') {
+          // citação longa (ABNT): recuo, fonte menor, sem título
+          out.push(`<blockquote class="nb-longquote">${renderMarkdown(buf.slice(1).join('\n'), ctx)}</blockquote>`);
+          continue;
+        }
         const meta = CALLOUTS[key] || CALLOUTS.note;
         const title = c[3] || meta.label;
         out.push(

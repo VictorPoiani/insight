@@ -27,6 +27,8 @@ export interface ArticleData {
   sources: string[];
   /** ABNT: sobrenome em maiúsculas nas chamadas entre parênteses */
   upperCase: boolean;
+  /** referências só com as fontes citadas no texto (como pede a NBR 6023) */
+  onlyCited: boolean;
 }
 
 export const NORMS: { id: CitationNorm; label: string; hint: string }[] = [
@@ -40,7 +42,7 @@ const EMPTY_PRE: ArticlePre = { subtitle: '', authors: '', abstract: '', keyword
 export function articleData(data: unknown): ArticleData {
   const a = (data as { article?: Partial<ArticleData> } | null)?.article;
   // artigos antigos (sem configuração) seguem como texto editorial
-  if (!a) return { norm: 'editorial', numbered: false, showPre: false, pre: EMPTY_PRE, sources: [], upperCase: true };
+  if (!a) return { norm: 'editorial', numbered: false, showPre: false, pre: EMPTY_PRE, sources: [], upperCase: true, onlyCited: false };
   const norm = a.norm === 'abnt' || a.norm === 'apa' || a.norm === 'editorial' ? a.norm : 'abnt';
   return {
     norm,
@@ -49,11 +51,12 @@ export function articleData(data: unknown): ArticleData {
     pre: { ...EMPTY_PRE, ...(a.pre || {}) },
     sources: Array.isArray(a.sources) ? a.sources.filter((x) => typeof x === 'string') : [],
     upperCase: a.upperCase ?? true,
+    onlyCited: a.onlyCited ?? true,
   };
 }
 
 export const newArticleData = (): { article: ArticleData } => ({
-  article: { norm: 'abnt', numbered: true, showPre: true, pre: EMPTY_PRE, sources: [], upperCase: true },
+  article: { norm: 'abnt', numbered: true, showPre: true, pre: EMPTY_PRE, sources: [], upperCase: true, onlyCited: true },
 });
 
 export const splitKeywords = (s: string) =>

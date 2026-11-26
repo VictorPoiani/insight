@@ -55,7 +55,7 @@ export function NoteEditor(props: RichNoteEditorProps) {
           ))}
         </div>
       </div>
-      {mode === 'visual' ? <RichNoteEditor key="v" {...props} variant={props.item.template === 'poem' ? 'poem' : undefined} /> : <MarkdownEditor key="m" {...props} />}
+      {mode === 'visual' ? <RichNoteEditor key="v" {...props} variant={props.item.template === 'poem' ? 'poem' : props.item.template === 'article' ? 'article' : undefined} /> : <MarkdownEditor key="m" {...props} />}
     </div>
   );
 }

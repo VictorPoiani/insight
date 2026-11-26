@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookMarked, FilePlus2, FolderPlus } from 'lucide-react';
+import { ArrowRight, BookMarked, FilePlus2, FolderPlus, Upload } from 'lucide-react';
 import { entryKind } from '@/lib/notebook/entries';
 import { useNotebookLinks } from '../editor/linkContext';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -19,12 +19,14 @@ export function ProjectHome({
   onOpen,
   onNew,
   onSummary,
+  onImport,
 }: {
   item: NotebookItem;
   api: NotebookApi;
   onOpen: (id: string) => void;
   onNew: (o: NewOpts) => void;
   onSummary: (projectId: string) => void;
+  onImport: (parentId: string | null) => void;
 }) {
   const { entries } = useNotebookLinks();
   const projEntries = Object.values(entries)
@@ -184,6 +186,14 @@ export function ProjectHome({
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="nb-pane-title">Neste projeto</h2>
           <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => onImport(item.id)}
+              title="Importar arquivos para este projeto"
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-xs font-bold hover:text-[var(--nb-hl)]"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar
+            </button>
             <button
               type="button"
               onClick={() => onNew({ parentId: item.id })}

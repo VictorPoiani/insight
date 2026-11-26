@@ -929,3 +929,10 @@
 .nb-rich-doc.nb-poem p { max-width: none; }
 .nb-rich-doc.nb-poem .nb-fig { margin: 2em auto; }
 .nb-rich-doc.nb-poem .nb-rc { font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif; font-size: 14px; line-height: 1.6; }
+
+
+/* estúdio 2D no celular: só os ícones na barra flutuante */
+@media (max-width: 640px) {
+  .nb-studio .nb-studio-bar button > span:last-child:not(:only-child) { display: none; }
+  .nb-studio .nb-studio-bar > div > span.font-mono { display: none; }
+}

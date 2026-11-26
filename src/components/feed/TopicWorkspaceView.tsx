@@ -71,6 +71,10 @@ interface TopicWorkspaceViewProps {
   onWorkspaceUpdated?: (nextData: TopicWorkspaceData) => void;
   /** Salva em outro lugar (ex.: My Notebook) em vez de custom_topics. */
   persistOverride?: (nextData: TopicWorkspaceData) => Promise<void> | void;
+  /** Notebook: o mapa mental ocupa toda a área, com controles flutuantes no topo */
+  studio?: boolean;
+  /** conteúdo no início da barra flutuante (título do mapa) */
+  studioLead?: React.ReactNode;
 }
 
 const NODE_COLORS = [
@@ -104,7 +108,10 @@ export function TopicWorkspaceView({
   isAdmin,
   onWorkspaceUpdated,
   persistOverride,
+  studio = false,
+  studioLead,
 }: TopicWorkspaceViewProps) {
+  const studioMap = studio && templateType === 'mindmap';
   const [data, setData] = useState<TopicWorkspaceData>(initialData || {});
   const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
@@ -474,13 +481,15 @@ export function TopicWorkspaceView({
   return (
     <div
       className={
-        isFullScreen
+        studioMap
+          ? 'absolute inset-0 flex flex-col'
+          : isFullScreen
           ? 'fixed inset-0 z-50 bg-background flex flex-col p-4 sm:p-6 overflow-y-auto'
           : 'mx-4 sm:mx-6 mb-10 p-4 sm:p-6 rounded-2xl bg-surface border border-border flex flex-col gap-5 min-h-[76vh]'
       }
     >
       {/* CABEÇALHO UNIVERSAL DO WORKSPACE */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3.5 shrink-0">
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3.5 shrink-0 ${studioMap ? 'hidden' : ''}`}>
         <div className="flex items-center gap-2">
           {templateType === 'goals' && <Target className="w-4 h-4 text-accent" />}
           {templateType === 'habits' && <Activity className="w-4 h-4 text-[#10b981]" />}
@@ -569,9 +578,17 @@ export function TopicWorkspaceView({
           1. ESTÚDIO DE BRAINSTORM & ARQUITETURA 2D (MINDMAP)
          ===================================================================== */}
       {templateType === 'mindmap' && (
-        <div className="flex-1 flex flex-col gap-3 min-h-0">
+        <div className={studioMap ? 'relative flex-1 min-h-0' : 'flex-1 flex flex-col gap-3 min-h-0'}>
           {isAdmin && (
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-elevated border border-border text-xs shrink-0">
+            <div
+              data-pz-stop
+              className={
+                studioMap
+                  ? 'nb-studio-bar absolute top-3 left-1/2 -translate-x-1/2 z-30 w-max max-w-[calc(100%-24px)] flex flex-wrap items-center justify-center gap-1.5 p-1.5 rounded-2xl bg-[#141417]/85 backdrop-blur-md border border-zinc-800 shadow-2xl text-xs'
+                  : 'flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-elevated border border-border text-xs shrink-0'
+              }
+            >
+              {studioMap && studioLead}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] font-mono uppercase text-muted px-1.5">
                   Inserir:
@@ -766,9 +783,11 @@ export function TopicWorkspaceView({
               backgroundSize: `${22 * pz.view.k}px ${22 * pz.view.k}px`,
               backgroundPosition: `${pz.view.x}px ${pz.view.y}px`,
             }}
-            className={`relative w-full rounded-2xl bg-[#09090b] border border-border overflow-hidden select-none outline-none ${
-              isFullScreen ? 'flex-1 min-h-[520px]' : 'h-[72vh] min-h-[560px]'
-            } ${pz.panning ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`${
+              studioMap
+                ? 'absolute inset-0 bg-[#09090b]'
+                : `relative w-full rounded-2xl bg-[#09090b] border border-border ${isFullScreen ? 'flex-1 min-h-[520px]' : 'h-[72vh] min-h-[560px]'}`
+            } overflow-hidden select-none outline-none ${pz.panning ? 'cursor-grabbing' : 'cursor-grab'}`}
           >
             <div
               ref={boardRef}
@@ -2848,8 +2867,29 @@ export function TopicWorkspaceView({
         </div>
       )}
 
-      {(showWorkspaceNotes || Boolean(data.workspaceNotes?.trim())) && (
-        <div className="pt-4 border-t border-border space-y-2 shrink-0">
+      {studioMap && (
+        <button
+          type="button"
+          data-pz-stop
+          onClick={() => setShowWorkspaceNotes(!showWorkspaceNotes)}
+          title="Documentação do mapa"
+          className={`absolute bottom-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 h-8 px-3 rounded-xl border text-[11px] font-semibold backdrop-blur ${
+            showWorkspaceNotes ? 'bg-accent/20 border-accent text-primary' : 'bg-[#141417]/85 border-zinc-800 text-zinc-300 hover:text-white'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" /> Documentação
+        </button>
+      )}
+
+      {(studioMap ? showWorkspaceNotes : showWorkspaceNotes || Boolean(data.workspaceNotes?.trim())) && (
+        <div
+          data-pz-stop
+          className={
+            studioMap
+              ? 'absolute bottom-14 left-3.5 z-30 w-[min(380px,calc(100%-28px))] p-3 rounded-2xl bg-[#141417]/95 backdrop-blur border border-zinc-800 shadow-2xl space-y-2'
+              : 'pt-4 border-t border-border space-y-2 shrink-0'
+          }
+        >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-accent" />

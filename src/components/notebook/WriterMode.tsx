@@ -27,6 +27,8 @@ import {
   Settings2,
   Loader2,
   ExternalLink,
+  FilePlus2,
+  X,
 } from 'lucide-react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
@@ -35,7 +37,11 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Typography from '@tiptap/extension-typography';
-import Image from '@tiptap/extension-image';
+import { BubbleMenu } from '@tiptap/react/menus';
+import { EntryRef } from './editor/extensions';
+import { Illustration, PageBreak } from './editor/bookExtensions';
+import { ImageBar } from './editor/ImageBar';
+import { EntryLinkButtons } from './editor/RichNoteEditor';
 import { Placeholder } from '@tiptap/extensions';
 import { countWords, htmlToText } from '@/lib/notebook/markdown';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
@@ -45,7 +51,14 @@ import type { NotebookApi } from '@/lib/notebook/useNotebook';
 
 
 /** Lista branca de tags/atributos do texto do capítulo (DOM, não regex). */
-const ALLOWED = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'H2', 'H3', 'BLOCKQUOTE', 'HR', 'IMG', 'SPAN']);
+const ALLOWED = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'H2', 'H3', 'BLOCKQUOTE', 'HR', 'IMG', 'SPAN', 'FIGURE', 'FIGCAPTION']);
+/** Atributos permitidos por tag, com o formato exato que cada um pode ter. */
+const ATTR_OK: Record<string, Record<string, RegExp>> = {
+  IMG: { src: /^https?:\/\//i, alt: /^[^<>]{0,300}$/ },
+  SPAN: { 'data-ref': /^[0-9a-f-]{36}$/i, 'data-kind': /^(elemento|nota_autor|aviso)$/ },
+  HR: { 'data-page-break': /^true$/ },
+  FIGURE: { 'data-figure': /^$/, 'data-layout': /^(center|full|wide|left|right)$/, 'data-width': /^(30|40|50|60|70|80|90|100)$/ },
+};
 export function sanitizeWriterHtml(html: string): string {
   if (typeof window === 'undefined' || !html) return '';
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
@@ -67,8 +80,8 @@ export function sanitizeWriterHtml(html: string): string {
       }
       const align = (node as HTMLElement).style?.textAlign;
       for (const a of Array.from(node.attributes)) {
-        if (node.tagName === 'IMG' && a.name === 'src' && /^https?:\/\//i.test(a.value)) continue;
-        if (node.tagName === 'IMG' && a.name === 'alt') continue;
+        const rule = ATTR_OK[node.tagName]?.[a.name];
+        if (rule && rule.test(a.value)) continue;
         node.removeAttribute(a.name);
       }
       if (align === 'center' || align === 'right' || align === 'justify') (node as HTMLElement).style.textAlign = align;
@@ -222,6 +235,42 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 
+  // ------------------------------------------------ paginação real
+  // A altura útil da página acompanha a largura do papel (proporção de livro).
+  const [paging, setPaging] = useState<{ pages: number; current: number; fill: number; full: boolean }>({ pages: 1, current: 1, fill: 0, full: false });
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  const pagingTimer = useRef<number | null>(null);
+  const editorRefW = useRef<Editor | null>(null);
+  const measure = useCallback(() => {
+    const ed = editorRefW.current;
+    if (!ed) return;
+    const dom = ed.view.dom as HTMLElement;
+    const pageH = Math.round(dom.clientWidth * 1.42);
+    const kids = Array.from(dom.children) as HTMLElement[];
+    const heights: number[] = [0];
+    let segStart = dom.getBoundingClientRect().top;
+    for (const k of kids) {
+      if (k.matches('hr.nb-pagebreak')) {
+        heights[heights.length - 1] = k.getBoundingClientRect().top - segStart;
+        heights.push(0);
+        segStart = k.getBoundingClientRect().bottom;
+      }
+    }
+    heights[heights.length - 1] = dom.getBoundingClientRect().bottom - segStart;
+    // página do cursor
+    const { $from } = ed.state.selection;
+    let current = 1;
+    ed.state.doc.forEach((n, offset) => {
+      if (n.type.name === 'pageBreak' && offset < $from.pos) current++;
+    });
+    const h = heights[current - 1] || 0;
+    setPaging({ pages: heights.length, current, fill: Math.min(1.5, h / pageH), full: h > pageH });
+  }, []);
+  const schedulePaging = () => {
+    if (pagingTimer.current) window.clearTimeout(pagingTimer.current);
+    pagingTimer.current = window.setTimeout(measure, 250);
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -237,7 +286,9 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right', 'justify'] }),
       // tipografia de livro: -- vira travessão, ... vira reticências, aspas curvas
       Typography.configure({ emDash: '—', ellipsis: '…', openDoubleQuote: '“', closeDoubleQuote: '”', openSingleQuote: '‘', closeSingleQuote: '’' }),
-      Image.configure({ inline: false }),
+      Illustration.configure({ inline: false }),
+      PageBreak,
+      EntryRef,
       Placeholder.configure({ placeholder: 'Era uma vez…' }),
       CurrentBlock,
     ],
@@ -266,8 +317,12 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       lastWords.current = w;
       sessionStart.current = w;
     },
-    onUpdate: ({ editor: ed }) => save(ed),
+    onUpdate: ({ editor: ed }) => {
+      save(ed);
+      schedulePaging();
+    },
     onSelectionUpdate: ({ editor: ed }) => {
+      schedulePaging();
       // máquina de escrever: a linha atual fica no meio da tela
       if (!prefsRef.current.typewriter || !scrollRef.current) return;
       try {
@@ -279,6 +334,21 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       }
     },
   });
+
+  editorRefW.current = editor;
+  // callbacks estáveis: o BubbleMenu re-registra o plugin quando a função muda
+  const showTextMenu = useCallback(
+    ({ editor: e, from, to }: { editor: Editor; from: number; to: number }) => from !== to && !e.isActive('image') && !e.isActive('pageBreak'),
+    []
+  );
+  const showImageMenu = useCallback(({ editor: e }: { editor: Editor }) => e.isActive('image'), []);
+  useEffect(() => {
+    if (!editor) return;
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(editor.view.dom);
+    return () => ro.disconnect();
+  }, [editor, measure, prefs.width, prefs.size, prefs.font]);
 
   // modo foco do papel
   useEffect(() => {
@@ -322,7 +392,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
   const status = (item.data?.status as ChapterStatus) || 'rascunho';
   const statusMeta = CHAPTER_STATUS.find((s) => s.id === status)!;
   const readMin = Math.max(1, Math.round(words / 220));
-  const pages = Math.max(1, Math.round(words / 250));
+  const pages = paging.pages;
 
   const c = () => editor!.chain().focus();
   const tools: { icon: React.ReactElement; label: string; run: () => void; sep?: boolean; active?: boolean }[] = editor
@@ -339,6 +409,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
         { icon: <AlignRight />, label: 'Alinhar à direita', run: () => c().setTextAlign('right').run(), active: editor.isActive({ textAlign: 'right' }) },
         { icon: <AlignJustify />, label: 'Justificar', run: () => c().setTextAlign('justify').run(), active: editor.isActive({ textAlign: 'justify' }) },
         { icon: <Sparkles />, label: 'Quebra de cena', run: () => c().setHorizontalRule().run(), sep: true },
+        { icon: <FilePlus2 />, label: 'Nova página (Ctrl+Shift+Enter)', run: () => c().insertPageBreak().run() },
         { icon: <ImagePlus />, label: 'Imagem', run: () => fileRef.current?.click() },
         { icon: <Eraser />, label: 'Limpar formatação', run: () => c().unsetAllMarks().clearNodes().unsetTextAlign().run() },
         { icon: <Undo2 />, label: 'Desfazer (Ctrl+Z)', run: () => c().undo().run(), sep: true },
@@ -470,13 +541,53 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
             ❦
           </span>
           {editor ? (
-            <EditorContent editor={editor} />
+            <>
+              <BubbleMenu editor={editor} shouldShow={showTextMenu}>
+                <div className="nb-rich-bubble" style={{ fontFamily: 'var(--font-sans, ui-sans-serif), system-ui, sans-serif' }}>
+                  <EntryLinkButtons editor={editor} />
+                </div>
+              </BubbleMenu>
+              <BubbleMenu pluginKey="imageBar" editor={editor} shouldShow={showImageMenu}>
+                <div style={{ fontFamily: 'var(--font-sans, ui-sans-serif), system-ui, sans-serif' }}>
+                  <ImageBar editor={editor} />
+                </div>
+              </BubbleMenu>
+              <EditorContent editor={editor} />
+            </>
           ) : (
             <div className="py-10 grid place-items-center text-[var(--paper-ink-2)]">
               <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           )}
         </div>
+
+        {/* página cheia: recomenda começar outra */}
+        {editor && paging.full && !dismissed.has(paging.current) && (
+          <div className="nb-page-full" role="status">
+            <span className="w-8 h-8 shrink-0 grid place-items-center rounded-lg bg-amber-500/15 text-amber-500">
+              <FilePlus2 className="w-4 h-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-bold">A página {paging.current} chegou ao fim</span>
+              <span className="block text-[12px] text-[var(--nb-ink-3)]">Comece uma nova página para manter a diagramação do livro.</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().insertPageBreak().run()}
+              className="shrink-0 h-8 px-3 rounded-lg bg-[var(--nb-hl)] text-white text-[12px] font-bold hover:opacity-90"
+            >
+              Nova página
+            </button>
+            <button
+              type="button"
+              aria-label="Dispensar"
+              onClick={() => setDismissed((d) => new Set(d).add(paging.current))}
+              className="shrink-0 p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* nota do autor + navegação */}
         <div className="nb-writer-chrome mx-auto mt-8 space-y-4" style={{ maxWidth: WIDTHS[prefs.width] }}>
@@ -533,7 +644,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
           <span>/ {goal.toLocaleString('pt-BR')} palavras</span>
         </div>
         <span className="hidden sm:inline font-mono">+{session.toLocaleString('pt-BR')} nesta sessão</span>
-        <span className="hidden md:inline">~{pages} pág. · {readMin} min de leitura</span>
+        <span className="hidden md:inline">{pages} {pages === 1 ? 'página' : 'páginas'} · pág. {paging.current} {Math.round(Math.min(1, paging.fill) * 100)}% · {readMin} min de leitura</span>
         <div className="flex-1" />
         <select
           value={status}

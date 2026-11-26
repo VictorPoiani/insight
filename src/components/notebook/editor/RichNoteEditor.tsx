@@ -11,7 +11,6 @@ import { Markdown } from '@tiptap/markdown';
 import Highlight from '@tiptap/extension-highlight';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
-import Image from '@tiptap/extension-image';
 import { Placeholder } from '@tiptap/extensions';
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from '@tiptap/suggestion';
 import {
@@ -49,7 +48,11 @@ import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { Glyph } from '../icons/Glyph';
 import type { GlyphName } from '@/lib/notebook/glyphs';
-import { CALLOUT_TYPES, Callout, TagHighlight, WikiLink, joinFrontmatter, splitFrontmatter } from './extensions';
+import { CALLOUT_TYPES, Callout, EntryRef, TagHighlight, WikiLink, joinFrontmatter, splitFrontmatter } from './extensions';
+import { Illustration, PoemKeys } from './bookExtensions';
+import { ImageBar } from './ImageBar';
+import { useEditorTick } from './useEditorTick';
+import { useNotebookLinks } from './linkContext';
 
 export interface RichNoteEditorProps {
   item: NotebookItem;
@@ -62,6 +65,8 @@ export interface RichNoteEditorProps {
   role?: string | null;
   level?: number | null;
   jumpTo?: { line: number; at: number } | null;
+  /** modo poesia: Enter quebra o verso, linha vazia abre estrofe */
+  variant?: 'poem';
 }
 
 // ------------------------------------------------------------------ menus de sugestão
@@ -241,7 +246,7 @@ const TaskToggle = Extension.create({
 });
 
 // ------------------------------------------------------------------ componente
-export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink, onTag, onAsset, role, level, jumpTo }: RichNoteEditorProps) {
+export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink, onTag, onAsset, role, level, jumpTo, variant }: RichNoteEditorProps) {
   const initial = useMemo(() => splitFrontmatter(item.content || ''), [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [props, setProps] = useState<[string, string][]>(initial.props);
   const propsRef = useRef(props);
@@ -346,7 +351,9 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       TaskList,
       TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),
-      Image.configure({ inline: false }),
+      Illustration.configure({ inline: false }),
+      EntryRef,
+      ...(variant === 'poem' ? [PoemKeys] : []),
       Placeholder.configure({
         placeholder: ({ node }) => (node.type.name === 'heading' ? 'Título' : 'Escreva, ou digite / para comandos e [[ para ligar notas'),
       }),
@@ -358,7 +365,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       makeSuggest('slashMenu', '/', slashFilter, 'slash', setMenu, menuRef),
       makeSuggest('linkMenu', '[[', linkItems, 'link', setMenu, menuRef),
     ];
-  }, [pickImage]);
+  }, [pickImage, variant]);
 
   const editor = useEditor({
     extensions,
@@ -366,7 +373,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
     contentType: 'markdown',
     immediatelyRender: false,
     editorProps: {
-      attributes: { class: 'nb-rich-doc', spellcheck: 'true' },
+      attributes: { class: variant === 'poem' ? 'nb-rich-doc nb-poem' : 'nb-rich-doc', spellcheck: 'true' },
       handleClickOn: (_view, _pos, node, _nodePos, event) => {
         if (node.type.name === 'wikiLink') {
           event.preventDefault();
@@ -407,6 +414,11 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
     onUpdate: () => schedule(),
   });
   editorRef.current = editor;
+  const showTextMenu = useCallback(
+    ({ editor: e, from, to }: { editor: Editor; from: number; to: number }) => from !== to && !e.isActive('codeBlock') && !e.isActive('image'),
+    []
+  );
+  const showImageMenu = useCallback(({ editor: e }: { editor: Editor }) => e.isActive('image'), []);
 
   // salva ao sair
   useEffect(() => () => flush(), [flush]);
@@ -470,8 +482,11 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
 
       {inTable && <TableBar editor={editor} />}
 
-      <BubbleMenu editor={editor} shouldShow={({ editor: e, from, to }) => from !== to && !e.isActive('codeBlock') && !e.isActive('image')}>
+      <BubbleMenu editor={editor} shouldShow={showTextMenu}>
         <SelectionMenu editor={editor} />
+      </BubbleMenu>
+      <BubbleMenu pluginKey="imageBar" editor={editor} shouldShow={showImageMenu}>
+        <ImageBar editor={editor} />
       </BubbleMenu>
 
       <EditorContent editor={editor} />
@@ -643,7 +658,43 @@ function TableBar({ editor }: { editor: Editor }) {
   );
 }
 
+export function EntryLinkButtons({ editor, size = 'md' }: { editor: Editor; size?: 'sm' | 'md' }) {
+  useEditorTick(editor);
+  const links = useNotebookLinks();
+  const cls = size === 'sm' ? 'h-7 px-2 text-[11px]' : 'h-8 px-2.5 text-[12px]';
+  if (editor.isActive('entryRef')) {
+    return (
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().extendMarkRange('entryRef').unsetMark('entryRef').run()}
+        className={`${cls} flex items-center gap-1 rounded-md font-bold text-[var(--nb-ink-2)] hover:bg-[var(--nb-pane-2)]`}
+      >
+        <Glyph name="cross" className="text-[13px]" /> Desvincular
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      title="Vincular informação (resumo ao passar o mouse)"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={async () => {
+        const { from, to } = editor.state.selection;
+        const text = editor.state.doc.textBetween(from, to, ' ').trim();
+        if (!text) return;
+        const r = await links.requestEntry(text);
+        if (r) editor.chain().focus().setTextSelection({ from, to }).setMark('entryRef', r).run();
+      }}
+      className={`${cls} flex items-center gap-1 rounded-md font-bold text-[var(--nb-hl)] hover:bg-[var(--nb-hl-soft)]`}
+    >
+      <Glyph name="sparkle" className="text-[13px]" /> Vincular
+    </button>
+  );
+}
+
 function SelectionMenu({ editor }: { editor: Editor }) {
+  useEditorTick(editor);
   const [linking, setLinking] = useState(false);
   const [url, setUrl] = useState('');
   const c = () => editor.chain().focus();
@@ -714,6 +765,8 @@ function SelectionMenu({ editor }: { editor: Editor }) {
       >
         <Glyph name="mindmap" className="text-[16px]" />
       </Btn>
+      <Sep />
+      <EntryLinkButtons editor={editor} />
     </div>
   );
 }

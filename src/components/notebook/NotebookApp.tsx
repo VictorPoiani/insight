@@ -35,6 +35,7 @@ import {
   PanelLeftClose,
   Maximize2,
   Minimize2,
+  BookMarked,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -55,6 +56,11 @@ import { BookDashboard } from './BookDashboard';
 import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
+import { EntryDialog } from './entries/EntryDialog';
+import { EntryPopover } from './entries/EntryPopover';
+import { SummaryView } from './entries/SummaryView';
+import { useEntries } from '@/lib/notebook/useEntries';
+import type { EntryKind } from '@/lib/notebook/entries';
 import { NewProjectDialog, type NewProjectInput } from './projects/NewProjectDialog';
 import { isProject, projectType } from '@/lib/notebook/projects';
 import { NotebookLinksContext } from './editor/linkContext';
@@ -77,7 +83,7 @@ interface Viewer {
 }
 
 type LeftMode = 'files' | 'search' | null;
-type MainView = 'home' | 'note' | 'graph';
+type MainView = 'home' | 'note' | 'graph' | 'summary';
 
 const TABS_KEY = 'insight-notebook-tabs';
 const LAYOUT_KEY = 'insight-notebook-layout';
@@ -188,6 +194,7 @@ function NotebookLocked({ anon }: { anon: boolean }) {
 
 function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const api = useNotebook(viewer.id);
+  const entriesApi = useEntries(viewer.id);
 
   // Preview: converte de uma vez todas as fichas de personagem antigas (texto)
   const swept = useRef(false);
@@ -213,6 +220,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [immersive, setImmersive] = useState(false);
   const [sideHidden, setSideHidden] = useState(false);
   const [projectDialog, setProjectDialog] = useState(false);
+  const [summaryProject, setSummaryProject] = useState<string | null | undefined>(undefined);
+  const [summaryFocus, setSummaryFocus] = useState<string | null>(null);
+  const [entryReq, setEntryReq] = useState<{ text: string; resolve: (v: { id: string; kind: EntryKind } | null) => void } | null>(null);
   const [searchSeed, setSearchSeed] = useState<string | undefined>();
   const [jump, setJump] = useState<{ line: number; at: number } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -493,9 +503,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       const full = item._full ? item : await api.loadFull(item.id);
       if (!full) return;
       const book = full.parent_id && api.items[full.parent_id]?.template === 'book' ? api.items[full.parent_id] : null;
-      setPublishing({ item: full, blocks: itemToPostBlocks(full, book) });
+      setPublishing({ item: full, blocks: itemToPostBlocks(full, book, entriesApi.entries) });
     },
-    [api]
+    [api, entriesApi.entries]
   );
 
   const path = useMemo(() => {
@@ -523,7 +533,27 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   // modo foco: some tudo menos o conteúdo (vale para qualquer nota)
   const showChrome = !immersive;
 
-  const linkCtx = useMemo(() => ({ titles, exists: titleExists, open: (t: string) => void openOrCreateLink(t) }), [titles, titleExists, openOrCreateLink]);
+  // projeto da nota aberta (para onde vai a nova informação do Sumário)
+  const currentProjectId = useMemo(() => {
+    if (active && isProject(active)) return active.id;
+    const root = path[0];
+    return root && isProject(root) ? root.id : null;
+  }, [active, path]);
+  const requestEntry = useCallback(
+    (text: string) => new Promise<{ id: string; kind: EntryKind } | null>((resolve) => setEntryReq({ text: text.trim().slice(0, 160), resolve })),
+    []
+  );
+  const openSummary = useCallback((projectId: string | null | undefined, focus: string | null = null) => {
+    setSummaryProject(projectId);
+    setSummaryFocus(focus);
+    setView('summary');
+  }, []);
+  const linkCtx = useMemo(
+    () => ({ titles, exists: titleExists, open: (t: string) => void openOrCreateLink(t), entries: entriesApi.entries, requestEntry }),
+    [titles, titleExists, openOrCreateLink, entriesApi.entries, requestEntry]
+  );
+  const liveItems = useMemo(() => Object.values(api.items).filter((i) => !i.archived_at), [api.items]);
+  const projectList = useMemo(() => liveItems.filter((i) => isProject(i)).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [liveItems]);
 
   // ------------------------------------------------------------ render
   return (
@@ -548,6 +578,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             </RibbonBtn>
             <RibbonBtn label="Grafo (Ctrl+G)" active={shown === 'graph'} onClick={() => setView((v) => (v === 'graph' ? (activeId ? 'note' : 'home') : 'graph'))}>
               <Network />
+            </RibbonBtn>
+            <RibbonBtn label="Sumário" active={shown === 'summary'} onClick={() => (shown === 'summary' ? setView(activeId ? 'note' : 'home') : openSummary(currentProjectId ?? undefined))}>
+              <BookMarked />
             </RibbonBtn>
             <RibbonBtn label="Nota de hoje" onClick={() => void openDaily()}>
               <CalendarDays />
@@ -705,6 +738,21 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 <Minimize2 className="w-3.5 h-3.5" /> Sair do foco · Esc
               </button>
             )}
+            {shown === 'summary' && (
+              <SummaryView
+                items={liveItems}
+                projects={projectList}
+                entriesApi={entriesApi}
+                projectId={summaryProject}
+                focusId={summaryFocus}
+                onProject={(p) => {
+                  setSummaryProject(p);
+                  setSummaryFocus(null);
+                }}
+                onOpen={open}
+              />
+            )}
+
             {shown === 'graph' && (
               <div className="absolute inset-0">
                 <GraphView items={Object.values(api.items)} activeId={activeId} onOpen={open} />
@@ -831,6 +879,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                       }}
                       onOpen={open}
                       onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
+                      onSummary={(pid) => openSummary(pid)}
                       jump={jump}
                     />
                   </div>
@@ -864,6 +913,30 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           onOpen={open}
           onCreate={(title) => void createAndOpen({ title, parentId: null })}
           onClose={() => setSwitcher(false)}
+        />
+      )}
+
+      <EntryPopover
+        entries={entriesApi.entries}
+        targetTitle={(id) => api.items[id]?.title || null}
+        onReadMore={(e) => (e.target_id && api.items[e.target_id] ? open(e.target_id) : openSummary(e.project_id ?? undefined, e.id))}
+        onOpenSummary={(id) => openSummary(entriesApi.entries[id]?.project_id ?? undefined, id)}
+      />
+
+      {entryReq && (
+        <EntryDialog
+          text={entryReq.text}
+          projectId={currentProjectId}
+          entriesApi={entriesApi}
+          notes={liveItems}
+          onCancel={() => {
+            entryReq.resolve(null);
+            setEntryReq(null);
+          }}
+          onDone={(e) => {
+            entryReq.resolve({ id: e.id, kind: e.kind });
+            setEntryReq(null);
+          }}
         />
       )}
 
@@ -941,6 +1014,7 @@ function NoteBody({
   onTag,
   onOpen,
   onNew,
+  onSummary,
   jump,
 }: {
   item: NotebookItem;
@@ -952,6 +1026,7 @@ function NoteBody({
   onTag: (t: string) => void;
   onOpen: (id: string) => void;
   onNew: (o: { parentId: string | null; template?: string; title?: string }) => void;
+  onSummary: (projectId: string) => void;
   jump: { line: number; at: number } | null;
 }) {
   const onBlocks = useCallback((blocks: PostBlock[]) => api.update(item.id, { blocks }, { debounce: 1000 }), [api, item.id]);
@@ -963,7 +1038,7 @@ function NoteBody({
   );
 
   if (item.kind === 'folder' && isProject(item)) {
-    return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} />;
+    return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} onSummary={onSummary} />;
   }
 
   if (item.kind === 'folder') {

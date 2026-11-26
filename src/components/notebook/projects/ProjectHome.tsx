@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, FilePlus2, FolderPlus } from 'lucide-react';
+import { ArrowRight, BookMarked, FilePlus2, FolderPlus } from 'lucide-react';
+import { entryKind } from '@/lib/notebook/entries';
+import { useNotebookLinks } from '../editor/linkContext';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { PROJECT_TYPES, projectData, projectType, type ProjectType } from '@/lib/notebook/projects';
@@ -11,7 +13,23 @@ import { itemIcon } from '../FileExplorer';
 type NewOpts = { parentId: string | null; template?: string; title?: string };
 
 /** Página inicial do projeto: tipo, descrição, sugestões e conteúdo. */
-export function ProjectHome({ item, api, onOpen, onNew }: { item: NotebookItem; api: NotebookApi; onOpen: (id: string) => void; onNew: (o: NewOpts) => void }) {
+export function ProjectHome({
+  item,
+  api,
+  onOpen,
+  onNew,
+  onSummary,
+}: {
+  item: NotebookItem;
+  api: NotebookApi;
+  onOpen: (id: string) => void;
+  onNew: (o: NewOpts) => void;
+  onSummary: (projectId: string) => void;
+}) {
+  const { entries } = useNotebookLinks();
+  const projEntries = Object.values(entries)
+    .filter((e) => e.project_id === item.id)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const data = projectData(item);
   const def = projectType(data.type);
   const [desc, setDesc] = useState(data.description || '');
@@ -121,6 +139,44 @@ export function ProjectHome({ item, api, onOpen, onNew }: { item: NotebookItem; 
             </button>
           ))}
         </div>
+      </section>
+
+      {/* sumário */}
+      <section>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="nb-pane-title">Sumário do projeto</h2>
+          <button
+            type="button"
+            onClick={() => onSummary(item.id)}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-xs font-bold hover:text-[var(--nb-hl)]"
+          >
+            <BookMarked className="w-3.5 h-3.5" /> Abrir Sumário{projEntries.length ? ` (${projEntries.length})` : ''}
+          </button>
+        </div>
+        {projEntries.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {projEntries.slice(0, 14).map((e) => {
+              const k = entryKind(e.kind);
+              return (
+                <span
+                  key={e.id}
+                  data-ref={e.id}
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-[var(--nb-line)] bg-[var(--nb-pane)] text-[12px] font-semibold cursor-default"
+                >
+                  <Glyph name={k.glyph} className="text-[12px]" />
+                  <span style={{ color: k.color }} className="sr-only">
+                    {k.short}
+                  </span>
+                  {e.title}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[13px] text-[var(--nb-ink-3)]">
+            Selecione um trecho num capítulo ou nota e use <span className="font-semibold text-[var(--nb-ink-2)]">Vincular informação</span>: personagens, lugares, notas do autor e avisos aparecem aqui.
+          </p>
+        )}
       </section>
 
       {/* conteúdo */}

@@ -1,5 +1,6 @@
 'use client';
 
+import { extractEntryRefs } from './entries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { PostBlock } from '@/types/database';
@@ -33,6 +34,12 @@ function blocksText(blocks: PostBlock[] | null | undefined): string {
 
 /** Campos derivados (links, tags, contagem de palavras) a partir do conteúdo. */
 export function deriveFields(item: Pick<NotebookItem, 'template' | 'content' | 'blocks' | 'data'>) {
+  const base = deriveBase(item);
+  const data = item.data ? JSON.stringify(item.data) : '';
+  return { ...base, entry_refs: extractEntryRefs(item.content, data) };
+}
+
+function deriveBase(item: Pick<NotebookItem, 'template' | 'content' | 'blocks' | 'data'>) {
   if (item.template === 'blocks') {
     const text = htmlToText(blocksText(item.blocks));
     return { links: extractLinks(text), tags: extractTags(text), word_count: countWords(text) };

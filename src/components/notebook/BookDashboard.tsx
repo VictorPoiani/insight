@@ -24,6 +24,7 @@ import type { BookData, ChapterStatus, NotebookItem } from '@/lib/notebook/types
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { CHAPTER_STATUS, sanitizeWriterHtml } from './WriterMode';
 import { itemIcon } from './FileExplorer';
+import { Glyph } from './icons/Glyph';
 
 interface Props {
   book: NotebookItem;
@@ -427,7 +428,7 @@ export function BookDashboard({ book, api, onOpen, onNew, role, level }: Props) 
               onClick={() => onNew({ parentId: book.id, template: 'mindmap' })}
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-xs font-bold hover:text-[var(--nb-hl)]"
             >
-              🕸️ Mapa da trama
+              <Glyph name="mindmap" className="text-[14px]" /> Mapa da trama
             </button>
           </div>
         </div>

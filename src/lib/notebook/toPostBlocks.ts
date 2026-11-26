@@ -68,7 +68,7 @@ export function itemToPostBlocks(item: NotebookItem, book?: NotebookItem | null)
   if (item.template === 'blocks') return (item.blocks || []).map((b) => ({ ...b, id: uid() }));
   if (item.template === 'chapter') {
     const head: PostBlock[] = [];
-    if (book) head.push({ id: uid(), type: 'callout', html: `📖 ${escapeHtml(book.title)}`, calloutIcon: '📖', fontStyle: 'serif' });
+    if (book) head.push({ id: uid(), type: 'callout', html: escapeHtml(book.title), calloutIcon: '📖', fontStyle: 'serif' });
     head.push({ id: uid(), type: 'h1', html: escapeHtml(item.title), fontStyle: 'serif', align: 'center' });
     const note = String(item.data?.authorNote || '').trim();
     const body = htmlToPostBlocks(String(item.data?.html || ''), { font: 'serif' });

@@ -2,6 +2,7 @@ import type { TopicTemplateType } from '@/types/database';
 import { buildInitialWorkspaceData } from '@/components/feed/TopicTabsManager';
 import type { NotebookItemData, NotebookTemplate } from './types';
 import { characterToMarkdown, emptyCharacter } from './character';
+import type { GlyphName } from './glyphs';
 
 export type TemplateSection = 'escrita' | 'livro' | 'textos' | 'workspaces';
 
@@ -11,7 +12,7 @@ export interface NotebookTemplateDef {
   name: string;
   description: string;
   /** emoji usado como ícone padrão do item */
-  icon: string;
+  icon: GlyphName;
   color: string;
   kind: 'folder' | 'note';
   /** título inicial */
@@ -41,7 +42,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'escrita',
     name: 'Nota livre',
     description: 'Markdown com [[links]] entre notas, #tags, callouts e tarefas — como no Obsidian.',
-    icon: '📝',
+    icon: 'note',
     color: '#64748b',
     kind: 'note',
     title: () => 'Nova nota',
@@ -52,7 +53,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'escrita',
     name: 'Página em blocos',
     description: 'O editor de blocos do Insight: grade, imagens, vídeos, tabelas, gráficos e enquetes.',
-    icon: '🧱',
+    icon: 'blocks',
     color: '#2563eb',
     kind: 'note',
     title: () => 'Página em blocos',
@@ -62,7 +63,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'escrita',
     name: 'Pasta',
     description: 'Organize notas em pastas e subpastas.',
-    icon: '📁',
+    icon: 'folder',
     color: '#a1a1aa',
     kind: 'folder',
     title: () => 'Nova pasta',
@@ -74,7 +75,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'livro',
     name: 'Livro autoral',
     description: 'Capa, sinopse, metas de palavras, capítulos com status e publicação no Insight.',
-    icon: '📖',
+    icon: 'book',
     color: '#b45309',
     kind: 'folder',
     title: () => 'Meu livro',
@@ -85,7 +86,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'livro',
     name: 'Capítulo',
     description: 'Página de livro sem distrações: modo foco, máquina de escrever e meta por sessão.',
-    icon: '📄',
+    icon: 'chapter',
     color: '#d97706',
     kind: 'note',
     title: () => 'Capítulo 1',
@@ -96,7 +97,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'livro',
     name: 'Ficha de personagem',
     description: 'Essência, cadernos, três perfis, trajetória e entrevista guiada.',
-    icon: '🎭',
+    icon: 'character',
     color: '#db2777',
     kind: 'note',
     title: () => 'Novo personagem',
@@ -108,7 +109,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'livro',
     name: 'Worldbuilding',
     description: 'Lugares, regras do mundo, linha do tempo e glossário.',
-    icon: '🗺️',
+    icon: 'world',
     color: '#0d9488',
     kind: 'note',
     title: () => 'Mundo',
@@ -139,7 +140,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'textos',
     name: 'Diário',
     description: 'Nota do dia com humor, gratidão e tarefas.',
-    icon: '📔',
+    icon: 'journal',
     color: '#7c3aed',
     kind: 'note',
     title: (d) => isoDate(d),
@@ -147,7 +148,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
       [
         `# ${fmtDate(d)}`,
         '',
-        '**Humor:** 🙂',
+        '**Humor:** ',
         '',
         '## O que aconteceu',
         '',
@@ -165,7 +166,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'textos',
     name: 'Roteiro',
     description: 'Cenas com cabeçalho, ação e diálogo no formato de roteiro.',
-    icon: '🎬',
+    icon: 'screenplay',
     color: '#dc2626',
     kind: 'note',
     title: () => 'Roteiro',
@@ -192,7 +193,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'textos',
     name: 'Resumo de estudo',
     description: 'Método Cornell: perguntas, anotações e resumo final.',
-    icon: '🎓',
+    icon: 'study',
     color: '#0284c7',
     kind: 'note',
     title: () => 'Resumo',
@@ -222,7 +223,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'textos',
     name: 'Ata de reunião',
     description: 'Pauta, decisões e próximos passos.',
-    icon: '🗓️',
+    icon: 'meeting',
     color: '#475569',
     kind: 'note',
     title: (d) => `Reunião ${isoDate(d)}`,
@@ -247,7 +248,7 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     section: 'textos',
     name: 'Ideia rápida',
     description: 'Capture uma ideia antes que ela fuja.',
-    icon: '💡',
+    icon: 'idea',
     color: '#ca8a04',
     kind: 'note',
     title: () => 'Ideia',
@@ -257,13 +258,13 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
   // ------------------------------------------------------------ workspaces dos tópicos
   ...(
     [
-      ['goals', 'Controle de metas', 'Prioridades, indicadores e progresso.', '🎯', '#2563eb'],
-      ['habits', 'Monitoramento de hábitos', 'Registro semanal de consistência.', '🔁', '#10b981'],
-      ['tasks', 'Controle de tarefas', 'Entregas, status e responsáveis.', '✅', '#10b981'],
-      ['roadmap', 'Projetos & Roadmaps', 'Fases e marcos em kanban ou linha do tempo.', '🧭', '#38bdf8'],
-      ['mindmap', 'Mapa mental', 'Quadro 2D de ideias conectadas — ótimo para tramas.', '🕸️', '#a855f7'],
-      ['diet', 'Plano nutricional', 'Refeições, macros e hidratação.', '🍎', '#f59e0b'],
-      ['agenda', 'Agenda & Cronograma', 'Aulas, prazos e eventos.', '📅', '#E63946'],
+      ['goals', 'Controle de metas', 'Prioridades, indicadores e progresso.', 'goals', '#2563eb'],
+      ['habits', 'Monitoramento de hábitos', 'Registro semanal de consistência.', 'habits', '#10b981'],
+      ['tasks', 'Controle de tarefas', 'Entregas, status e responsáveis.', 'tasks', '#10b981'],
+      ['roadmap', 'Projetos & Roadmaps', 'Fases e marcos em kanban ou linha do tempo.', 'roadmap', '#38bdf8'],
+      ['mindmap', 'Mapa mental', 'Quadro 2D de ideias conectadas — ótimo para tramas.', 'mindmap', '#a855f7'],
+      ['diet', 'Plano nutricional', 'Refeições, macros e hidratação.', 'diet', '#f59e0b'],
+      ['agenda', 'Agenda & Cronograma', 'Aulas, prazos e eventos.', 'agenda', '#E63946'],
     ] as const
   ).map(
     ([id, name, description, icon, color]): NotebookTemplateDef => ({

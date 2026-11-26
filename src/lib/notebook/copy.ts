@@ -13,4 +13,6 @@ export const NOTEBOOK_SHORT = 'Notebook';
 export const NOTEBOOK_FEATURES = {
   /** ficha de personagem interativa (perfis, trajetória e entrevista) */
   characterSheet: true,
+  /** editor universal (Tiptap) nas notas: modo Visual + modo Markdown */
+  richEditor: true,
 } as const;

@@ -4,21 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { EyeOff, Eye, Lock } from 'lucide-react';
 import { useNitro } from '@/components/nitro/NitroProvider';
-import { createClient } from '@/lib/supabase/client';
+import { ageFrom, setMyBirthday, useMyBirthday } from '@/lib/account/birthday';
 
-/** Idade pela data de nascimento 'AAAA-MM-DD' (null = não informada/inválida). */
-function ageFrom(birthday?: string | null): number | null {
-  if (!birthday) return null;
-  const b = new Date(`${birthday.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(b.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - b.getFullYear();
-  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
-  return age;
-}
-
-// data salva nesta sessão (contas antigas que informam agora), compartilhada entre os posts
-let sessionBirthday: string | null = null;
 
 /**
  * Conteúdo +18: aparece borrado até a pessoa tocar em "Mostrar".
@@ -28,8 +15,8 @@ let sessionBirthday: string | null = null;
  */
 export function NsfwGate({ active, children, compact = false }: { active: boolean; children: React.ReactNode; compact?: boolean }) {
   const { viewer, ready } = useNitro();
-  const [savedBirthday, setSavedBirthday] = useState<string | null>(sessionBirthday);
-  const age = ageFrom(viewer?.birthday || savedBirthday);
+  const birthday = useMyBirthday(viewer?.id);
+  const age = ageFrom(birthday);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
   const [draft, setDraft] = useState('');
@@ -69,20 +56,18 @@ export function NsfwGate({ active, children, compact = false }: { active: boolea
     }
     setSaving(true);
     setErr(null);
-    const { error } = await createClient().from('profiles').update({ birthday: draft }).eq('id', viewer.id);
+    const res = await setMyBirthday(viewer.id, draft);
     setSaving(false);
-    if (error) {
-      setErr('Não foi possível salvar. Tente de novo.');
+    if (!res.ok) {
+      setErr(res.error || 'Não foi possível salvar.');
       return;
     }
-    sessionBirthday = draft;
-    setSavedBirthday(draft);
     setAsking(false);
     if (a >= 18) setRevealed(true);
   }
 
   let panel: React.ReactNode;
-  if (!ready) {
+  if (!ready || (viewer && birthday === undefined)) {
     panel = null;
   } else if (!viewer) {
     panel = (

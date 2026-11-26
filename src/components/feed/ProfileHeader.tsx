@@ -15,6 +15,7 @@ import { SpotifySearchModal } from './SpotifySearchModal';
 import ContributorLevelPill from '@/components/ContributorLevelPill';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { useNitro } from '@/components/nitro/NitroProvider';
+import { setMyBirthday, useMyBirthday } from '@/lib/account/birthday';
 import {
   Bolt,
   BellPlus,
@@ -572,7 +573,13 @@ export function ProfileHeader({
   const [location, setLocation] = useState(
     profile.location ?? (isFounderProfile ? 'Rio Paranaíba, MG' : '')
   );
-  const [birthday, setBirthday] = useState(profile.birthday || '');
+  // data completa: só o dono lê (tabela privada); os outros veem dia/mês
+  const myBirthday = useMyBirthday(isOwnProfile ? profile.id : null);
+  const birthdayLocked = Boolean(myBirthday);
+  const [birthday, setBirthday] = useState('');
+  useEffect(() => {
+    setBirthday(myBirthday || '');
+  }, [myBirthday]);
   const [bio, setBio] = useState(profile.bio || '');
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -648,7 +655,7 @@ export function ProfileHeader({
     setLocation(
       profile.location ?? (isFounderProfile ? 'Rio Paranaíba, MG' : '')
     );
-    setBirthday(profile.birthday || '');
+    setBirthday(myBirthday || '');
     setBio(profile.bio || '');
 
     if (profile.social_links?.status_id) {
@@ -1075,6 +1082,15 @@ export function ProfileHeader({
     e.preventDefault();
     setSavingProfile(true);
 
+    if (isOwnProfile && !birthdayLocked && birthday) {
+      const res = await setMyBirthday(profile.id, birthday);
+      if (!res.ok) {
+        setSavingProfile(false);
+        alert(res.error);
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -1083,8 +1099,6 @@ export function ProfileHeader({
         nickname: nickname.trim(),
         nickname_color: nicknameColor,
         location: location.trim(),
-        // trava no banco: depois de informada, só o suporte altera
-        ...(profile.birthday ? {} : { birthday: birthday || null }),
         bio: bio.trim(),
       })
       .eq('id', profile.id);
@@ -1187,11 +1201,12 @@ export function ProfileHeader({
   }
 
   // para os outros, só dia e mês (a idade não fica pública)
-  const formattedBirthday = birthday
-    ? isOwnProfile
-      ? birthday.split('-').reverse().join('/')
-      : birthday.slice(5, 10).split('-').reverse().join('/')
-    : null;
+  const formattedBirthday =
+    isOwnProfile && myBirthday
+      ? myBirthday.split('-').reverse().join('/')
+      : profile.birthday_md
+      ? profile.birthday_md.split('-').reverse().join('/')
+      : null;
 
   const formattedJoinDate = useMemo(() => {
     if (isFounderProfile) return 'Desde julho de 2026';
@@ -1709,13 +1724,13 @@ export function ProfileHeader({
                   type="date"
                   value={birthday}
                   onChange={(e) => setBirthday(e.target.value)}
-                  disabled={!!profile.birthday}
+                  disabled={birthdayLocked}
                   max={new Date().toISOString().slice(0, 10)}
-                  title={profile.birthday ? 'A data de nascimento só pode ser corrigida pelo suporte.' : undefined}
+                  title={birthdayLocked ? 'A data de nascimento só pode ser corrigida pelo suporte.' : undefined}
                   className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-none focus:border-accent disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <p className="mt-1 text-[10px] text-muted">
-                  {profile.birthday ? 'Para corrigir, fale com o suporte.' : 'Depois de salva, só o suporte altera.'}
+                  {birthdayLocked ? 'Para corrigir, fale com o suporte.' : 'Depois de salva, só o suporte altera.'}
                 </p>
               </div>
             </div>

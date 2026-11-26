@@ -33,18 +33,21 @@ const EMPTY: SourceInput = {
 /** Cadastro e edição de uma fonte, com a referência formatada ao vivo. */
 export function SourceDialog({
   source,
+  initialTitle,
   projectId,
   sourcesApi,
   onClose,
   onSaved,
 }: {
   source: Source | null;
+  /** título já digitado (ao criar a fonte de dentro do texto) */
+  initialTitle?: string;
   projectId: string | null;
   sourcesApi: SourcesApi;
   onClose: () => void;
   onSaved?: (s: Source) => void;
 }) {
-  const [f, setF] = useState<SourceInput>(() => (source ? { ...EMPTY, ...source, authors: source.authors.length ? source.authors : EMPTY.authors } : { ...EMPTY, project_id: projectId }));
+  const [f, setF] = useState<SourceInput>(() => (source ? { ...EMPTY, ...source, authors: source.authors.length ? source.authors : EMPTY.authors } : { ...EMPTY, project_id: projectId, title: initialTitle || '' }));
   const [quote, setQuote] = useState('');
   const [qpage, setQpage] = useState('');
   const [saving, setSaving] = useState(false);

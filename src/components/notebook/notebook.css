@@ -2289,3 +2289,116 @@ tr:hover .nb-ibx-add, .nb-ibx-add:focus-visible { opacity: 1; }
   .nb-art2-outline { display: none; }
   .nb-art2-side { position: static; max-height: none; order: 2; border-top: 1px solid var(--a-line); padding-top: 18px; }
 }
+
+/* ============================================================ elementos acadêmicos (modo Artigo) */
+.nb-cite-wrap, .nb-fn-wrap { display: inline; }
+.nb-cite {
+  cursor: pointer;
+  color: var(--nb-ink);
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+}
+.nb-cite:hover, .nb-cite[data-selected] { border-bottom-color: var(--nb-ink); background: rgba(255, 255, 255, 0.04); }
+.nb-cite[data-missing] { color: #f87171; border-bottom-color: #f87171; }
+.nb-rich-doc { counter-reset: fn fig tab quad graf; }
+.nb-fn { counter-increment: fn; cursor: pointer; padding: 0 1px; font-size: 0.72em; font-weight: 700; color: var(--nb-ink-2); }
+.nb-fn::after { content: counter(fn); }
+.nb-fn:hover { color: var(--nb-ink); text-decoration: underline; }
+.nb-fn-ref { font-size: 0.72em; font-weight: 700; }
+.nb-footnotes { margin-top: 2em; padding-top: 0.8em; border-top: 1px solid var(--nb-line); font-size: 0.85em; list-style: decimal; padding-left: 1.4em; color: var(--nb-ink-2); }
+/* popover das citações, notas e fórmulas */
+.nb-acad-pop {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--nb-pane);
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.7);
+  font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+  font-size: 12.5px;
+  color: var(--nb-ink);
+}
+.nb-acad-pop-title { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nb-ink-3); }
+.nb-acad-pop-list li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); color: var(--nb-ink-2); }
+.nb-acad-pop-list button { color: var(--nb-ink-3); }
+.nb-acad-row { display: flex; align-items: center; gap: 8px; }
+.nb-acad-row > span { width: 52px; flex-shrink: 0; font-size: 11px; color: var(--nb-ink-3); }
+.nb-acad-row input, .nb-acad-row select, .nb-acad-area {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--nb-bg);
+  outline: none;
+  color: var(--nb-ink);
+}
+.nb-acad-area { height: auto; padding: 6px 8px; resize: vertical; line-height: 1.45; }
+.nb-acad-row input:focus, .nb-acad-row select:focus, .nb-acad-area:focus { border-color: rgba(255, 255, 255, 0.3); }
+/* fórmulas */
+.nb-math { cursor: pointer; }
+.nb-math-out { padding: 0 2px; border-radius: 3px; }
+.nb-math-out:hover, .nb-math[data-selected] .nb-math-out { background: rgba(255, 255, 255, 0.05); }
+.nb-math--block { display: block; margin: 0.8em 0; text-align: center; }
+.nb-math--block .nb-math-out { display: block; padding: 6px 0; }
+.nb-math-preview { min-height: 28px; padding: 8px; border-radius: 5px; background: var(--nb-bg); text-align: center; overflow-x: auto; }
+.nb-math-src { font-family: var(--font-mono, ui-monospace), monospace; font-size: 0.9em; }
+.nb-math-src--block { text-align: center; padding: 0.6em; }
+/* legendas padronizadas */
+.nb-rich-doc p.nb-cap, .nb-md p.nb-cap { margin-top: 1em; font-size: 0.86em; line-height: 1.35; text-align: center; color: var(--nb-ink); }
+.nb-rich-doc p.nb-cap--fonte, .nb-md p.nb-cap--fonte { margin-top: 0.35em; text-align: left; color: var(--nb-ink-2); }
+.nb-rich-doc p.nb-cap--figura { counter-increment: fig; }
+.nb-rich-doc p.nb-cap--tabela { counter-increment: tab; }
+.nb-rich-doc p.nb-cap--quadro { counter-increment: quad; }
+.nb-rich-doc p.nb-cap--grafico { counter-increment: graf; }
+.nb-rich-doc p.nb-cap--figura::before { content: 'Figura ' counter(fig) ' – '; font-weight: 700; }
+.nb-rich-doc p.nb-cap--tabela::before { content: 'Tabela ' counter(tab) ' – '; font-weight: 700; }
+.nb-rich-doc p.nb-cap--quadro::before { content: 'Quadro ' counter(quad) ' – '; font-weight: 700; }
+.nb-rich-doc p.nb-cap--grafico::before { content: 'Gráfico ' counter(graf) ' – '; font-weight: 700; }
+/* figuras com legenda no artigo seguem a mesma numeração */
+.nb-art2 .nb-rich-doc figure.nb-fig { counter-increment: fig; }
+.nb-art2 .nb-rich-doc figure.nb-fig figcaption::before { content: 'Figura ' counter(fig) ' – '; font-weight: 700; font-style: normal; }
+/* citação longa (NBR 10520): recuo de 4 cm, fonte menor, espaço simples, sem aspas */
+.nb-rich-doc .nb-rc--longa,
+.nb-md .nb-longquote {
+  margin: 1em 0 1em min(4cm, 22%);
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  font-size: 0.86em;
+  line-height: 1.3;
+  text-align: justify;
+}
+.nb-rich-doc .nb-rc--longa::before { content: none !important; }
+.nb-rich-doc .nb-rc--longa > * + * { margin-top: 0.3em; }
+.nb-art2 .nb-rich-doc .nb-rc--longa { border-left: 1px dashed rgba(255, 255, 255, 0.12); padding-left: 10px; margin-left: calc(min(4cm, 22%) - 11px); }
+/* notas e painel */
+.nb-art2-notes { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--a-line); }
+.nb-art2-notes h2 { margin-bottom: 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nb-ink-3); }
+.nb-art2-notes li { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--nb-ink-2); }
+.nb-art2-notes li + li { margin-top: 4px; }
+.nb-art2-refs-hint { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--a-line); font-size: 12.5px; color: var(--nb-ink-3); }
+.nb-art2-cite {
+  position: absolute;
+  right: 22px;
+  top: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nb-ink-2);
+  opacity: 0;
+}
+.nb-art2-cite.\!static { position: static; opacity: 1; }
+.nb-art2-list > li:hover .nb-art2-cite, .nb-art2-cite:focus-visible { opacity: 1; }
+.nb-art2-cite:hover { color: var(--nb-ink); border-color: rgba(255, 255, 255, 0.3); }
+.nb-art2-quote { cursor: grab; }

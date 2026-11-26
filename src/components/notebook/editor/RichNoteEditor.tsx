@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { ACADEMIC_EXTENSIONS, CitationContext, academicSlashItems, citeItems } from './academic';
 import { createPortal } from 'react-dom';
 import { Extension, type Editor, type Range } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
@@ -68,13 +69,13 @@ export interface RichNoteEditorProps {
   level?: number | null;
   jumpTo?: { line: number; at: number } | null;
   /** modo poesia: Enter quebra o verso, linha vazia abre estrofe */
-  variant?: 'poem';
+  variant?: 'poem' | 'article';
 }
 
 // ------------------------------------------------------------------ menus de sugestão
 export type MenuItem = { id: string; label: string; hint?: string; icon: React.ReactNode; run: (editor: Editor, range: Range) => void };
 export type MenuState = {
-  kind: 'slash' | 'link' | 'mention';
+  kind: 'slash' | 'link' | 'mention' | 'cite';
   items: MenuItem[];
   index: number;
   rect: DOMRect | null;
@@ -84,6 +85,7 @@ export type MenuState = {
 const CALLOUT_GLYPH: Record<string, GlyphName> = {
   nota: 'pen',
   segredo: 'lock',
+  checagem: 'alert',
   ideia: 'idea',
   dica: 'sparkle',
   info: 'info',
@@ -209,7 +211,7 @@ export function makeSuggest(
   name: string,
   char: string,
   getItems: (query: string) => MenuItem[],
-  kind: 'slash' | 'link' | 'mention',
+  kind: 'slash' | 'link' | 'mention' | 'cite',
   setMenu: React.MutableRefObject<(m: MenuState | ((p: MenuState) => MenuState)) => void>,
   menuRef: React.MutableRefObject<MenuState>
 ) {
@@ -310,6 +312,9 @@ const TaskToggle = Extension.create({
 
 // ------------------------------------------------------------------ componente
 export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink, onTag, onAsset, role, level, jumpTo, variant }: RichNoteEditorProps) {
+  const citeTools = useContext(CitationContext);
+  const citeRef = useRef(citeTools);
+  citeRef.current = citeTools;
   const initial = useMemo(() => splitFrontmatter(item.content || ''), [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [props, setProps] = useState<[string, string][]>(initial.props);
   const propsRef = useRef(props);
@@ -402,10 +407,10 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       }
       return items;
     };
-    const slash = slashItems(pickImage);
+    const slash = variant === 'article' ? [...slashItems(pickImage), ...academicSlashItems()] : slashItems(pickImage);
     const slashFilter = (query: string) => {
       const q = norm(query);
-      return slash.filter((s) => !q || norm(s.label).includes(q) || s.id.includes(q)).slice(0, 12);
+      return slash.filter((s) => !q || norm(s.label).includes(q) || s.id.includes(q)).slice(0, 14);
     };
     return [
       StarterKit.configure({
@@ -420,6 +425,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       Illustration.configure({ inline: false }),
       EntryRef,
       ...(variant === 'poem' ? [PoemKeys] : []),
+      ...(variant === 'article' ? [...ACADEMIC_EXTENSIONS, makeSuggest('citeMenu', '^', (q) => citeItems(q, citeRef.current), 'cite', setMenu, menuRef)] : []),
       Placeholder.configure({
         placeholder: ({ node }) => (node.type.name === 'heading' ? 'Título' : 'Escreva, ou digite / para comandos e [[ para ligar notas'),
       }),
@@ -855,7 +861,7 @@ export function SuggestMenu({ menu, onHover }: { menu: NonNullable<MenuState>; o
   return createPortal(
     <div ref={listRef} className="nb-rich-suggest nb-scroll" style={{ top, left }} role="listbox" aria-label={menu.kind === 'slash' ? 'Comandos' : menu.kind === 'mention' ? 'Menções' : 'Notas'}>
       <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-wider text-[var(--nb-ink-3)]">
-        {menu.kind === 'slash' ? 'Inserir' : menu.kind === 'mention' ? 'Mencionar' : 'Ligar a uma nota'}
+        {menu.kind === 'slash' ? 'Inserir' : menu.kind === 'mention' ? 'Mencionar' : menu.kind === 'cite' ? 'Citar fonte' : 'Ligar a uma nota'}
       </p>
       {menu.items.map((it, i) => (
         <button

@@ -194,7 +194,7 @@ function LongInput({ value, label, onChange }: { value: string; label: string; o
 }
 
 /** Lista de verbetes ligados, com busca para adicionar. */
-function RefList({ refs, multi, label, onChange, onOpen }: { refs: string[]; multi: boolean; label: string; onChange: (ids: string[]) => void; onOpen: (id: string) => void }) {
+export function RefList({ refs, multi, label, onChange, onOpen }: { refs: string[]; multi: boolean; label: string; onChange: (ids: string[]) => void; onOpen: (id: string) => void }) {
   const links = useNotebookLinks();
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');

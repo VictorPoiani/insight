@@ -33,7 +33,7 @@ function relText(l: EntryLink, me: string) {
   const out = l.from_id === me;
   if (l.rel === 'outro') return l.label || 'relacionado a';
   if (out) return r.phrase;
-  const inverse: Partial<Record<EntryRel, string>> = { pai: 'filho(a) de', mentor: 'aprendiz de', membro: 'tem como membro', mora: 'lar de' };
+  const inverse: Partial<Record<EntryRel, string>> = { pai: 'filho(a) de', mentor: 'aprendiz de', membro: 'tem como membro', mora: 'lar de', governa: 'governado por', vassalo: 'suserano de', parte: 'inclui', fundou: 'fundado por', venera: 'venerado por', criou: 'criado por' };
   return inverse[l.rel] || r.phrase;
 }
 

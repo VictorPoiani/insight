@@ -41,6 +41,8 @@ export interface ChronoEra {
   start: number;
   end: number;
   color: string;
+  /** sigla usada nas datas pela era (ex.: "3ª E.") */
+  short?: string;
 }
 export interface ChronoEvent {
   id: string;
@@ -49,12 +51,43 @@ export interface ChronoEvent {
   summary: string;
   entryId?: string | null;
   major?: boolean;
+  /** outras menções envolvidas (facções, lugares, personagens) */
+  links?: { entryId: string }[];
+  /** capítulos onde o acontecimento é narrado */
+  chapters?: string[];
+  /** dia e mês pelo calendário do mundo (opcional) */
+  month?: number | null;
+  day?: number | null;
 }
 export interface ChronosData {
   era: string;
   eras: ChronoEra[];
   events: ChronoEvent[];
   focus?: string | null;
+  /** calendário do mundo usado para dia e mês */
+  calendarId?: string | null;
+  /** mostrar os anos contados a partir do início de cada era */
+  eraDates?: boolean;
+}
+
+/** Todas as menções de um acontecimento. */
+export function eventEntries(ev: ChronoEvent): string[] {
+  return Array.from(new Set([ev.entryId, ...(ev.links || []).map((l) => l.entryId)].filter((x): x is string => !!x)));
+}
+
+/** Ano escrito como o leitor do mundo leria. */
+export function formatWorldYear(data: ChronosData, year: number): string {
+  if (data.eraDates) {
+    const era = data.eras.find((e) => year >= e.start && year <= e.end);
+    if (era) return `${year - era.start + 1} ${era.short || era.name}`;
+  }
+  return `${year}${data.era ? ` ${data.era}` : ''}`;
+}
+
+export function formatWorldDate(data: ChronosData, ev: Pick<ChronoEvent, 'year' | 'month' | 'day'>, cal?: WorldCalendarData | null): string {
+  const y = formatWorldYear(data, ev.year);
+  if (cal && ev.month != null && cal.months[ev.month]) return `${ev.day ? `${ev.day} de ` : ''}${cal.months[ev.month].name}, ${y}`;
+  return y;
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -122,6 +155,8 @@ export function normalizeChronos(raw: unknown): ChronosData {
     eras: Array.isArray(d.eras) ? d.eras : [],
     events: Array.isArray(d.events) ? d.events : [],
     focus: d.focus || null,
+    calendarId: typeof d.calendarId === 'string' ? d.calendarId : null,
+    eraDates: !!d.eraDates,
   };
 }
 

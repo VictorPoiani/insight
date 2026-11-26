@@ -98,7 +98,7 @@ export function entryLook(e: Pick<NotebookEntry, 'kind' | 'category'> | null | u
 }
 
 // ------------------------------------------------------------------ relações
-export type EntryRel = 'pai' | 'conjuge' | 'irmao' | 'aliado' | 'inimigo' | 'conhece' | 'mentor' | 'membro' | 'mora' | 'outro';
+export type EntryRel = 'pai' | 'conjuge' | 'irmao' | 'aliado' | 'inimigo' | 'conhece' | 'mentor' | 'membro' | 'mora' | 'governa' | 'vassalo' | 'parte' | 'fundou' | 'venera' | 'criou' | 'rival' | 'outro';
 
 export interface EntryLink {
   id: string;
@@ -111,7 +111,7 @@ export interface EntryLink {
 }
 
 /** Como ler a relação: "<de> é <frase> <para>". */
-export const ENTRY_RELS: { id: EntryRel; label: string; phrase: string; family?: boolean; color: string }[] = [
+export const ENTRY_RELS: { id: EntryRel; label: string; phrase: string; family?: boolean; hierarchy?: boolean; color: string }[] = [
   { id: 'pai', label: 'Pai/mãe de', phrase: 'pai ou mãe de', family: true, color: '#a78bfa' },
   { id: 'conjuge', label: 'Cônjuge de', phrase: 'cônjuge de', family: true, color: '#f472b6' },
   { id: 'irmao', label: 'Irmão/irmã de', phrase: 'irmão ou irmã de', family: true, color: '#c4b5fd' },
@@ -121,8 +121,25 @@ export const ENTRY_RELS: { id: EntryRel; label: string; phrase: string; family?:
   { id: 'mentor', label: 'Mentor de', phrase: 'mentor de', color: '#38bdf8' },
   { id: 'membro', label: 'Membro de', phrase: 'membro de', color: '#f59e0b' },
   { id: 'mora', label: 'Vive em', phrase: 'vive em', color: '#2dd4bf' },
+  { id: 'governa', label: 'Governa', phrase: 'governa', color: '#eab308', hierarchy: true },
+  { id: 'vassalo', label: 'Vassalo de', phrase: 'vassalo de', color: '#ca8a04', hierarchy: true },
+  { id: 'parte', label: 'Parte de', phrase: 'parte de', color: '#0ea5e9', hierarchy: true },
+  { id: 'fundou', label: 'Fundou', phrase: 'fundou', color: '#a3e635' },
+  { id: 'venera', label: 'Venera', phrase: 'venera', color: '#e879f9' },
+  { id: 'criou', label: 'Criou', phrase: 'criou', color: '#fb923c' },
+  { id: 'rival', label: 'Rival de', phrase: 'rival de', color: '#fb7185' },
   { id: 'outro', label: 'Outra relação', phrase: '', color: '#64748b' },
 ];
+/**
+ * Hierarquia: quem está acima de quem.
+ * "A governa B", "A mentor de B" → A acima de B; "B vassalo de A", "B parte de A", "B membro de A" → A acima de B.
+ */
+export function hierarchyEdge(l: { from_id: string; to_id: string; rel: string }): { parent: string; child: string } | null {
+  if (l.rel === 'governa' || l.rel === 'mentor' || l.rel === 'fundou') return { parent: l.from_id, child: l.to_id };
+  if (l.rel === 'vassalo' || l.rel === 'parte' || l.rel === 'membro') return { parent: l.to_id, child: l.from_id };
+  return null;
+}
+
 export const entryRel = (r: string) => ENTRY_RELS.find((x) => x.id === r) || ENTRY_RELS[ENTRY_RELS.length - 1];
 
 export const ENTRY_UUID_RE = new RegExp(`^${UUID}$`, 'i');

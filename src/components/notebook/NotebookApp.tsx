@@ -66,6 +66,7 @@ import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
+import { CanvasStudio } from './canvas/CanvasStudio';
 import { ContextMenuProvider } from './menu/ContextMenu';
 import { GlobalContextMenus, type GlobalMenuActions } from './menu/GlobalMenus';
 import { WorldCalendar } from './worldtime/WorldCalendar';
@@ -760,6 +761,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     setSplit({ kind: 'item', id: prev });
   }, [split, activeId, open]);
   const renderSplitItem = (it: NotebookItem) => {
+    if (it.template === 'canvas')
+      return <CanvasStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
     if (it.template === 'map')
       return <MapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
     if (it.template === 'mindmap' && NOTEBOOK_FEATURES.studio)
@@ -857,6 +860,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'new', group: 'Criar', label: 'Nova nota', icon: ic(FilePlus2), shortcut: 'Ctrl+N', run: () => void newInContext() },
     { id: 'project', group: 'Criar', label: 'Novo projeto', icon: ic(FolderPlus), run: () => setProjectDialog(true) },
     { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
+    { id: 'canvas', group: 'Criar', label: 'Novo canvas', icon: <Glyph name="canvas" />, keywords: 'quadro obsidian cartoes', run: () => void newInContext('canvas') },
     { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
     { id: 'daily', group: 'Criar', label: 'Nota de hoje', icon: ic(CalendarDays), keywords: 'diario diário', run: () => void openDaily() },
     session.state
@@ -1295,7 +1299,20 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               />
             )}
 
-            {shown === 'note' && active?._full && active.template !== 'chapter' && active.template !== 'map' && !(active.template === 'mindmap' && NOTEBOOK_FEATURES.studio) && (
+            {shown === 'note' && active?._full && active.template === 'canvas' && (
+              <CanvasStudio
+                key={`${active.id}-${reloadKey}`}
+                item={active}
+                api={api}
+                path={path}
+                onOpen={open}
+                onRename={(t) => void rename(active.id, t)}
+                role={viewer.role}
+                level={viewer.contributor_level}
+              />
+            )}
+
+            {shown === 'note' && active?._full && active.template !== 'chapter' && active.template !== 'map' && active.template !== 'canvas' && !(active.template === 'mindmap' && NOTEBOOK_FEATURES.studio) && (
               <div className="nb-scroll absolute inset-0 overflow-y-auto">
                 {active.template === 'book' ? (
                   <BookDashboard

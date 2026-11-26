@@ -129,7 +129,7 @@ export function SplitPane({
           </div>
         ) : item && item.template === 'chapter' ? (
           <ChapterPreview item={item} onEdit={onPromote} />
-        ) : item && (item.template === 'map' || item.template === 'mindmap') ? (
+        ) : item && (item.template === 'map' || item.template === 'mindmap' || item.template === 'canvas') ? (
           <div className="absolute inset-0">{renderItem(item)}</div>
         ) : item ? (
           <div className="nb-scroll absolute inset-0 overflow-y-auto">

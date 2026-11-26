@@ -51,6 +51,18 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     content: () => '',
   },
   {
+    id: 'canvas',
+    section: 'escrita',
+    name: 'Canvas',
+    description: 'Quadro infinito com cartões, notas, imagens, grupos e ligações — como o Canvas do Obsidian.',
+    icon: 'canvas',
+    color: '#94a3b8',
+    kind: 'note',
+    title: () => 'Novo canvas',
+    content: () => '',
+    data: () => ({ canvas: { nodes: [], edges: [] } }),
+  },
+  {
     id: 'blocks',
     section: 'escrita',
     name: 'Página em blocos',

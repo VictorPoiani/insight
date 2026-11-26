@@ -16,6 +16,8 @@ export type NotebookTemplate =
   | 'study'
   | 'meeting'
   | 'idea'
+  | 'poem'
+  | 'article'
   // modelos dos tópicos (workspace interativo)
   | 'goals'
   | 'habits'

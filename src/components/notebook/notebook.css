@@ -739,3 +739,40 @@
   .nb-rich-tablebar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .nb-rich-tablebar > * { flex-shrink: 0; }
 }
+
+/* papel do livro com o editor novo */
+.nb-paper.ProseMirror { outline: none; min-height: 40vh; }
+.nb-paper p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--paper-ink-2);
+  opacity: 0.6;
+  font-style: italic;
+}
+.nb-paper [style*='text-align: right'], .nb-paper [style*='text-align: justify'] { text-indent: 0; }
+.nb-paper hr.ProseMirror-selectednode::after { color: var(--nb-hl); }
+.nb-paper img.ProseMirror-selectednode { outline: 2px solid var(--nb-hl); outline-offset: 3px; }
+
+/* campos ricos (ficha de personagem) */
+.nb-field .ProseMirror { outline: none; min-height: 3em; line-height: 1.7; }
+.nb-field .ProseMirror > * + * { margin-top: 0.55em; }
+.nb-field .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--nb-ink-3);
+  opacity: 0.7;
+}
+.nb-field .ProseMirror strong { font-weight: 700; }
+.nb-field .ProseMirror mark { background: color-mix(in srgb, #facc15 38%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
+.nb-field .ProseMirror ul { list-style: disc; padding-left: 1.3em; }
+.nb-field .ProseMirror ol { list-style: decimal; padding-left: 1.3em; }
+.nb-field .ProseMirror li > p { margin: 0; }
+.nb-field .ProseMirror blockquote { padding-left: 12px; border-left: 3px solid var(--nb-line); color: var(--nb-ink-2); font-style: italic; }
+.nb-field .ProseMirror h3 { font-weight: 800; font-size: 1.05em; }
+.nb-field .ProseMirror .nb-wl { color: var(--nb-link); font-weight: 600; cursor: pointer; border-bottom: 1px dotted color-mix(in srgb, var(--nb-link) 60%, transparent); }
+.nb-field .ProseMirror .nb-wl.is-missing { opacity: 0.65; border-bottom-style: dashed; }
+.nb-field .ProseMirror .nb-rtag { color: var(--nb-hl); background: var(--nb-hl-soft); border-radius: 999px; padding: 0 6px; font-size: 0.9em; font-weight: 600; }

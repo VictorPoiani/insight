@@ -10,6 +10,8 @@ import {
   Quote,
   AlignCenter,
   AlignLeft,
+  AlignRight,
+  AlignJustify,
   Sparkles,
   ImagePlus,
   Eraser,
@@ -26,6 +28,15 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import StarterKit from '@tiptap/starter-kit';
+import TextAlign from '@tiptap/extension-text-align';
+import Typography from '@tiptap/extension-typography';
+import Image from '@tiptap/extension-image';
+import { Placeholder } from '@tiptap/extensions';
 import { countWords, htmlToText } from '@/lib/notebook/markdown';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
@@ -77,6 +88,28 @@ export function sanitizeWriterHtml(html: string): string {
   return root.innerHTML;
 }
 
+/** Marca o bloco onde está o cursor (o "modo foco" do papel apaga o resto). */
+const CurrentBlock = Extension.create({
+  name: 'currentBlock',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('currentBlock'),
+        props: {
+          decorations(state) {
+            const { $from } = state.selection;
+            if ($from.depth < 1) return null;
+            const start = $from.before(1);
+            const node = state.doc.nodeAt(start);
+            if (!node) return null;
+            return DecorationSet.create(state.doc, [Decoration.node(start, start + node.nodeSize, { class: 'nb-current' })]);
+          },
+        },
+      }),
+    ];
+  },
+});
+
 const PREFS_KEY = 'insight-notebook-writer';
 const DEFAULT_PREFS: WriterPrefs = { paper: 'claro', font: 'literata', size: 19, width: 'normal', typewriter: false, focus: false };
 
@@ -119,7 +152,6 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
   const [showPrefs, setShowPrefs] = useState(false);
   const [words, setWords] = useState(item.word_count);
   const [uploading, setUploading] = useState(false);
-  const paperRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef(item.data);
@@ -146,19 +178,6 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       }
       return n;
     });
-
-  // carrega o HTML do capítulo quando troca de capítulo
-  useEffect(() => {
-    const el = paperRef.current;
-    if (!el || !item._full) return;
-    const html = sanitizeWriterHtml(String(item.data?.html || ''));
-    el.innerHTML = html || '<p><br></p>';
-    const w = countWords(htmlToText(html));
-    setWords(w);
-    lastWords.current = w;
-    sessionStart.current = w;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id, item._full]);
 
   // soma palavras do dia no livro (histórico/heatmap).
   // Usa refs: o objeto `api` muda a cada render e não pode ser dependência
@@ -189,10 +208,10 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
     };
   }, [flushHistory]);
 
-  const save = useCallback(() => {
-    const el = paperRef.current;
-    if (!el) return;
-    const html = sanitizeWriterHtml(el.innerHTML);
+  const insertImagesRef = useRef<(files: File[]) => void>(() => {});
+
+  const save = useCallback((ed: Editor) => {
+    const html = sanitizeWriterHtml(ed.getHTML());
     const w = countWords(htmlToText(html));
     if (w > lastWords.current) pendingHistory.current += w - lastWords.current;
     lastWords.current = w;
@@ -200,29 +219,72 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
     apiRef.current.update(item.id, { data: { ...dataRef.current, html } }, { debounce: 1200 });
   }, [item.id]);
 
-  // foco e máquina de escrever
-  const onSelection = useCallback(() => {
-    const el = paperRef.current;
-    const sel = document.getSelection();
-    if (!el || !sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return;
-    let node: Node | null = sel.anchorNode;
-    while (node && node.parentNode !== el) node = node.parentNode;
-    el.querySelectorAll('.nb-current').forEach((n) => n !== node && n.classList.remove('nb-current'));
-    if (node instanceof HTMLElement) node.classList.add('nb-current');
-    if (prefs.typewriter && scrollRef.current) {
-      const r = sel.getRangeAt(0).getBoundingClientRect();
-      const box = scrollRef.current.getBoundingClientRect();
-      if (r.height) {
-        const target = box.top + box.height * 0.45;
-        scrollRef.current.scrollBy({ top: r.top - target, behavior: 'smooth' });
-      }
-    }
-  }, [prefs.typewriter]);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [2, 3] },
+        code: false,
+        codeBlock: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        listKeymap: false,
+        link: false,
+      }),
+      TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right', 'justify'] }),
+      // tipografia de livro: -- vira travessão, ... vira reticências, aspas curvas
+      Typography.configure({ emDash: '—', ellipsis: '…', openDoubleQuote: '“', closeDoubleQuote: '”', openSingleQuote: '‘', closeSingleQuote: '’' }),
+      Image.configure({ inline: false }),
+      Placeholder.configure({ placeholder: 'Era uma vez…' }),
+      CurrentBlock,
+    ],
+    content: item._full ? sanitizeWriterHtml(String(item.data?.html || '')) : '',
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: true,
+    editorProps: {
+      attributes: { class: 'nb-paper', spellcheck: 'true', lang: 'pt-BR', role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Texto do capítulo' },
+      handlePaste: (_v, e) => {
+        const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
+        if (!files.length) return false;
+        insertImagesRef.current(files);
+        return true;
+      },
+      handleDrop: (_v, e) => {
+        const files = Array.from((e as DragEvent).dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
+        if (!files.length) return false;
+        e.preventDefault();
+        insertImagesRef.current(files);
+        return true;
+      },
+    },
+    onCreate: ({ editor: ed }) => {
+      const w = countWords(ed.getText());
+      setWords(w);
+      lastWords.current = w;
+      sessionStart.current = w;
+    },
+    onUpdate: ({ editor: ed }) => save(ed),
+    onSelectionUpdate: ({ editor: ed }) => {
+      // máquina de escrever: a linha atual fica no meio da tela
+      if (!prefsRef.current.typewriter || !scrollRef.current) return;
+      try {
+        const c = ed.view.coordsAtPos(ed.state.selection.from);
+        const box = scrollRef.current.getBoundingClientRect();
+        scrollRef.current.scrollBy({ top: c.top - (box.top + box.height * 0.45), behavior: 'smooth' });
+      } catch {
+        /* posição fora da tela */
+      }
+    },
+  });
+
+  // modo foco do papel
   useEffect(() => {
-    document.addEventListener('selectionchange', onSelection);
-    return () => document.removeEventListener('selectionchange', onSelection);
-  }, [onSelection]);
+    if (!editor) return;
+    editor.view.dom.setAttribute('data-focus', String(prefs.focus));
+  }, [editor, prefs.focus]);
 
   // Esc sai do modo imersivo
   useEffect(() => {
@@ -231,68 +293,6 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [immersive, onImmersive]);
-
-  const exec = (cmd: string, arg?: string) => {
-    paperRef.current?.focus();
-    document.execCommand(cmd, false, arg);
-    save();
-  };
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.key.toLowerCase() === 'b') return e.preventDefault(), exec('bold');
-    if (mod && e.key.toLowerCase() === 'i') return e.preventDefault(), exec('italic');
-    if (mod && e.key.toLowerCase() === 'u') return e.preventDefault(), exec('underline');
-    // tipografia: -- vira travessão, "..." vira reticências
-    if (e.key === '-' || e.key === '.') {
-      const sel = document.getSelection();
-      const n = sel?.anchorNode;
-      if (sel?.isCollapsed && n?.nodeType === Node.TEXT_NODE) {
-        const before = (n.textContent || '').slice(0, sel.anchorOffset);
-        if (e.key === '-' && before.endsWith('-')) {
-          e.preventDefault();
-          document.execCommand('delete');
-          document.execCommand('insertText', false, '—');
-          return save();
-        }
-        if (e.key === '.' && before.endsWith('..')) {
-          e.preventDefault();
-          document.execCommand('delete');
-          document.execCommand('delete');
-          document.execCommand('insertText', false, '…');
-          return save();
-        }
-      }
-    }
-    // aspas curvas
-    if (e.key === '"') {
-      const sel = document.getSelection();
-      const n = sel?.anchorNode;
-      const before = n?.nodeType === Node.TEXT_NODE ? (n.textContent || '').slice(0, sel!.anchorOffset) : '';
-      e.preventDefault();
-      document.execCommand('insertText', false, !before || /[\s(—[]$/.test(before) ? '“' : '”');
-      return save();
-    }
-  }
-
-  function onPaste(e: React.ClipboardEvent) {
-    const files = Array.from(e.clipboardData.files);
-    if (files.length) {
-      e.preventDefault();
-      void insertImages(files);
-      return;
-    }
-    // cola texto puro, cada linha vira um parágrafo (sem estilos de fora)
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    const html = text
-      .replace(/\r\n?/g, '\n')
-      .split(/\n+/)
-      .map((p) => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '<br>'}</p>`)
-      .join('');
-    document.execCommand('insertHTML', false, html);
-    save();
-  }
 
   async function insertImages(files: File[]) {
     setUploading(true);
@@ -304,15 +304,14 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
           scope: 'notebook',
         });
         await api.registerAsset(item.id, res.r2Key, res.publicUrl);
-        paperRef.current?.focus();
-        document.execCommand('insertHTML', false, `<img src="${res.publicUrl.replace(/"/g, '&quot;')}" alt="" />`);
-        save();
+        editor?.chain().focus().setImage({ src: res.publicUrl, alt: '' }).run();
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
       }
     }
     setUploading(false);
   }
+  insertImagesRef.current = (files) => void insertImages(files);
 
   const idx = chapters.findIndex((c) => c.id === item.id);
   const prev = idx > 0 ? chapters[idx - 1] : null;
@@ -325,26 +324,27 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
   const readMin = Math.max(1, Math.round(words / 220));
   const pages = Math.max(1, Math.round(words / 250));
 
-  const tools = useMemo(
-    () => [
-      { icon: <Bold />, label: 'Negrito (Ctrl+B)', run: () => exec('bold') },
-      { icon: <Italic />, label: 'Itálico (Ctrl+I)', run: () => exec('italic') },
-      { icon: <Underline />, label: 'Sublinhado (Ctrl+U)', run: () => exec('underline') },
-      { icon: <Strikethrough />, label: 'Tachado', run: () => exec('strikeThrough') },
-      { icon: <Heading2 />, label: 'Título de cena', run: () => exec('formatBlock', 'h2'), sep: true },
-      { icon: <Quote />, label: 'Citação / carta', run: () => exec('formatBlock', 'blockquote') },
-      { icon: <Type />, label: 'Parágrafo', run: () => exec('formatBlock', 'p') },
-      { icon: <AlignLeft />, label: 'Alinhar à esquerda', run: () => exec('justifyLeft'), sep: true },
-      { icon: <AlignCenter />, label: 'Centralizar', run: () => exec('justifyCenter') },
-      { icon: <Sparkles />, label: 'Quebra de cena ✦ ✦ ✦', run: () => exec('insertHorizontalRule'), sep: true },
-      { icon: <ImagePlus />, label: 'Imagem', run: () => fileRef.current?.click() },
-      { icon: <Eraser />, label: 'Limpar formatação', run: () => exec('removeFormat') },
-      { icon: <Undo2 />, label: 'Desfazer', run: () => exec('undo'), sep: true },
-      { icon: <Redo2 />, label: 'Refazer', run: () => exec('redo') },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [save]
-  );
+  const c = () => editor!.chain().focus();
+  const tools: { icon: React.ReactElement; label: string; run: () => void; sep?: boolean; active?: boolean }[] = editor
+    ? [
+        { icon: <Bold />, label: 'Negrito (Ctrl+B)', run: () => c().toggleBold().run(), active: editor.isActive('bold') },
+        { icon: <Italic />, label: 'Itálico (Ctrl+I)', run: () => c().toggleItalic().run(), active: editor.isActive('italic') },
+        { icon: <Underline />, label: 'Sublinhado (Ctrl+U)', run: () => c().toggleUnderline().run(), active: editor.isActive('underline') },
+        { icon: <Strikethrough />, label: 'Tachado', run: () => c().toggleStrike().run(), active: editor.isActive('strike') },
+        { icon: <Heading2 />, label: 'Título de cena', run: () => c().toggleHeading({ level: 2 }).run(), sep: true, active: editor.isActive('heading', { level: 2 }) },
+        { icon: <Quote />, label: 'Citação / carta', run: () => c().toggleBlockquote().run(), active: editor.isActive('blockquote') },
+        { icon: <Type />, label: 'Parágrafo', run: () => c().setParagraph().run() },
+        { icon: <AlignLeft />, label: 'Alinhar à esquerda', run: () => c().setTextAlign('left').run(), sep: true, active: editor.isActive({ textAlign: 'left' }) },
+        { icon: <AlignCenter />, label: 'Centralizar', run: () => c().setTextAlign('center').run(), active: editor.isActive({ textAlign: 'center' }) },
+        { icon: <AlignRight />, label: 'Alinhar à direita', run: () => c().setTextAlign('right').run(), active: editor.isActive({ textAlign: 'right' }) },
+        { icon: <AlignJustify />, label: 'Justificar', run: () => c().setTextAlign('justify').run(), active: editor.isActive({ textAlign: 'justify' }) },
+        { icon: <Sparkles />, label: 'Quebra de cena', run: () => c().setHorizontalRule().run(), sep: true },
+        { icon: <ImagePlus />, label: 'Imagem', run: () => fileRef.current?.click() },
+        { icon: <Eraser />, label: 'Limpar formatação', run: () => c().unsetAllMarks().clearNodes().unsetTextAlign().run() },
+        { icon: <Undo2 />, label: 'Desfazer (Ctrl+Z)', run: () => c().undo().run(), sep: true },
+        { icon: <Redo2 />, label: 'Refazer (Ctrl+Shift+Z)', run: () => c().redo().run() },
+      ]
+    : [];
 
   return (
     <div
@@ -365,7 +365,10 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
                 aria-label={t.label}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={t.run}
-                className="p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)] hover:bg-[var(--nb-pane-2)] [&>svg]:w-4 [&>svg]:h-4"
+                aria-pressed={t.active}
+                className={`p-1.5 rounded-md [&>svg]:w-4 [&>svg]:h-4 ${
+                  t.active ? 'bg-[var(--nb-hl-soft)] text-[var(--nb-hl)]' : 'text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)] hover:bg-[var(--nb-pane-2)]'
+                }`}
               >
                 {t.icon}
               </button>
@@ -466,32 +469,13 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
           <span className="nb-ornament mt-3 mb-10" aria-hidden="true">
             ❦
           </span>
-          <div
-            ref={paperRef}
-            className="nb-paper"
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck
-            lang="pt-BR"
-            data-focus={prefs.focus}
-            data-empty={words === 0}
-            data-placeholder="Era uma vez…"
-            role="textbox"
-            aria-multiline="true"
-            aria-label="Texto do capítulo"
-            onFocus={() => {
-              document.execCommand('defaultParagraphSeparator', false, 'p');
-            }}
-            onInput={save}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onDrop={(e) => {
-              if (e.dataTransfer.files.length) {
-                e.preventDefault();
-                void insertImages(Array.from(e.dataTransfer.files));
-              }
-            }}
-          />
+          {editor ? (
+            <EditorContent editor={editor} />
+          ) : (
+            <div className="py-10 grid place-items-center text-[var(--paper-ink-2)]">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          )}
         </div>
 
         {/* nota do autor + navegação */}
@@ -572,8 +556,8 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
         <button
           type="button"
           onClick={() => {
-            save();
-            onPublish({ ...item, data: { ...item.data, html: sanitizeWriterHtml(paperRef.current?.innerHTML || '') } });
+            if (editor) save(editor);
+            onPublish({ ...item, data: { ...item.data, html: sanitizeWriterHtml(editor?.getHTML() || '') } });
           }}
           className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-[var(--nb-hl)] text-white font-bold hover:opacity-90"
         >

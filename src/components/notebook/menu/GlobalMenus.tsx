@@ -45,6 +45,9 @@ import {
   FilePlus,
   Command,
   Home,
+  Columns2,
+  Timer,
+  Camera,
 } from 'lucide-react';
 import type { NotebookEntry } from '@/lib/notebook/entries';
 import { Glyph } from '../icons/Glyph';
@@ -70,6 +73,12 @@ export interface GlobalMenuActions {
   toggleRight: () => void;
   sideHidden: boolean;
   openItem: (id: string) => void;
+  /** tela dividida */
+  openAside: (id: string) => void;
+  entryAside: (id: string) => void;
+  /** sessão de escrita */
+  session: { active: boolean; start: () => void; end: () => void };
+  snapshot: (() => void) | null;
   tab: {
     close: (id: string) => void;
     closeOthers: (id: string) => void;
@@ -259,12 +268,16 @@ function generalItems(a: GlobalMenuActions): MenuEntry[] {
     { label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: a.picker },
     { label: 'Importar arquivos', icon: ic(Upload), run: a.importFiles },
     'sep',
-    { label: 'Abrir rápido', icon: ic(Command), shortcut: 'Ctrl+O', run: a.quickOpen },
+    { label: 'Paleta de comandos', icon: ic(Command), shortcut: 'Ctrl+K', run: a.quickOpen },
     { label: 'Buscar no Notebook', icon: ic(Search), shortcut: 'Ctrl+Shift+F', run: () => a.search('') },
     { label: 'Sumário (menções)', icon: ic(BookMarked), run: () => a.openSummary(null) },
     { label: 'Grafo de notas', icon: ic(Network), shortcut: 'Ctrl+G', run: a.graph },
     { label: 'Início', icon: ic(Home), run: a.home },
     'sep',
+    a.session.active
+      ? { label: 'Encerrar sessão de escrita', icon: ic(Timer), run: a.session.end }
+      : { label: 'Iniciar sessão de escrita', icon: ic(Timer), run: a.session.start },
+    ...(a.snapshot ? [{ label: 'Salvar instantâneo…', icon: ic(Camera), run: a.snapshot }] : []),
     { label: 'Modo foco', icon: ic(Maximize2), shortcut: 'Ctrl+.', run: a.toggleFocus },
     { label: a.sideHidden ? 'Mostrar barra lateral' : 'Ocultar barra lateral', icon: ic(PanelLeft), shortcut: 'Ctrl+Shift+\\', run: a.toggleSide },
     { label: 'Painel de detalhes', icon: ic(PanelRight), run: a.toggleRight },
@@ -280,6 +293,7 @@ function tabItems(id: string, a: GlobalMenuActions): MenuEntry[] {
     { label: 'Fechar as outras', icon: ic(X), run: () => a.tab.closeOthers(id) },
     { label: 'Fechar todas', icon: ic(X), run: a.tab.closeAll },
     'sep',
+    { label: 'Abrir ao lado', icon: ic(Columns2), shortcut: 'Alt+clique', run: () => a.openAside(id) },
     { label: a.tab.isPinned(id) ? 'Desafixar' : 'Fixar no topo', icon: ic(Pin), run: () => a.tab.pin(id) },
     { label: 'Exportar…', icon: ic(Download), run: () => a.tab.exportItem(id) },
     'sep',
@@ -290,6 +304,7 @@ function tabItems(id: string, a: GlobalMenuActions): MenuEntry[] {
 function cardItems(id: string, a: GlobalMenuActions): MenuEntry[] {
   return [
     { label: 'Abrir', icon: ic(ArrowUpRight), run: () => a.openItem(id) },
+    { label: 'Abrir ao lado', icon: ic(Columns2), shortcut: 'Alt+clique', run: () => a.openAside(id) },
     { label: a.tab.isPinned(id) ? 'Desafixar' : 'Fixar no topo', icon: ic(Pin), run: () => a.tab.pin(id) },
     { label: 'Exportar…', icon: ic(Download), run: () => a.tab.exportItem(id) },
     'sep',
@@ -300,6 +315,8 @@ function cardItems(id: string, a: GlobalMenuActions): MenuEntry[] {
 function mentionItems(entry: NotebookEntry, a: GlobalMenuActions): MenuEntry[] {
   return [
     { label: 'Abrir (Ler mais)', icon: ic(ArrowUpRight), run: () => a.readMore(entry) },
+    { label: 'Abrir ao lado', icon: ic(Columns2), shortcut: 'Alt+clique', run: () => a.entryAside(entry.id) },
+    ...(entry.target_id ? [{ label: 'Abrir a ficha ao lado', icon: ic(Columns2), run: () => a.openAside(entry.target_id!) }] : []),
     { label: 'Ver no Sumário', icon: ic(BookMarked), run: () => a.openSummary(entry.id) },
     { label: 'Copiar nome', icon: ic(Copy), run: () => void navigator.clipboard?.writeText(entry.title).catch(blocked) },
   ];

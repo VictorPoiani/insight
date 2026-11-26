@@ -8,6 +8,8 @@ import type { NotebookItem } from '@/lib/notebook/types';
 import type { EntriesApi } from '@/lib/notebook/useEntries';
 import { Glyph } from '../icons/Glyph';
 import { itemIcon } from '../FileExplorer';
+import { EntryAppearances } from './MentionContext';
+import type { NotebookApi } from '@/lib/notebook/useNotebook';
 
 const norm = (s: string) =>
   s
@@ -29,7 +31,9 @@ export function SummaryView({
   onOpen,
   onReadMore,
   onUploadImage,
+  api,
 }: {
+  api: NotebookApi;
   items: NotebookItem[];
   projects: NotebookItem[];
   entriesApi: EntriesApi;
@@ -223,6 +227,7 @@ export function SummaryView({
                 entriesApi={entriesApi}
                 onOpen={onOpen}
                 onUploadImage={onUploadImage}
+                api={api}
               />
             ))}
           </div>
@@ -248,7 +253,9 @@ function EntryCard({
   entriesApi,
   onOpen,
   onUploadImage,
+  api,
 }: {
+  api: NotebookApi;
   entry: NotebookEntry;
   focus: boolean;
   usedIn: NotebookItem[];
@@ -260,6 +267,7 @@ function EntryCard({
 }) {
   const k = entryLook(entry);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [context, setContext] = useState(focus);
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState(entry.title);
   const [summary, setSummary] = useState(entry.summary);
@@ -443,18 +451,29 @@ function EntryCard({
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)] mr-1">
               {usedIn.length ? `Aparece em ${usedIn.length}` : 'Ainda não vinculada a nenhum trecho'}
             </span>
-            {usedIn.slice(0, 12).map((it) => (
-              <button
-                key={it.id}
-                type="button"
-                onClick={() => onOpen(it.id)}
-                className="flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--nb-pane-2)] text-[11px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-hl)]"
-              >
-                <span className="text-[12px]">{itemIcon(it)}</span>
-                {it.title}
-              </button>
-            ))}
+            {!context &&
+              usedIn.slice(0, 12).map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  data-item-id={it.id}
+                  onClick={() => onOpen(it.id)}
+                  className="flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--nb-pane-2)] text-[11px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-hl)]"
+                >
+                  <span className="text-[12px]">{itemIcon(it)}</span>
+                  {it.title}
+                </button>
+              ))}
+            <button
+              type="button"
+              aria-expanded={context}
+              onClick={() => setContext((v) => !v)}
+              className="h-6 px-2 rounded-full text-[11px] font-bold text-[var(--nb-hl)] hover:bg-[var(--nb-hl-soft)]"
+            >
+              {context ? 'Ocultar trechos' : usedIn.length ? 'Ver trechos' : 'Procurar no texto'}
+            </button>
           </div>
+          {context && <EntryAppearances entry={entry} usedIn={usedIn} api={api} onOpen={onOpen} />}
         </div>
       </div>
     </div>

@@ -53,6 +53,10 @@ export interface ChapterData {
   /** HTML do capítulo (modo escritor) */
   html?: string;
   wordGoal?: number;
+  /** sinopse da cena/capítulo (quadro de cenas) */
+  synopsis?: string;
+  /** menção (personagem) do ponto de vista */
+  pov?: string | null;
 }
 
 export interface WriterPrefs {

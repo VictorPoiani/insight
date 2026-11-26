@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, BookMarked } from 'lucide-react';
+import { ArrowUpRight, BookMarked, Columns2 } from 'lucide-react';
 import { entryLook, type NotebookEntry } from '@/lib/notebook/entries';
 import { Glyph } from '../icons/Glyph';
 
@@ -16,11 +16,14 @@ export function EntryPopover({
   targetTitle,
   onReadMore,
   onOpenSummary,
+  onAside,
 }: {
   entries: Record<string, NotebookEntry>;
   targetTitle: (id: string) => string | null;
   onReadMore: (entry: NotebookEntry) => void;
   onOpenSummary: (entryId: string) => void;
+  /** abre a menção na tela dividida, ao lado do texto */
+  onAside?: (entry: NotebookEntry) => void;
 }) {
   const [state, setState] = useState<State>(null);
   const showT = useRef<number | null>(null);
@@ -110,6 +113,17 @@ export function EntryPopover({
             </button>
             {target && <span className="text-[11px] text-[var(--nb-ink-3)] truncate">{target}</span>}
             <span className="flex-1" />
+            {onAside && (
+              <button
+                type="button"
+                title="Abrir ao lado (Alt+clique)"
+                aria-label="Abrir ao lado"
+                onClick={() => (setState(null), onAside(entry))}
+                className="p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)] hover:bg-[var(--nb-pane-2)]"
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               type="button"
               title="Abrir no Sumário"

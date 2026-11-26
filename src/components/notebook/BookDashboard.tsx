@@ -15,6 +15,8 @@ import {
   Loader2,
   X,
   Flame,
+  List,
+  LayoutGrid,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
@@ -25,6 +27,7 @@ import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { CHAPTER_STATUS, sanitizeWriterHtml } from './WriterMode';
 import { itemIcon } from './FileExplorer';
 import { Glyph } from './icons/Glyph';
+import { Corkboard, type ChapterMeta } from './book/Corkboard';
 
 interface Props {
   book: NotebookItem;
@@ -47,7 +50,21 @@ const GENRES = ['Romance', 'Fantasia', 'Ficção científica', 'Suspense', 'Terr
 
 export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const [statusMap, setStatusMap] = useState<Record<string, ChapterStatus>>({});
+  const [metaMap, setMetaMap] = useState<Record<string, ChapterMeta>>({});
+  const [layout, setLayout] = useState<'lista' | 'quadro'>(() => {
+    try {
+      return (localStorage.getItem('insight-notebook-chapters-view') as 'lista' | 'quadro') || 'lista';
+    } catch {
+      return 'lista';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('insight-notebook-chapters-view', layout);
+    } catch {
+      /* ignora */
+    }
+  }, [layout]);
   const [uploading, setUploading] = useState(false);
   const [reading, setReading] = useState<{ title: string; html: string }[] | null>(null);
   const [loadingRead, setLoadingRead] = useState(false);
@@ -73,13 +90,13 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
     let alive = true;
     supabase
       .from('notebook_items')
-      .select('id, status:data->>status')
+      .select('id, status:data->>status, synopsis:data->>synopsis, pov:data->>pov')
       .in('id', chapters.map((c) => c.id))
       .then(({ data: rows }) => {
         if (!alive || !rows) return;
-        const m: Record<string, ChapterStatus> = {};
-        rows.forEach((r: any) => (m[r.id] = (r.status as ChapterStatus) || 'rascunho'));
-        setStatusMap(m);
+        const m: Record<string, ChapterMeta> = {};
+        rows.forEach((r: any) => (m[r.id] = { status: (r.status as ChapterStatus) || 'rascunho', synopsis: r.synopsis || '', pov: r.pov || null }));
+        setMetaMap((prev) => ({ ...m, ...Object.fromEntries(Object.entries(prev).filter(([id]) => touched.current.has(id))) }));
       });
     return () => {
       alive = false;
@@ -87,8 +104,27 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterKey, supabase]);
 
-  // status de capítulos abertos nesta sessão (mais recente que o banco)
-  const statusOf = (c: NotebookItem): ChapterStatus => (c._full ? (c.data?.status as ChapterStatus) : statusMap[c.id]) || 'rascunho';
+  // dados de capítulos abertos nesta sessão (mais recentes que o banco)
+  const touched = useRef<Set<string>>(new Set());
+  const metaOf = (c: NotebookItem): ChapterMeta =>
+    touched.current.has(c.id) && metaMap[c.id]
+      ? metaMap[c.id]
+      : c._full
+        ? { status: (c.data?.status as ChapterStatus) || 'rascunho', synopsis: String(c.data?.synopsis || ''), pov: (c.data?.pov as string) || null }
+        : metaMap[c.id] || { status: 'rascunho', synopsis: '', pov: null };
+  const statusOf = (c: NotebookItem): ChapterStatus => metaOf(c).status;
+
+  /** grava sinopse/status/ponto de vista sem perder o resto dos dados do capítulo */
+  const saveMeta = async (id: string, patch: Partial<ChapterMeta>) => {
+    const c = api.items[id];
+    if (!c) return;
+    touched.current.add(id);
+    setMetaMap((m) => ({ ...m, [id]: { ...metaOf(c), ...patch } }));
+    const full = c._full ? api.items[id] : await api.loadFull(id);
+    if (!full) return;
+    const cur = api.items[id] || full;
+    api.update(id, { data: { ...cur.data, ...patch } }, { debounce: 'synopsis' in patch ? 800 : 0 });
+  };
 
   const total = chapters.reduce((n, c) => n + c.word_count, 0);
   const goal = Number(data.wordGoal) || 50000;
@@ -359,6 +395,29 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black">Capítulos</h2>
+          <div className="flex-1" />
+          <div className="flex items-center gap-0.5 mr-2 p-0.5 rounded-lg border border-[var(--nb-line)]" role="group" aria-label="Visualização dos capítulos">
+            <button
+              type="button"
+              title="Lista"
+              aria-label="Lista"
+              aria-pressed={layout === 'lista'}
+              onClick={() => setLayout('lista')}
+              className={`p-1.5 rounded-md ${layout === 'lista' ? 'bg-[var(--nb-pane-2)] text-[var(--nb-ink)]' : 'text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'}`}
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Quadro de cenas"
+              aria-label="Quadro de cenas"
+              aria-pressed={layout === 'quadro'}
+              onClick={() => setLayout('quadro')}
+              className={`p-1.5 rounded-md ${layout === 'quadro' ? 'bg-[var(--nb-pane-2)] text-[var(--nb-ink)]' : 'text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'}`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => onNew({ parentId: book.id, template: 'chapter' })}
@@ -371,12 +430,14 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
           <p className="py-10 text-center text-sm text-[var(--nb-ink-3)] rounded-2xl border border-dashed border-[var(--nb-line)]">
             Nenhum capítulo ainda. Toda grande história começa com uma página em branco.
           </p>
+        ) : layout === 'quadro' ? (
+          <Corkboard chapters={chapters} meta={metaOf} api={api} onMeta={(id, p) => void saveMeta(id, p)} onOpen={onOpen} />
         ) : (
           <ol className="rounded-2xl border border-[var(--nb-line)] overflow-hidden divide-y divide-[var(--nb-line)]">
             {chapters.map((c, i) => {
               const st = CHAPTER_STATUS.find((s) => s.id === statusOf(c))!;
               return (
-                <li key={c.id} className="group flex items-center gap-3 px-3 sm:px-4 py-3 bg-[var(--nb-pane)] hover:bg-[var(--nb-pane-2)]">
+                <li key={c.id} data-item-id={c.id} className="group flex items-center gap-3 px-3 sm:px-4 py-3 bg-[var(--nb-pane)] hover:bg-[var(--nb-pane-2)]">
                   <span className="w-7 text-right font-mono text-xs text-[var(--nb-ink-3)]">{i + 1}</span>
                   <button type="button" onClick={() => onOpen(c.id)} className="flex-1 min-w-0 text-left">
                     <span className="block truncate font-semibold font-serif text-[15px]">{c.title}</span>

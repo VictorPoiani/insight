@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ListTree, Link2, Info, History, X, RotateCcw, Save, Loader2, ArrowUpRight } from 'lucide-react';
+import { ListTree, Link2, Info, History, X, ArrowUpRight } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { extractHeadings, htmlToText, countWords } from '@/lib/notebook/markdown';
@@ -10,8 +10,12 @@ import { GraphView } from './GraphView';
 import { itemGlyph, itemIcon } from './FileExplorer';
 import { Glyph } from './icons/Glyph';
 import { ICON_CHOICES } from '@/lib/notebook/glyphs';
+import { VersionHistory } from './history/VersionHistory';
+import { NoteMentions } from './entries/MentionContext';
+import { useNotebookLinks } from './editor/linkContext';
 
-type Tab = 'outline' | 'links' | 'info' | 'history';
+export type RightTab = 'outline' | 'links' | 'info' | 'history';
+type Tab = RightTab;
 
 const COLORS = ['#64748b', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#d97706', '#ca8a04', '#16a34a', '#0d9488', '#0284c7'];
 
@@ -21,10 +25,16 @@ interface Props {
   onOpen: (id: string) => void;
   onJump: (line: number) => void;
   onClose?: () => void;
+  /** pedido externo para trocar de aba (paleta de comandos, menus) */
+  tabRequest?: { tab: Tab; at: number } | null;
 }
 
-export function RightPanel({ item, api, onOpen, onJump, onClose }: Props) {
+export function RightPanel({ item, api, onOpen, onJump, onClose, tabRequest }: Props) {
   const [tab, setTab] = useState<Tab>('outline');
+  const links = useNotebookLinks();
+  useEffect(() => {
+    if (tabRequest) setTab(tabRequest.tab);
+  }, [tabRequest]);
 
   const headings = useMemo(() => {
     if (!item) return [];
@@ -115,6 +125,7 @@ export function RightPanel({ item, api, onOpen, onJump, onClose }: Props) {
             <div className="h-52 rounded-xl border border-[var(--nb-line)] bg-[var(--nb-bg)] overflow-hidden">
               <GraphView items={Object.values(api.items)} activeId={item.id} onOpen={onOpen} local compact />
             </div>
+            <NoteMentions item={item} api={api} entries={links.entries} onReadMore={links.readMore} />
             <LinkList
               title={`Mencionam esta nota (${backlinks.length})`}
               empty="Nenhuma nota aponta para cá ainda."
@@ -135,7 +146,7 @@ export function RightPanel({ item, api, onOpen, onJump, onClose }: Props) {
         )}
 
         {item && tab === 'info' && <InfoTab item={item} api={api} />}
-        {item && tab === 'history' && <HistoryTab item={item} api={api} />}
+        {item && tab === 'history' && <VersionHistory key={item.id} item={item} api={api} />}
       </div>
     </div>
   );
@@ -258,80 +269,6 @@ function InfoTab({ item, api }: { item: NotebookItem; api: NotebookApi }) {
           <input type="checkbox" checked={item.is_template} onChange={(e) => api.update(item.id, { is_template: e.target.checked })} className="w-4 h-4 accent-[var(--nb-hl)]" />
         </label>
       )}
-    </div>
-  );
-}
-
-function HistoryTab({ item, api }: { item: NotebookItem; api: NotebookApi }) {
-  const [revs, setRevs] = useState<Awaited<ReturnType<NotebookApi['listRevisions']>> | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setRevs(null);
-    api.listRevisions(item.id).then((r) => alive && setRevs(r));
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
-
-  const current = revs?.find((r) => r.id === preview);
-
-  return (
-    <div className="px-2 py-1 space-y-3">
-      <button
-        type="button"
-        disabled={saving}
-        onClick={async () => {
-          setSaving(true);
-          await api.flushAll();
-          await api.saveRevisionNow(item.id);
-          setRevs(await api.listRevisions(item.id));
-          setSaving(false);
-        }}
-        className="w-full flex items-center justify-center gap-2 h-8 rounded-lg border border-[var(--nb-line)] text-[12px] font-semibold hover:bg-[var(--nb-pane-2)]"
-      >
-        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Salvar versão agora
-      </button>
-      <p className="text-[11px] text-[var(--nb-ink-3)]">Uma versão é guardada automaticamente a cada 10 minutos de edição (até 40 por nota).</p>
-      {!revs && <Loader2 className="w-4 h-4 mx-auto animate-spin text-[var(--nb-ink-3)]" />}
-      {revs?.length === 0 && <p className="text-xs text-[var(--nb-ink-3)]">Nenhuma versão ainda.</p>}
-      {revs?.map((r) => (
-        <div key={r.id} className={`rounded-lg border ${preview === r.id ? 'border-[var(--nb-hl)]' : 'border-[var(--nb-line)]'}`}>
-          <button type="button" onClick={() => setPreview(preview === r.id ? null : r.id)} className="w-full text-left px-3 py-2">
-            <span className="block text-[12px] font-semibold">{new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
-            <span className="text-[11px] text-[var(--nb-ink-3)]">{r.word_count.toLocaleString('pt-BR')} palavras</span>
-          </button>
-          {preview === r.id && current && (
-            <div className="px-3 pb-3 space-y-2">
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed p-2 rounded bg-[var(--nb-bg)] text-[var(--nb-ink-2)]">
-                {(current.content || htmlToText(String(current.data?.html || ''))).slice(0, 3000) || '(sem texto)'}
-              </pre>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!confirm('Restaurar esta versão? A versão atual será guardada no histórico antes.')) return;
-                  await api.saveRevisionNow(item.id);
-                  api.update(item.id, {
-                    title: current.title,
-                    content: current.content,
-                    blocks: current.blocks,
-                    data: (current.data as NotebookItem['data']) || item.data,
-                  });
-                  setRevs(await api.listRevisions(item.id));
-                  // força o editor a recarregar
-                  window.dispatchEvent(new CustomEvent('insight-notebook-reload', { detail: item.id }));
-                }}
-                className="w-full flex items-center justify-center gap-1.5 h-7 rounded-md bg-[var(--nb-hl)] text-white text-[11px] font-bold"
-              >
-                <RotateCcw className="w-3 h-3" /> Restaurar esta versão
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }

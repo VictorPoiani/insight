@@ -486,8 +486,14 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
   );
   const showImageMenu = useCallback(({ editor: e }: { editor: Editor }) => e.isActive('image'), []);
 
-  // salva ao sair
-  useEffect(() => () => flush(), [flush]);
+  // salva ao sair (só se houver edição pendente: recarregar o editor depois de
+  // uma restauração/marcação não pode regravar o texto antigo)
+  useEffect(
+    () => () => {
+      if (saveTimer.current) flush();
+    },
+    [flush]
+  );
 
   // títulos mudaram: recalcula ligações tracejadas
   useEffect(() => {

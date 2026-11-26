@@ -38,6 +38,13 @@ import {
   BookMarked,
   Download,
   Upload,
+  Columns2,
+  Timer,
+  Camera,
+  GitCompareArrows,
+  LayoutGrid,
+  Hash,
+  Shuffle,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -79,7 +86,12 @@ import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { GraphView } from './GraphView';
 import { RightPanel } from './RightPanel';
-import { QuickSwitcher, SearchPanel, TemplatePicker } from './Pickers';
+import { SearchPanel, TemplatePicker } from './Pickers';
+import { CommandPalette, type PaletteCommand, type PaletteHeading, type PaletteMode } from './palette/CommandPalette';
+import { SplitPane, SPLIT_MIN, type SplitTarget } from './split/SplitPane';
+import { SessionPill, SessionStartDialog, SessionSummaryDialog, useWritingSession } from './session/WritingSession';
+import type { RightTab } from './RightPanel';
+import { extractHeadings } from '@/lib/notebook/markdown';
 import './notebook.css';
 import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
@@ -225,7 +237,6 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [view, setView] = useState<MainView>('home');
   const [left, setLeft] = useState<LeftMode>('files');
   const [right, setRight] = useState(false);
-  const [switcher, setSwitcher] = useState(false);
   const [picker, setPicker] = useState<{ parentId: string | null } | null>(null);
   const [publishing, setPublishing] = useState<{ item: NotebookItem; blocks: PostBlock[] } | null>(null);
   const [immersive, setImmersive] = useState(false);
@@ -244,6 +255,12 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const [palette, setPalette] = useState<{ mode: PaletteMode; aside: boolean } | null>(null);
+  const [split, setSplit] = useState<SplitTarget | null>(null);
+  const [splitW, setSplitW] = useState(440);
+  const [rightTabReq, setRightTabReq] = useState<{ tab: RightTab; at: number } | null>(null);
+  const [sessionDialog, setSessionDialog] = useState(false);
+  const session = useWritingSession(api, viewer.id);
   const restored = useRef(false);
 
   // ------------------------------------------------------------ layout salvo
@@ -255,6 +272,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         setLeft(small ? null : l.left ?? 'files');
         setRight(small ? false : !!l.right);
         setSideHidden(!!l.sideHidden);
+        if (!small && l.split && (l.split.kind === 'item' || l.split.kind === 'entry') && typeof l.split.id === 'string') setSplit(l.split);
+        if (typeof l.splitW === 'number') setSplitW(Math.max(SPLIT_MIN, Math.min(1400, l.splitW)));
       } else if (small) setLeft(null);
     } catch {
       /* ignora */
@@ -263,11 +282,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   useEffect(() => {
     if (typeof window === 'undefined' || window.innerWidth < 1024) return;
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left, right, sideHidden }));
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left, right, sideHidden, split, splitW }));
     } catch {
       /* ignora */
     }
-  }, [left, right, sideHidden]);
+  }, [left, right, sideHidden, split, splitW]);
 
   // abas + nota da URL
   useEffect(() => {
@@ -498,9 +517,12 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         setImmersive((v) => !v);
         return;
       }
-      if (k === 'o' || (k === 'k' && !(e.target as HTMLElement)?.closest?.('textarea'))) {
+      if (k === 'p' && e.shiftKey) {
         e.preventDefault();
-        setSwitcher(true);
+        setPalette({ mode: '>', aside: false });
+      } else if (k === 'o' || (k === 'k' && !(e.target as HTMLElement)?.closest?.('textarea'))) {
+        e.preventDefault();
+        setPalette({ mode: '', aside: false });
       } else if (k === 'n' && !e.shiftKey) {
         e.preventDefault();
         void newInContext();
@@ -612,6 +634,203 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     },
     [api, viewer.contributor_level, viewer.role]
   );
+  // ------------------------------------------------------------ tela dividida
+  const promoteSplit = useCallback(() => {
+    if (!split) return;
+    if (split.kind === 'item') open(split.id);
+    else if (entriesApi.entries[split.id]) readMore(entriesApi.entries[split.id]);
+    setSplit(null);
+  }, [split, open, readMore, entriesApi.entries]);
+  const swapSplit = useCallback(() => {
+    if (!split || split.kind !== 'item' || !activeId) return;
+    const prev = activeId;
+    open(split.id);
+    setSplit({ kind: 'item', id: prev });
+  }, [split, activeId, open]);
+  const renderSplitItem = (it: NotebookItem) => {
+    if (it.template === 'map')
+      return <MapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
+    if (it.template === 'mindmap' && NOTEBOOK_FEATURES.studio)
+      return <MindmapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} />;
+    if (it.template === 'book')
+      return (
+        <BookDashboard
+          book={it}
+          api={api}
+          onOpen={open}
+          onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
+          role={viewer.role}
+          level={viewer.contributor_level}
+        />
+      );
+    return (
+      <NoteBody
+        key={`split-${it.id}-${reloadKey}`}
+        item={it}
+        api={api}
+        viewer={viewer}
+        titles={titles}
+        titleExists={titleExists}
+        onOpenLink={(t) => void openOrCreateLink(t)}
+        onTag={(t) => {
+          setSearchSeed(`#${t}`);
+          setLeft('search');
+        }}
+        onOpen={open}
+        onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
+        onSummary={(pid) => openSummary(pid)}
+        onImport={(pid) => startImport(pid)}
+        jump={null}
+      />
+    );
+  };
+
+  // Alt+clique em menção, cartão ou aba: abre ao lado
+  const altRef = useRef({ entries: entriesApi.entries, items: api.items });
+  altRef.current = { entries: entriesApi.entries, items: api.items };
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!e.altKey || e.button !== 0) return;
+      const t = e.target as HTMLElement | null;
+      if (!t?.closest?.('.nb-app')) return;
+      const ref = t.closest('[data-ref]') as HTMLElement | null;
+      if (ref?.dataset.ref && altRef.current.entries[ref.dataset.ref]) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSplit({ kind: 'entry', id: ref.dataset.ref });
+        return;
+      }
+      const card = t.closest('[data-item-id], [data-tab-id]') as HTMLElement | null;
+      const id = card?.dataset.itemId || card?.dataset.tabId;
+      if (id && altRef.current.items[id]) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSplit({ kind: 'item', id });
+      }
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
+
+  // ------------------------------------------------------------ paleta de comandos
+  const openSnapshot = useCallback(() => {
+    setRight(true);
+    setRightTabReq({ tab: 'history', at: Date.now() });
+    setTimeout(() => (document.querySelector('input[aria-label="Nome do instantâneo"]') as HTMLInputElement | null)?.focus(), 120);
+  }, []);
+
+  const paletteHeadings = useCallback((): PaletteHeading[] => {
+    const root = document.querySelector('.nb-main-body');
+    const els = root ? (Array.from(root.querySelectorAll('.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4')) as HTMLElement[]) : [];
+    const fromDom = els
+      .filter((el) => (el.textContent || '').trim())
+      .map((el) => ({
+        text: (el.textContent || '').trim(),
+        level: Number(el.tagName[1]) || 2,
+        go: () => {
+          el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          el.classList.add('nb-flash');
+          setTimeout(() => el.classList.remove('nb-flash'), 1200);
+        },
+      }));
+    if (fromDom.length) return fromDom;
+    if (active?._full && active.template !== 'chapter' && shown === 'note')
+      return extractHeadings(active.content || '').map((h) => ({ text: h.text, level: h.level, go: () => setJump({ line: h.line, at: Date.now() }) }));
+    return [];
+  }, [active, shown]);
+
+  const ic = (C: React.ElementType) => <C />;
+  const noteOpen = shown === 'note' && !!active;
+  const commands: PaletteCommand[] = [
+    { id: 'new', group: 'Criar', label: 'Nova nota', icon: ic(FilePlus2), shortcut: 'Ctrl+N', run: () => void newInContext() },
+    { id: 'project', group: 'Criar', label: 'Novo projeto', icon: ic(FolderPlus), run: () => setProjectDialog(true) },
+    { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
+    { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
+    { id: 'daily', group: 'Criar', label: 'Nota de hoje', icon: ic(CalendarDays), keywords: 'diario diário', run: () => void openDaily() },
+    session.state
+      ? { id: 'session', group: 'Escrita', label: 'Encerrar sessão de escrita', icon: ic(Timer), keywords: 'meta cronometro', run: () => session.end(true) }
+      : { id: 'session', group: 'Escrita', label: 'Iniciar sessão de escrita', icon: ic(Timer), keywords: 'meta cronometro pomodoro', run: () => setSessionDialog(true) },
+    ...(book
+      ? [
+          {
+            id: 'cork',
+            group: 'Escrita',
+            label: `Quadro de cenas de “${book.title}”`,
+            icon: ic(LayoutGrid),
+            keywords: 'corkboard capitulos fichas',
+            run: () => {
+              try {
+                localStorage.setItem('insight-notebook-chapters-view', 'quadro');
+              } catch {
+                /* ignora */
+              }
+              open(book.id);
+            },
+          },
+        ]
+      : []),
+    ...(noteOpen && active!.kind === 'note'
+      ? [
+          { id: 'snap', group: 'Nota atual', label: 'Salvar instantâneo…', icon: ic(Camera), keywords: 'versao snapshot historico', run: openSnapshot },
+          {
+            id: 'compare',
+            group: 'Nota atual',
+            label: 'Comparar versões',
+            icon: ic(GitCompareArrows),
+            keywords: 'historico diff revisao',
+            run: () => {
+              setRight(true);
+              setRightTabReq({ tab: 'history', at: Date.now() });
+            },
+          },
+          {
+            id: 'unlinked',
+            group: 'Nota atual',
+            label: 'Menções sem marcação nesta nota',
+            icon: ic(Sparkles),
+            keywords: 'conexoes backlinks',
+            run: () => {
+              setRight(true);
+              setRightTabReq({ tab: 'links', at: Date.now() });
+            },
+          },
+          { id: 'heading', group: 'Nota atual', label: 'Ir para um título…', icon: ic(Hash), run: () => setTimeout(() => setPalette({ mode: '#', aside: false }), 0) },
+          { id: 'pin', group: 'Nota atual', label: active!.pinned ? 'Desafixar nota' : 'Fixar nota', icon: ic(Pin), run: () => api.update(active!.id, { pinned: !active!.pinned }) },
+          { id: 'dup', group: 'Nota atual', label: 'Duplicar nota', icon: ic(Copy), run: () => void api.duplicate(active!.id) },
+          { id: 'export', group: 'Nota atual', label: 'Exportar nota…', icon: ic(Download), run: () => setExporting(active) },
+          { id: 'trash', group: 'Nota atual', label: 'Mover nota para a lixeira', icon: ic(Trash2), run: () => void api.trash(active!.id) },
+        ]
+      : []),
+    { id: 'aside', group: 'Tela', label: 'Abrir ao lado…', icon: ic(Columns2), keywords: 'dividir tela split', run: () => setTimeout(() => setPalette({ mode: '', aside: true }), 0) },
+    ...(split
+      ? [
+          { id: 'split-close', group: 'Tela', label: 'Fechar tela dividida', icon: ic(X), run: () => setSplit(null) },
+          ...(split.kind === 'item' && noteOpen ? [{ id: 'split-swap', group: 'Tela', label: 'Trocar os lados', icon: ic(Shuffle), run: swapSplit }] : []),
+        ]
+      : []),
+    { id: 'focus', group: 'Tela', label: immersive ? 'Sair do modo foco' : 'Modo foco', icon: ic(Maximize2), shortcut: 'Ctrl+.', run: () => setImmersive((v) => !v) },
+    { id: 'side', group: 'Tela', label: sideHidden ? 'Mostrar barra lateral' : 'Ocultar barra lateral', icon: ic(PanelLeftClose), shortcut: 'Ctrl+Shift+\\', run: () => setSideHidden((v) => !v) },
+    { id: 'right', group: 'Tela', label: right ? 'Fechar painel de detalhes' : 'Painel de detalhes', icon: ic(PanelRight), run: () => setRight((r) => !r) },
+    { id: 'home', group: 'Navegar', label: 'Início', icon: ic(Home), run: () => setView('home') },
+    {
+      id: 'search',
+      group: 'Navegar',
+      label: 'Buscar no texto das notas',
+      icon: ic(Search),
+      shortcut: 'Ctrl+Shift+F',
+      run: () => {
+        setSearchSeed(undefined);
+        setLeft('search');
+        setSideHidden(false);
+      },
+    },
+    { id: 'summary', group: 'Navegar', label: 'Sumário (menções)', icon: ic(BookMarked), run: () => openSummary(currentProjectId ?? undefined) },
+    { id: 'mentions', group: 'Navegar', label: 'Buscar menção…', icon: ic(Sparkles), run: () => setTimeout(() => setPalette({ mode: '+', aside: false }), 0) },
+    { id: 'graph', group: 'Navegar', label: 'Grafo de notas', icon: ic(Network), shortcut: 'Ctrl+G', run: () => setView('graph') },
+    { id: 'import', group: 'Arquivo', label: 'Importar arquivos', icon: ic(Upload), run: () => startImport(currentProjectId) },
+    { id: 'export-all', group: 'Arquivo', label: 'Exportar tudo (.zip)', icon: ic(Download), run: () => void runExportAll() },
+  ];
+
   // botão direito: ações gerais do Notebook
   const menuActions: GlobalMenuActions = {
     entries: entriesApi.entries,
@@ -629,7 +848,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     importFiles: () => startImport(currentProjectId),
     exportAll: () => void runExportAll(),
     exportActive: active && shown === 'note' ? () => setExporting(active) : null,
-    quickOpen: () => setSwitcher(true),
+    quickOpen: () => setPalette({ mode: '', aside: false }),
+    openAside: (id) => setSplit({ kind: 'item', id }),
+    entryAside: (id) => setSplit({ kind: 'entry', id }),
+    session: { active: !!session.state, start: () => setSessionDialog(true), end: () => session.end(true) },
+    snapshot: active && shown === 'note' && active.kind === 'note' ? () => openSnapshot() : null,
     graph: () => setView('graph'),
     home: () => setView('home'),
     toggleFocus: () => setImmersive((v) => !v),
@@ -708,7 +931,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               <RibbonBtn label="Novo a partir de modelo" onClick={() => setPicker({ parentId: null })}>
                 <LayoutTemplate />
               </RibbonBtn>
-              <RibbonBtn label="Abrir rápido (Ctrl+O)" onClick={() => setSwitcher(true)}>
+              <RibbonBtn label="Paleta de comandos (Ctrl+K)" onClick={() => setPalette({ mode: '', aside: false })}>
                 <Command />
               </RibbonBtn>
             </span>
@@ -846,7 +1069,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             </div>
           )}
 
-          <div className="nb-main-body flex-1 min-h-0 relative">
+          <div className="flex-1 min-h-0 flex relative">
+          <div className="nb-main-body flex-1 min-w-0 min-h-0 relative">
             {immersive && !isWriter && (
               <button
                 type="button"
@@ -861,6 +1085,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 items={liveItems}
                 projects={projectList}
                 entriesApi={entriesApi}
+                api={api}
                 projectId={summaryProject}
                 focusId={summaryFocus}
                 onProject={(p) => {
@@ -1032,6 +1257,24 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               </div>
             )}
           </div>
+          {split && showChrome && (
+            <SplitPane
+              target={split}
+              width={splitW}
+              onWidth={setSplitW}
+              api={api}
+              entriesApi={entriesApi}
+              activeId={shown === 'note' ? activeId : null}
+              onClose={() => setSplit(null)}
+              onPromote={promoteSplit}
+              onSwap={split.kind === 'item' && shown === 'note' && active ? swapSplit : null}
+              onTarget={setSplit}
+              onOpen={open}
+              onSummary={(id) => openSummary(entriesApi.entries[id]?.project_id ?? undefined, id)}
+              renderItem={renderSplitItem}
+            />
+          )}
+          </div>
         </main>
 
         {/* PAINEL DIREITO */}
@@ -1044,6 +1287,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 api={api}
                 onOpen={open}
                 onJump={(line) => setJump({ line, at: Date.now() })}
+                tabRequest={rightTabReq}
                 onClose={typeof window !== 'undefined' && window.innerWidth < 1024 ? () => setRight(false) : undefined}
               />
             </aside>
@@ -1051,13 +1295,43 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         )}
       </div>
 
-      {switcher && (
-        <QuickSwitcher
+      {palette && (
+        <CommandPalette
           api={api}
+          entries={entriesApi.entries}
           recent={recent}
-          onOpen={open}
+          commands={commands}
+          headings={paletteHeadings}
+          initialMode={palette.mode}
+          asideDefault={palette.aside}
+          onOpen={(id, aside) => (aside ? setSplit({ kind: 'item', id }) : open(id))}
+          onEntry={(e, aside) => (aside ? setSplit({ kind: 'entry', id: e.id }) : readMore(e))}
           onCreate={(title) => void createAndOpen({ title, parentId: null })}
-          onClose={() => setSwitcher(false)}
+          onClose={() => setPalette(null)}
+        />
+      )}
+
+      {/* sessão de escrita */}
+      <SessionPill s={session} dim={immersive} />
+      {sessionDialog && (
+        <SessionStartDialog
+          streak={session.streak()}
+          onClose={() => setSessionDialog(false)}
+          onStart={(t, g) => {
+            setSessionDialog(false);
+            session.start(t, g);
+          }}
+        />
+      )}
+      {session.summary && (
+        <SessionSummaryDialog
+          summary={session.summary}
+          onClose={session.closeSummary}
+          onOpen={open}
+          onAgain={() => {
+            session.closeSummary();
+            setSessionDialog(true);
+          }}
         />
       )}
 
@@ -1087,6 +1361,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         targetTitle={(id) => api.items[id]?.title || null}
         onReadMore={readMore}
         onOpenSummary={(id) => openSummary(entriesApi.entries[id]?.project_id ?? undefined, id)}
+        onAside={(e) => setSplit({ kind: 'entry', id: e.id })}
       />
 
       {entryReq && (

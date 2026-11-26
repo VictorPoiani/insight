@@ -16,6 +16,18 @@ import {
 
 type Patch = Partial<Pick<NotebookItem, 'title' | 'icon' | 'color' | 'content' | 'blocks' | 'data' | 'parent_id' | 'position' | 'pinned' | 'is_template' | 'archived_at' | 'published_post_id' | 'template'>>;
 
+export interface NotebookRevision {
+  id: string;
+  title: string;
+  content: string;
+  blocks: PostBlock[] | null;
+  data: NotebookItemData | null;
+  word_count: number;
+  created_at: string;
+  /** nome do instantâneo (null = versão automática) */
+  label: string | null;
+}
+
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'offline';
 
 const LOCAL_KEY = (profileId: string) => `insight-notebook-pending:${profileId}`;
@@ -391,19 +403,20 @@ export function useNotebook(profileId: string | null) {
     async (id: string) => {
       const { data } = await supabase
         .from('notebook_revisions')
-        .select('id, title, content, blocks, data, word_count, created_at')
+        .select('id, title, content, blocks, data, word_count, created_at, label')
         .eq('item_id', id)
         .order('created_at', { ascending: false })
-        .limit(40);
-      return (data || []) as { id: string; title: string; content: string; blocks: PostBlock[] | null; data: NotebookItemData | null; word_count: number; created_at: string }[];
+        .limit(100);
+      return (data || []) as NotebookRevision[];
     },
     [supabase]
   );
 
   const saveRevisionNow = useCallback(
-    async (id: string) => {
+    async (id: string, label?: string | null) => {
       const cur = itemsRef.current[id];
       if (!cur || !profileId) return;
+      const name = (label || '').trim().slice(0, 80) || null;
       lastRevision.current.set(id, Date.now());
       await supabase.from('notebook_revisions').insert({
         item_id: id,
@@ -413,9 +426,24 @@ export function useNotebook(profileId: string | null) {
         blocks: cur.blocks ?? null,
         data: cur.data ?? null,
         word_count: cur.word_count,
+        ...(name ? { label: name } : {}),
       });
     },
     [profileId, supabase]
+  );
+
+  const renameRevision = useCallback(
+    async (revId: string, label: string | null) => {
+      await supabase.rpc('notebook_revision_rename', { p_id: revId, p_label: label || '' });
+    },
+    [supabase]
+  );
+
+  const deleteRevision = useCallback(
+    async (revId: string) => {
+      await supabase.from('notebook_revisions').delete().eq('id', revId);
+    },
+    [supabase]
   );
 
   // ------------------------------------------------------------ busca no texto
@@ -469,11 +497,13 @@ export function useNotebook(profileId: string | null) {
       move,
       listRevisions,
       saveRevisionNow,
+      renameRevision,
+      deleteRevision,
       searchContent,
       registerAsset,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, loading, error, setError, saveState, reload, loadFull, update, flushAll, create, duplicate, trash, restore, destroy, move, listRevisions, saveRevisionNow, searchContent, registerAsset]
+    [items, loading, error, setError, saveState, reload, loadFull, update, flushAll, create, duplicate, trash, restore, destroy, move, listRevisions, saveRevisionNow, renameRevision, deleteRevision, searchContent, registerAsset]
   );
 }
 

@@ -218,6 +218,7 @@ export function ProjectHome({
                 <button
                   key={k.id}
                   type="button"
+                  data-item-id={k.id}
                   onClick={() => onOpen(k.id)}
                   className="flex items-center gap-3 p-3 rounded-xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left"
                 >
@@ -252,6 +253,8 @@ function glyphFor(t: string) {
     character: 'character',
     world: 'world',
     map: 'map',
+    calendar: 'moon',
+    timeline: 'timeline',
     mindmap: 'mindmap',
     roadmap: 'roadmap',
     idea: 'idea',

@@ -203,7 +203,7 @@ export function SummaryView({
                     ))}
                   </select>
                 </div>
-                <FamilyTree entries={entriesApi.entries} links={entriesApi.links} rootId={treeRoot} selectedId={selected} onSelect={setSelected} />
+                <FamilyTree entries={entriesApi.entries} links={entriesApi.links} rootId={treeRoot} selectedId={selected} onSelect={setSelected} onRoot={(id) => (setRoot(id), setSelected(null))} />
               </>
             )}
             {selected && entriesApi.entries[selected] && (

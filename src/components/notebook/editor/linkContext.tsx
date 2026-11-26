@@ -11,6 +11,8 @@ export interface NotebookLinks {
   entries: Record<string, NotebookEntry>;
   /** abre o diálogo "Mencionar" e devolve a entrada escolhida/criada */
   requestEntry: (text: string) => Promise<{ id: string; kind: EntryKind } | null>;
+  /** abre a ficha/nota da menção (o mesmo que "Ler mais") */
+  readMore?: (entryId: string) => void;
 }
 
 export const NotebookLinksContext = createContext<NotebookLinks>({

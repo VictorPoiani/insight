@@ -59,6 +59,10 @@ import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
+import { ContextMenuProvider } from './menu/ContextMenu';
+import { GlobalContextMenus, type GlobalMenuActions } from './menu/GlobalMenus';
+import { WorldCalendar } from './worldtime/WorldCalendar';
+import { Chronos } from './worldtime/Chronos';
 import { ExportDialog, ImportResultDialog } from './interop/InteropDialogs';
 import { IMPORT_ACCEPT, exportAll, importFiles, type ImportResult } from '@/lib/notebook/interop';
 import { EntryDialog } from './entries/EntryDialog';
@@ -574,14 +578,23 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     setSummaryFocus(focus);
     setView('summary');
   }, []);
+  const readMoreRef = useRef<(e: NotebookEntry) => void>(() => {});
   const linkCtx = useMemo(
-    () => ({ titles, exists: titleExists, open: (t: string) => void openOrCreateLink(t), entries: entriesApi.entries, requestEntry }),
+    () => ({
+      titles,
+      exists: titleExists,
+      open: (t: string) => void openOrCreateLink(t),
+      entries: entriesApi.entries,
+      requestEntry,
+      readMore: (id: string) => entriesApi.entries[id] && readMoreRef.current(entriesApi.entries[id]),
+    }),
     [titles, titleExists, openOrCreateLink, entriesApi.entries, requestEntry]
   );
   const readMore = useCallback(
     (e: NotebookEntry) => (e.target_id && api.items[e.target_id] ? open(e.target_id) : openSummary(e.project_id ?? undefined, e.id)),
     [api.items, open, openSummary]
   );
+  readMoreRef.current = readMore;
   const uploadEntryImage = useCallback(
     async (f: File) => {
       try {
@@ -599,6 +612,53 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     },
     [api, viewer.contributor_level, viewer.role]
   );
+  // botão direito: ações gerais do Notebook
+  const menuActions: GlobalMenuActions = {
+    entries: entriesApi.entries,
+    requestEntry,
+    readMore,
+    openSummary: (id) => openSummary(id ? entriesApi.entries[id]?.project_id ?? undefined : currentProjectId ?? undefined, id),
+    search: (q) => {
+      setSearchSeed(q || undefined);
+      setLeft('search');
+      setSideHidden(false);
+    },
+    newNote: () => void newInContext(),
+    newProject: () => setProjectDialog(true),
+    picker: () => setPicker({ parentId: null }),
+    importFiles: () => startImport(currentProjectId),
+    exportAll: () => void runExportAll(),
+    exportActive: active && shown === 'note' ? () => setExporting(active) : null,
+    quickOpen: () => setSwitcher(true),
+    graph: () => setView('graph'),
+    home: () => setView('home'),
+    toggleFocus: () => setImmersive((v) => !v),
+    toggleSide: () => setSideHidden((v) => !v),
+    toggleRight: () => setRight((r) => !r),
+    sideHidden,
+    openItem: open,
+    tab: {
+      close: closeTab,
+      closeOthers: (id) => {
+        setTabs([id]);
+        setActiveId(id);
+        setView('note');
+      },
+      closeAll: () => {
+        setTabs([]);
+        setActiveId(null);
+        setView('home');
+      },
+      pin: (id) => api.update(id, { pinned: !api.items[id]?.pinned }),
+      isPinned: (id) => !!api.items[id]?.pinned,
+      trash: (id) => {
+        closeTab(id);
+        void api.trash(id);
+      },
+      exportItem: (id) => api.items[id] && setExporting(api.items[id]),
+    },
+  };
+
   const mentionStyles = useMemo(
     () =>
       Object.values(entriesApi.entries)
@@ -612,6 +672,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   // ------------------------------------------------------------ render
   return (
     <NotebookLinksContext.Provider value={linkCtx}>
+    <ContextMenuProvider>
+    <GlobalContextMenus actions={menuActions} />
     <div className="nb-app" data-immersive={immersive} data-side-hidden={sideHidden} data-enter="true">
       <NotebookSplashExit />
       <div className="flex flex-1 min-h-0 flex-col md:flex-row relative">
@@ -720,6 +782,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     role="tab"
                     aria-selected={shown === 'note' && id === activeId}
                     className="nb-tab group"
+                    data-tab-id={id}
                     data-active={shown === 'note' && id === activeId}
                     onClick={() => open(id)}
                     onAuxClick={(e) => e.button === 1 && closeTab(id)}
@@ -884,7 +947,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     level={viewer.contributor_level}
                   />
                 ) : (
-                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) ? 'max-w-6xl' : 'max-w-3xl'}`}>
+                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' ? 'max-w-6xl' : 'max-w-3xl'}`}>
                     {/* trilha + ações */}
                     <div className="flex items-center gap-2 mb-4 min-h-[28px]">
                       <nav className="flex items-center gap-1 text-[12px] text-[var(--nb-ink-3)] min-w-0 flex-1" aria-label="Caminho">
@@ -1099,6 +1162,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         </div>
       )}
     </div>
+    </ContextMenuProvider>
     </NotebookLinksContext.Provider>
   );
 }
@@ -1166,7 +1230,8 @@ function NoteBody({
               <button
                 key={k.id}
                 type="button"
-                onClick={() => onOpen(k.id)}
+                data-item-id={k.id}
+                  onClick={() => onOpen(k.id)}
                 className="flex items-center gap-3 p-3 rounded-xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left"
               >
                 <span className="text-xl">{itemIcon(k)}</span>
@@ -1210,6 +1275,9 @@ function NoteBody({
       />
     );
   }
+
+  if (item.template === 'calendar') return <WorldCalendar item={item} api={api} />;
+  if (item.template === 'timeline') return <Chronos item={item} api={api} />;
 
   if (item.template === 'character' && NOTEBOOK_FEATURES.characterSheet) {
     return <CharacterSheet item={item} api={api} role={viewer.role} level={viewer.contributor_level} />;
@@ -1399,7 +1467,8 @@ function HomeView({
                   <button
                     key={pr.id}
                     type="button"
-                    onClick={() => onOpen(pr.id)}
+                    data-item-id={pr.id}
+                  onClick={() => onOpen(pr.id)}
                     className="group flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left transition-colors"
                   >
                     <span className="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-[var(--nb-pane-2)] text-[19px] text-[var(--nb-ink-2)] group-hover:text-[var(--nb-hl)]">
@@ -1425,7 +1494,7 @@ function HomeView({
               {books.map((b) => {
                 const chapterWords = live.filter((c) => c.parent_id === b.id && c.template === 'chapter').reduce((n, c) => n + c.word_count, 0);
                 return (
-                  <button key={b.id} type="button" onClick={() => onOpen(b.id)} className="shrink-0 w-28 text-left group">
+                  <button key={b.id} type="button" data-item-id={b.id} onClick={() => onOpen(b.id)} className="shrink-0 w-28 text-left group">
                     <span
                       className="nb-cover block w-full transition-transform group-hover:-translate-y-1"
                       style={{ background: `linear-gradient(150deg, ${b.color || '#b45309'}, #1c1917)` }}
@@ -1448,6 +1517,7 @@ function HomeView({
                 <button
                   key={r.id}
                   type="button"
+                  data-item-id={r.id}
                   onClick={() => onOpen(r.id)}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--nb-pane)] text-left border border-transparent hover:border-[var(--nb-line)]"
                 >

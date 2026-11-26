@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
-import { ENTRY_KINDS, entryKind, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
+import { ENTRY_CATEGORIES, ENTRY_KINDS, entryKind, entryLook, type EntryCategory, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { EntriesApi } from '@/lib/notebook/useEntries';
 import { Glyph } from '../icons/Glyph';
@@ -13,7 +13,7 @@ const norm = (s: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
 
-/** "Vincular informação": escolhe uma entrada do Sumário ou cria uma nova. */
+/** "Mencionar": escolhe uma menção do Sumário ou cria uma nova. */
 export function EntryDialog({
   text,
   projectId,
@@ -37,6 +37,9 @@ export function EntryDialog({
   const [summary, setSummary] = useState('');
   const sameTitle = notes.find((n) => norm(n.title) === norm(text));
   const [target, setTarget] = useState<string>(sameTitle?.id || '');
+  const [category, setCategory] = useState<EntryCategory>(
+    sameTitle?.template === 'world' ? 'lugar' : sameTitle?.template === 'character' || !sameTitle ? 'personagem' : 'conceito'
+  );
   const [saving, setSaving] = useState(false);
 
   const matches = useMemo(() => {
@@ -67,17 +70,17 @@ export function EntryDialog({
   async function create() {
     if (!title.trim()) return;
     setSaving(true);
-    const e = await entriesApi.create({ kind, title, summary, target_id: target || null, project_id: projectId });
+    const e = await entriesApi.create({ kind, title, summary, target_id: target || null, project_id: projectId, category: kind === 'elemento' ? category : null });
     setSaving(false);
     if (e) onDone(e);
   }
 
   return (
     <div className="fixed inset-0 z-[75] grid place-items-center p-4 bg-black/55 backdrop-blur-sm" onMouseDown={onCancel}>
-      <div role="dialog" aria-label="Vincular informação" onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] shadow-2xl nb-cs-in">
+      <div role="dialog" aria-label="Mencionar" onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] shadow-2xl nb-cs-in">
         <div className="flex items-center justify-between px-5 pt-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--nb-hl)]">Vincular informação</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--nb-hl)]">Mencionar</p>
             <p className="mt-0.5 text-[13px] text-[var(--nb-ink-2)] truncate">
               Trecho: <span className="font-semibold text-[var(--nb-ink)]">“{text}”</span>
             </p>
@@ -115,7 +118,7 @@ export function EntryDialog({
             </label>
             <div className="max-h-72 overflow-y-auto nb-scroll space-y-1">
               {matches.map((e) => {
-                const k = entryKind(e.kind);
+                const k = entryLook(e);
                 return (
                   <button
                     key={e.id}
@@ -128,7 +131,7 @@ export function EntryDialog({
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[13px] font-bold">{e.title}</span>
-                      <span className="block text-[12px] text-[var(--nb-ink-3)] line-clamp-2">{e.summary || k.short}</span>
+                      <span className="block text-[12px] text-[var(--nb-ink-3)] line-clamp-2">{e.summary || k.label}</span>
                     </span>
                   </button>
                 );
@@ -172,6 +175,26 @@ export function EntryDialog({
               ))}
             </div>
             <p className="text-[12px] text-[var(--nb-ink-3)]">{entryKind(kind).hint}</p>
+            {kind === 'elemento' && (
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Categoria">
+                {ENTRY_CATEGORIES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={category === c.id}
+                    onClick={() => setCategory(c.id)}
+                    className={`flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-bold transition-colors ${
+                      category === c.id ? 'border-transparent text-white' : 'border-[var(--nb-line)] text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'
+                    }`}
+                    style={category === c.id ? { background: c.color } : undefined}
+                  >
+                    <Glyph name={c.glyph} className="text-[12px]" />
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               autoFocus
               value={title}

@@ -84,7 +84,7 @@ function inline(raw: string, ctx: RenderCtx): string {
       }</figure>`
     );
   });
-  // informação crucial: [trecho](ref:<uuid> "tipo")
+  // menção: [trecho](ref:<uuid> "tipo")
   s = s.replace(/\[([^\]\n]+)\]\(ref:([0-9a-f-]{36})(?:\s+"(elemento|nota_autor|aviso)")?\)/gi, (_, text, id, kind) =>
     keep(`<span class="nb-ref nb-ref--${kind || 'elemento'}" data-ref="${esc(id.toLowerCase())}" data-kind="${kind || 'elemento'}">${esc(text)}</span>`)
   );

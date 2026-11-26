@@ -255,6 +255,17 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     content: () => ['> [!ideia] A ideia em uma frase', '> ', '', '## Por que importa', '', '## Próximo passo', '- [ ] ', '', '#ideia'].join('\n'),
   },
   {
+    id: 'map',
+    section: 'livro',
+    name: 'Mapa (cartografia)',
+    description: 'Mapa do seu mundo com marcadores, rotas e regiões ligados às menções.',
+    icon: 'map',
+    color: '#0d9488',
+    kind: 'note',
+    title: () => 'Mapa do mundo',
+    data: () => ({ map: { image: null, w: 1600, h: 1000, markers: [], routes: [], regions: [] } }),
+  },
+  {
     id: 'poem',
     section: 'textos',
     name: 'Poema',

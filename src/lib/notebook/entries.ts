@@ -1,7 +1,9 @@
 /**
- * Linkagem de informação crucial + Sumário.
- * Um trecho do texto aponta para uma entrada (elemento da história, nota do
- * autor ou aviso). Passar o mouse mostra o resumo; "Ler mais" abre a ficha/nota.
+ * Menções + Sumário.
+ * Uma menção é um conceito definido pelo escritor (personagem, lugar,
+ * organização…). Trechos do texto apontam para ela; passar o mouse mostra a
+ * prévia e "Ler mais" abre a ficha/nota. Notas do autor e avisos usam o mesmo
+ * mecanismo. Relações entre menções alimentam o grafo e a genealogia.
  *   markdown:  [Filho de Maicon](ref:<uuid> "elemento")
  *   HTML:      <span data-ref="<uuid>" data-kind="elemento">Filho de Maicon</span>
  */
@@ -18,6 +20,8 @@ export interface NotebookEntry {
   summary: string;
   target_id: string | null;
   aliases: string[];
+  category: EntryCategory | null;
+  image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,11 +29,11 @@ export interface NotebookEntry {
 export const ENTRY_KINDS: { id: EntryKind; label: string; short: string; glyph: GlyphName; color: string; hint: string }[] = [
   {
     id: 'elemento',
-    label: 'Elemento da história',
-    short: 'Elemento',
+    label: 'Menção',
+    short: 'Menção',
     glyph: 'sparkle',
     color: '#60a5fa',
-    hint: 'Personagem, lugar, objeto ou termo: um resumo para refrescar a memória.',
+    hint: 'Um conceito da sua obra (personagem, lugar, organização…), com prévia ao passar o mouse.',
   },
   {
     id: 'nota_autor',
@@ -66,5 +70,55 @@ export function extractEntryRefs(...texts: (string | null | undefined)[]): strin
   }
   return Array.from(out).slice(0, 500);
 }
+
+export type EntryCategory = 'personagem' | 'lugar' | 'organizacao' | 'objeto' | 'evento' | 'conceito';
+
+export const ENTRY_CATEGORIES: { id: EntryCategory; label: string; glyph: GlyphName; color: string }[] = [
+  { id: 'personagem', label: 'Personagem', glyph: 'character', color: '#a78bfa' },
+  { id: 'lugar', label: 'Lugar', glyph: 'world', color: '#34d399' },
+  { id: 'organizacao', label: 'Organização', glyph: 'crown', color: '#f59e0b' },
+  { id: 'objeto', label: 'Objeto', glyph: 'gem', color: '#38bdf8' },
+  { id: 'evento', label: 'Evento', glyph: 'agenda', color: '#f472b6' },
+  { id: 'conceito', label: 'Conceito', glyph: 'sparkle', color: '#94a3b8' },
+];
+export const entryCategory = (c: string | null | undefined) => ENTRY_CATEGORIES.find((x) => x.id === c) || null;
+
+/** Cor/ícone de uma menção: pela categoria; notas do autor e avisos pelo tipo. */
+export function entryLook(e: Pick<NotebookEntry, 'kind' | 'category'> | null | undefined) {
+  if (e && e.kind === 'elemento') {
+    const c = entryCategory(e.category);
+    if (c) return { color: c.color, glyph: c.glyph, label: c.label };
+  }
+  const k = entryKind(e?.kind);
+  return { color: k.color, glyph: k.glyph, label: k.short };
+}
+
+// ------------------------------------------------------------------ relações
+export type EntryRel = 'pai' | 'conjuge' | 'irmao' | 'aliado' | 'inimigo' | 'conhece' | 'mentor' | 'membro' | 'mora' | 'outro';
+
+export interface EntryLink {
+  id: string;
+  profile_id: string;
+  from_id: string;
+  to_id: string;
+  rel: EntryRel;
+  label: string;
+  created_at: string;
+}
+
+/** Como ler a relação: "<de> é <frase> <para>". */
+export const ENTRY_RELS: { id: EntryRel; label: string; phrase: string; family?: boolean; color: string }[] = [
+  { id: 'pai', label: 'Pai/mãe de', phrase: 'pai ou mãe de', family: true, color: '#a78bfa' },
+  { id: 'conjuge', label: 'Cônjuge de', phrase: 'cônjuge de', family: true, color: '#f472b6' },
+  { id: 'irmao', label: 'Irmão/irmã de', phrase: 'irmão ou irmã de', family: true, color: '#c4b5fd' },
+  { id: 'aliado', label: 'Aliado de', phrase: 'aliado de', color: '#34d399' },
+  { id: 'inimigo', label: 'Inimigo de', phrase: 'inimigo de', color: '#f87171' },
+  { id: 'conhece', label: 'Conhece', phrase: 'conhece', color: '#94a3b8' },
+  { id: 'mentor', label: 'Mentor de', phrase: 'mentor de', color: '#38bdf8' },
+  { id: 'membro', label: 'Membro de', phrase: 'membro de', color: '#f59e0b' },
+  { id: 'mora', label: 'Vive em', phrase: 'vive em', color: '#2dd4bf' },
+  { id: 'outro', label: 'Outra relação', phrase: '', color: '#64748b' },
+];
+export const entryRel = (r: string) => ENTRY_RELS.find((x) => x.id === r) || ENTRY_RELS[ENTRY_RELS.length - 1];
 
 export const ENTRY_UUID_RE = new RegExp(`^${UUID}$`, 'i');

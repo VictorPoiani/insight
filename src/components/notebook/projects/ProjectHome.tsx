@@ -146,7 +146,7 @@ export function ProjectHome({
       {/* sumário */}
       <section>
         <div className="flex items-center justify-between gap-3 mb-3">
-          <h2 className="nb-pane-title">Sumário do projeto</h2>
+          <h2 className="nb-pane-title">Menções do projeto</h2>
           <button
             type="button"
             onClick={() => onSummary(item.id)}
@@ -176,7 +176,7 @@ export function ProjectHome({
           </div>
         ) : (
           <p className="text-[13px] text-[var(--nb-ink-3)]">
-            Selecione um trecho num capítulo ou nota e use <span className="font-semibold text-[var(--nb-ink-2)]">Vincular informação</span>: personagens, lugares, notas do autor e avisos aparecem aqui.
+            Selecione um trecho num capítulo ou nota e use <span className="font-semibold text-[var(--nb-ink-2)]">Mencionar</span> (ou digite + no texto): personagens, lugares, organizações, notas do autor e avisos aparecem aqui.
           </p>
         )}
       </section>
@@ -251,6 +251,7 @@ function glyphFor(t: string) {
     book: 'book',
     character: 'character',
     world: 'world',
+    map: 'map',
     mindmap: 'mindmap',
     roadmap: 'roadmap',
     idea: 'idea',

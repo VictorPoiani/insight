@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, BookMarked } from 'lucide-react';
-import { entryKind, type NotebookEntry } from '@/lib/notebook/entries';
+import { entryLook, type NotebookEntry } from '@/lib/notebook/entries';
 import { Glyph } from '../icons/Glyph';
 
 type State = { id: string; rect: DOMRect } | null;
 
 /**
- * Balão da informação crucial: passar o mouse (ou tocar) num trecho vinculado
+ * Prévia da menção: passar o mouse (ou tocar) num trecho vinculado
  * mostra o resumo, com "Ler mais" para a ficha/nota completa.
  */
 export function EntryPopover({
@@ -72,7 +72,7 @@ export function EntryPopover({
 
   if (!state) return null;
   const entry = entries[state.id];
-  const k = entryKind(entry?.kind);
+  const look = entryLook(entry);
   const width = 320;
   const left = Math.max(12, Math.min(state.rect.left + state.rect.width / 2 - width / 2, window.innerWidth - width - 12));
   const below = state.rect.bottom + 230 < window.innerHeight;
@@ -83,12 +83,17 @@ export function EntryPopover({
     <div ref={cardRef} className="nb-entry-pop" style={style} role="tooltip">
       {entry ? (
         <>
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 grid place-items-center rounded-md text-[13px]" style={{ color: k.color, background: `color-mix(in srgb, ${k.color} 16%, transparent)` }}>
-              <Glyph name={k.glyph} />
-            </span>
-            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: k.color }}>
-              {k.short}
+          <div className="flex items-center gap-2.5">
+            {entry.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={entry.image_url} alt="" className="w-10 h-10 rounded-xl object-cover border-2" style={{ borderColor: look.color }} />
+            ) : (
+              <span className="w-8 h-8 grid place-items-center rounded-lg text-[15px]" style={{ color: look.color, background: `color-mix(in srgb, ${look.color} 16%, transparent)` }}>
+                <Glyph name={look.glyph} />
+              </span>
+            )}
+            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: look.color }}>
+              {look.label}
             </span>
           </div>
           <p className="mt-2 text-[15px] font-extrabold leading-snug">{entry.title}</p>
@@ -117,7 +122,7 @@ export function EntryPopover({
           </div>
         </>
       ) : (
-        <p className="text-[13px] text-[var(--nb-ink-3)]">Esta informação foi removida do Sumário.</p>
+        <p className="text-[13px] text-[var(--nb-ink-3)]">Esta menção foi removida do Sumário.</p>
       )}
     </div>
   );

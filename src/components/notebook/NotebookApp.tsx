@@ -58,18 +58,21 @@ import { BookDashboard } from './BookDashboard';
 import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
+import { MapStudio } from './map/MapStudio';
 import { ExportDialog, ImportResultDialog } from './interop/InteropDialogs';
 import { IMPORT_ACCEPT, exportAll, importFiles, type ImportResult } from '@/lib/notebook/interop';
 import { EntryDialog } from './entries/EntryDialog';
 import { EntryPopover } from './entries/EntryPopover';
 import { SummaryView } from './entries/SummaryView';
 import { useEntries } from '@/lib/notebook/useEntries';
-import type { EntryKind } from '@/lib/notebook/entries';
+import { entryLook, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
 import { NewProjectDialog, type NewProjectInput } from './projects/NewProjectDialog';
 import { isProject, projectType } from '@/lib/notebook/projects';
 import { NotebookLinksContext } from './editor/linkContext';
 import { convertCharacterItem } from './character/convert';
 import { NOTEBOOK_FEATURES } from '@/lib/notebook/copy';
+import { uploadMediaToInsight } from '@/lib/mediaCompressor';
+import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { GraphView } from './GraphView';
 import { RightPanel } from './RightPanel';
 import { QuickSwitcher, SearchPanel, TemplatePicker } from './Pickers';
@@ -556,7 +559,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   // modo foco: some tudo menos o conteúdo (vale para qualquer nota)
   const showChrome = !immersive;
 
-  // projeto da nota aberta (para onde vai a nova informação do Sumário)
+  // projeto da nota aberta (para onde vai a nova menção)
   const currentProjectId = useMemo(() => {
     if (active && isProject(active)) return active.id;
     const root = path[0];
@@ -574,6 +577,34 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const linkCtx = useMemo(
     () => ({ titles, exists: titleExists, open: (t: string) => void openOrCreateLink(t), entries: entriesApi.entries, requestEntry }),
     [titles, titleExists, openOrCreateLink, entriesApi.entries, requestEntry]
+  );
+  const readMore = useCallback(
+    (e: NotebookEntry) => (e.target_id && api.items[e.target_id] ? open(e.target_id) : openSummary(e.project_id ?? undefined, e.id)),
+    [api.items, open, openSummary]
+  );
+  const uploadEntryImage = useCallback(
+    async (f: File) => {
+      try {
+        const res = await uploadMediaToInsight(f, {
+          budgetBytes: getUserUploadLimitBytes(viewer.contributor_level ?? 0, viewer.role ?? undefined),
+          asImage: true,
+          scope: 'notebook',
+        });
+        await api.registerAsset(null, res.r2Key, res.publicUrl);
+        return res.publicUrl;
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+        return null;
+      }
+    },
+    [api, viewer.contributor_level, viewer.role]
+  );
+  const mentionStyles = useMemo(
+    () =>
+      Object.values(entriesApi.entries)
+        .map((e) => `[data-ref="${e.id}"]{--mc:${entryLook(e).color}}`)
+        .join(''),
+    [entriesApi.entries]
   );
   const liveItems = useMemo(() => Object.values(api.items).filter((i) => !i.archived_at), [api.items]);
   const projectList = useMemo(() => liveItems.filter((i) => isProject(i)).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [liveItems]);
@@ -774,6 +805,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                   setSummaryFocus(null);
                 }}
                 onOpen={open}
+                onReadMore={readMore}
+                onUploadImage={uploadEntryImage}
               />
             )}
 
@@ -825,7 +858,20 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               <MindmapStudio key={`${active.id}-${reloadKey}`} item={active} api={api} path={path} onOpen={open} onRename={(t) => void rename(active.id, t)} />
             )}
 
-            {shown === 'note' && active?._full && active.template !== 'chapter' && !(active.template === 'mindmap' && NOTEBOOK_FEATURES.studio) && (
+            {shown === 'note' && active?._full && active.template === 'map' && (
+              <MapStudio
+                key={`${active.id}-${reloadKey}`}
+                item={active}
+                api={api}
+                path={path}
+                onOpen={open}
+                onRename={(t) => void rename(active.id, t)}
+                role={viewer.role}
+                level={viewer.contributor_level}
+              />
+            )}
+
+            {shown === 'note' && active?._full && active.template !== 'chapter' && active.template !== 'map' && !(active.template === 'mindmap' && NOTEBOOK_FEATURES.studio) && (
               <div className="nb-scroll absolute inset-0 overflow-y-auto">
                 {active.template === 'book' ? (
                   <BookDashboard
@@ -970,10 +1016,13 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       {exporting && <ExportDialog item={exporting} api={api} onClose={() => setExporting(null)} />}
       {importResult && <ImportResultDialog result={importResult} onOpen={open} onClose={() => setImportResult(null)} />}
 
+      {/* cor de cada menção (pela categoria), aplicada onde quer que ela apareça */}
+      <style>{mentionStyles}</style>
+
       <EntryPopover
         entries={entriesApi.entries}
         targetTitle={(id) => api.items[id]?.title || null}
-        onReadMore={(e) => (e.target_id && api.items[e.target_id] ? open(e.target_id) : openSummary(e.project_id ?? undefined, e.id))}
+        onReadMore={readMore}
         onOpenSummary={(id) => openSummary(entriesApi.entries[id]?.project_id ?? undefined, id)}
       />
 

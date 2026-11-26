@@ -88,6 +88,8 @@ export interface NotebookItem {
   links: string[];
   /** entradas do Sumário citadas no texto */
   entry_refs?: string[];
+  /** fontes (bibliografia) citadas no texto */
+  source_refs?: string[];
   word_count: number;
   position: number;
   pinned: boolean;
@@ -102,6 +104,6 @@ export interface NotebookItem {
 
 /** Colunas leves (árvore, busca de títulos, grafo). */
 export const NOTEBOOK_META_COLUMNS =
-  'id, profile_id, parent_id, kind, template, title, icon, color, tags, links, entry_refs, word_count, position, pinned, is_template, published_post_id, archived_at, created_at, updated_at';
+  'id, profile_id, parent_id, kind, template, title, icon, color, tags, links, entry_refs, source_refs, word_count, position, pinned, is_template, published_post_id, archived_at, created_at, updated_at';
 
 export const NOTEBOOK_FULL_COLUMNS = `${NOTEBOOK_META_COLUMNS}, content, blocks, data`;

@@ -1,6 +1,7 @@
 'use client';
 
 import { extractEntryRefs } from './entries';
+import { extractSourceRefs } from './sources';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { PostBlock } from '@/types/database';
@@ -48,7 +49,8 @@ function blocksText(blocks: PostBlock[] | null | undefined): string {
 export function deriveFields(item: Pick<NotebookItem, 'template' | 'content' | 'blocks' | 'data'>) {
   const base = deriveBase(item);
   const data = item.data ? JSON.stringify(item.data) : '';
-  return { ...base, entry_refs: extractEntryRefs(item.content, data) };
+  const html = item.template === 'chapter' ? String(item.data?.html || '') : '';
+  return { ...base, entry_refs: extractEntryRefs(item.content, data), source_refs: extractSourceRefs(item.content, html) };
 }
 
 function deriveBase(item: Pick<NotebookItem, 'template' | 'content' | 'blocks' | 'data'>) {

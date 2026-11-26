@@ -47,6 +47,7 @@ import {
   Database,
   BookOpen,
 } from 'lucide-react';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 const DEFAULT_FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 
@@ -511,7 +512,7 @@ export function TopicTabsManager({
         type: 'writing' as TopicTemplateType,
         section: 'models',
         title: 'Poemas & Livros',
-        subtitle: 'Mural de poemas, crônicas e capítulos ligado ao My Notebook.',
+        subtitle: `Mural de poemas, crônicas e capítulos ligado ao ${NOTEBOOK_NAME}.`,
         defaultIcon: 'book' as TopicIconKey,
         defaultColor: '#d97706',
       },
@@ -1333,7 +1334,7 @@ export function TopicTabsManager({
                                 'Poemas & Livros',
                                 'book',
                                 '#d97706',
-                                'Poemas, crônicas e capítulos — escritos aqui ou trazidos do My Notebook.'
+                                `Poemas, crônicas e capítulos — escritos aqui ou trazidos do ${NOTEBOOK_NAME}.`
                               )
                             }
                             className="group rounded-2xl bg-amber-700/[0.08] hover:bg-amber-700/[0.14] border border-amber-600/25 hover:border-amber-600/60 p-5 text-left transition-all flex flex-col justify-between overflow-hidden h-60 shadow-sm"
@@ -1341,7 +1342,7 @@ export function TopicTabsManager({
                             <div>
                               <h3 className="text-sm font-semibold text-primary">Poemas & Livros</h3>
                               <p className="text-xs text-secondary mt-1">
-                                Mural de escritos ligado ao My Notebook.
+                                Mural de escritos ligado ao {NOTEBOOK_NAME}.
                               </p>
                             </div>
                             <div className="rounded-xl bg-background/60 border border-border p-3 font-serif text-[11px] italic text-secondary leading-relaxed">

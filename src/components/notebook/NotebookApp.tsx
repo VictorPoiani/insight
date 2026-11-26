@@ -45,10 +45,14 @@ import { FileExplorer, itemIcon } from './FileExplorer';
 import { MarkdownEditor } from './MarkdownEditor';
 import { WriterMode } from './WriterMode';
 import { BookDashboard } from './BookDashboard';
+import { CharacterSheet } from './character/CharacterSheet';
+import { convertCharacterItem } from './character/convert';
+import { NOTEBOOK_FEATURES } from '@/lib/notebook/copy';
 import { GraphView } from './GraphView';
 import { RightPanel } from './RightPanel';
 import { QuickSwitcher, SearchPanel, TemplatePicker } from './Pickers';
 import './notebook.css';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 interface Viewer {
   id: string;
@@ -137,7 +141,7 @@ function NotebookLocked({ anon }: { anon: boolean }) {
           <Lock className="w-7 h-7 text-[var(--nb-hl)]" />
         </div>
         <p className="mt-6 text-[11px] font-black tracking-[0.3em] text-[var(--nb-hl)]">EM BREVE</p>
-        <h1 className="mt-2 text-4xl sm:text-5xl font-black tracking-tight">My Notebook</h1>
+        <h1 className="mt-2 text-4xl sm:text-5xl font-black tracking-tight">{NOTEBOOK_NAME}</h1>
         <p className="mt-4 max-w-lg text-[var(--nb-ink-2)]">
           Um espaço livre de criação dentro do Insight: escreva, organize, conecte ideias e publique quando estiver pronto.
           {anon ? ' Entre na sua conta para acompanhar a liberação.' : ' Estamos em testes fechados — logo chega para você.'}
@@ -172,6 +176,20 @@ function NotebookLocked({ anon }: { anon: boolean }) {
 
 function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const api = useNotebook(viewer.id);
+
+  // Preview: converte de uma vez todas as fichas de personagem antigas (texto)
+  const swept = useRef(false);
+  useEffect(() => {
+    if (swept.current || api.loading || !NOTEBOOK_FEATURES.characterSheet) return;
+    swept.current = true;
+    const ids = Object.values(api.items)
+      .filter((i) => i.template === 'character' && !i.archived_at)
+      .map((i) => i.id);
+    void (async () => {
+      for (const id of ids) await convertCharacterItem(api, id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api.loading]);
   const [tabs, setTabs] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<MainView>('home');
@@ -912,6 +930,10 @@ function NoteBody({
         persistOverride={persistWorkspace}
       />
     );
+  }
+
+  if (item.template === 'character' && NOTEBOOK_FEATURES.characterSheet) {
+    return <CharacterSheet item={item} api={api} role={viewer.role} level={viewer.contributor_level} />;
   }
 
   return (

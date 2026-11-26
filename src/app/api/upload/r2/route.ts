@@ -12,6 +12,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { formatBytes, getUserUploadLimitBytes, MB } from '@/lib/contributorLevels';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 /**
  * Upload direto ao Cloudflare R2.
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
     if (scope === 'notebook') {
       const { data: allowed } = await supabase.rpc('notebook_has_access');
       if (!allowed) {
-        return NextResponse.json({ error: 'O My Notebook ainda não está liberado para a sua conta.' }, { status: 403 });
+        return NextResponse.json({ error: `O ${NOTEBOOK_NAME} ainda não está liberado para a sua conta.` }, { status: 403 });
       }
     }
     const size = Math.floor(Number(body.compressedSize));

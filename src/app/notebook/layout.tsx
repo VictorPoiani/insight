@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Literata } from 'next/font/google';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 const literata = Literata({
   subsets: ['latin'],
@@ -10,7 +11,7 @@ const literata = Literata({
 });
 
 export const metadata: Metadata = {
-  title: 'My Notebook — Insight*',
+  title: `${NOTEBOOK_NAME} — Insight*`,
   description: 'Espaço livre de criação: notas conectadas, modelos e modo escritor de livros.',
   robots: { index: false, follow: false },
 };

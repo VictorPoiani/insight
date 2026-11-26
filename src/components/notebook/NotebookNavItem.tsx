@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { NotebookPen, Lock } from 'lucide-react';
 import { useNitro } from '@/components/nitro/NitroProvider';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 /**
  * Botão "My Notebook" (barra lateral e menu do celular).
@@ -29,7 +30,7 @@ export function NotebookNavItem({
     const inner = (
       <>
         <NotebookPen className="w-4 h-4 text-secondary" />
-        <span className="flex-1 text-primary">My Notebook</span>
+        <span className="flex-1 text-primary">{NOTEBOOK_NAME}</span>
         {!allowed && (
           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-elevated text-muted border border-border">
             <Lock className="w-2.5 h-2.5" /> Em breve
@@ -42,7 +43,7 @@ export function NotebookNavItem({
         {inner}
       </Link>
     ) : (
-      <span aria-disabled="true" title="My Notebook ainda está em testes fechados" className={`${cls} opacity-60 cursor-not-allowed`}>
+      <span aria-disabled="true" title={`${NOTEBOOK_NAME} ainda está em testes fechados`} className={`${cls} opacity-60 cursor-not-allowed`}>
         {inner}
       </span>
     );
@@ -57,7 +58,7 @@ export function NotebookNavItem({
       </span>
       {!collapsed && (
         <>
-          <span className="truncate flex-1">My Notebook</span>
+          <span className="truncate flex-1">{NOTEBOOK_NAME}</span>
           {!allowed && (
             <Lock className="w-3.5 h-3.5 shrink-0 text-muted" aria-label="Em breve" />
           )}
@@ -71,7 +72,7 @@ export function NotebookNavItem({
       <span
         role="link"
         aria-disabled="true"
-        title="My Notebook — em breve (testes fechados)"
+        title={`${NOTEBOOK_NAME} — em breve (testes fechados)`}
         className={`${base} text-secondary opacity-60 cursor-not-allowed select-none`}
       >
         {inner}
@@ -81,7 +82,7 @@ export function NotebookNavItem({
   return (
     <Link
       href="/notebook"
-      title={collapsed ? 'My Notebook' : undefined}
+      title={collapsed ? NOTEBOOK_NAME : undefined}
       className={`${base} ${active ? 'bg-surface text-accent border border-border' : 'text-secondary hover:bg-surface hover:text-primary'}`}
     >
       {inner}

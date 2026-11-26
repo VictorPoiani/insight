@@ -27,6 +27,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
 import './about.css';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 const FOUNDER_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 const WORDS = ['poemas', 'códigos', 'desabafos', 'teorias', 'análises', 'projetos', 'memórias'];
@@ -246,7 +247,7 @@ const PILLARS = [
 
 const SHOWCASE = [
   { src: '/tutorial/composer-slash.webp', title: 'Editor em blocos', text: '18 tipos de bloco: texto, enquete, mapa mental, música, código…', span: 'sm:col-span-2 sm:row-span-2', pos: '0% 0%' },
-  { src: '/tutorial/topic-poemas.webp', title: 'Poemas & Livros', text: 'Um mural de escritos ligado ao My Notebook.', span: '', pos: '50% 78%' },
+  { src: '/tutorial/topic-poemas.webp', title: 'Poemas & Livros', text: `Um mural de escritos ligado ao ${NOTEBOOK_NAME}.`, span: '', pos: '50% 78%' },
   { src: '/tutorial/topic-habitos.webp', title: 'Tópicos que trabalham', text: 'Metas, hábitos, agenda, dieta e mais.', span: '', pos: '50% 80%' },
   { src: '/tutorial/carousel.webp', title: 'Carrossel', text: 'Mídias seguidas viram galeria.', span: 'sm:col-span-2', pos: '50% 60%' },
   { src: '/tutorial/ranking.webp', title: 'Domingo de ranking', text: 'Quem apoia o projeto ganha a manchete.', span: 'sm:col-span-2', pos: '0% 0%' },
@@ -257,7 +258,7 @@ const TIMELINE = [
   { when: 'O começo', title: 'Post It', text: 'Um protótipo em JavaScript puro: um lugar para anotar ideias e publicar sem cerimônia.', done: true },
   { when: 'Versão 1.0', title: 'Insight*', text: 'Reconstruído do zero com Next.js e Supabase: editor em blocos, tópicos, temas e um feed sem algoritmo.', done: true },
   { when: 'Hoje', title: 'Comunidade', text: 'Respostas em conversa, menções, reposts com comentário, notícias, Insight Nitro, ranking de apoio e moderação automática.', done: true },
-  { when: 'Insight 2.0', title: 'Aberto para todos', text: 'Fim do beta fechado, Mensagens, My Notebook liberado, app instalável (PWA) e exportação dos seus escritos.', done: false },
+  { when: 'Insight 2.0', title: 'Aberto para todos', text: `Fim do beta fechado, Mensagens, ${NOTEBOOK_NAME} liberado, app instalável (PWA) e exportação dos seus escritos.`, done: false },
 ];
 
 const STACK = [

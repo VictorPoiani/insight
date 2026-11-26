@@ -18,6 +18,7 @@ import {
 } from '@/lib/notebook/character';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
+import { DiaryBook } from './DiaryBook';
 import { ArtArc, ArtBackstory, ArtEssence, ArtInterview, ArtMixed, ArtNotebooks, ArtPhysical, ArtPsych } from './Illustrations';
 
 const SERIF = "var(--nb-literata), Georgia, 'Times New Roman', serif";
@@ -197,7 +198,7 @@ export function CharacterSheet({ item, api, role, level }: Props) {
       </nav>
 
       <Essence ch={ch} save={save} item={item} api={api} role={role} level={level} />
-      <Notebooks ch={ch} save={save} />
+      <Notebooks ch={ch} save={save} name={item.title} />
       <Profiles ch={ch} save={save} />
       <Trajectory ch={ch} save={save} />
       <Interview ch={ch} save={save} />
@@ -343,11 +344,9 @@ function Essence({ ch, save, item, api, role, level }: SecProps & Props) {
 }
 
 // ------------------------------------------------------------------ cadernos
-function Notebooks({ ch, save }: SecProps) {
+function Notebooks({ ch, save, name }: SecProps & { name: string }) {
   const [tab, setTab] = useState<'escritor' | 'voz'>('escritor');
   const diary = ch.diary || [];
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
     <section>
       <SectionHead id="cadernos" kicker="02" title="Cadernos" text="Um bloco para as suas ideias e um diário escrito pelo próprio personagem." />
@@ -388,67 +387,7 @@ function Notebooks({ ch, save }: SecProps) {
               className="text-[14px]"
             />
           ) : (
-            <div className="space-y-4">
-              {diary.length === 0 && (
-                <p className="text-[13px] text-[var(--nb-ink-3)]" style={{ fontFamily: SERIF }}>
-                  Escreva como ele escreveria: o jeito de pensar, de falar, até os erros. O que ele acharia importante anotar?
-                </p>
-              )}
-              {diary.map((e) => (
-                <div key={e.id} className="group flex gap-3">
-                  <div className="w-px bg-[var(--nb-line)] shrink-0 ml-1" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={e.date}
-                        aria-label="Data da entrada"
-                        onChange={(ev) =>
-                          save({
-                            diary: diary.map((x) => (x.id === e.id ? { ...x, date: ev.target.value || today } : x)),
-                          })
-                        }
-                        className="bg-transparent text-[11px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)] outline-none"
-                      />
-                      <button
-                        type="button"
-                        aria-label="Apagar entrada"
-                        onClick={() => save({ diary: diary.filter((x) => x.id !== e.id) }, 0)}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 rounded text-[var(--nb-ink-3)] hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <Grow
-                      value={e.text}
-                      onChange={(v) =>
-                        save({
-                          diary: diary.map((x) => (x.id === e.id ? { ...x, text: v } : x)),
-                        })
-                      }
-                      serif
-                      label="Entrada do diário"
-                      placeholder="Querido diário…"
-                      className="text-[15px] italic"
-                    />
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  save(
-                    {
-                      diary: [...diary, { id: newId(), date: today, text: '' }],
-                    },
-                    0
-                  )
-                }
-                className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-[12px] font-bold hover:text-[var(--nb-hl)]"
-              >
-                <Plus className="w-3.5 h-3.5" /> Nova entrada
-              </button>
-            </div>
+            <DiaryBook diary={diary} characterName={name} onChange={(next, debounce) => save({ diary: next }, debounce)} />
           )}
         </div>
       </div>

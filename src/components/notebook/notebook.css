@@ -423,3 +423,71 @@
 .nb-cs-in { animation: nb-cs-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes nb-cs-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .nb-cs-in { animation: none; } }
+
+/* ------------------------------------------------ diário do personagem (livro) */
+.nb-diary {
+  --paper: #f3e7cf; --paper-ink: #3b2c18; --paper-ink-2: #8a7354; --paper-line: #e2d1ad;
+  --line-h: 28px;
+  perspective: 1600px;
+}
+.nb-diary[data-paper='claro'] { --paper: #fbf8f1; --paper-ink: #2b2620; --paper-ink-2: #7a6f60; --paper-line: #e9e1d2; }
+.nb-diary[data-paper='noite'] { --paper: #1b1b21; --paper-ink: #e6e2da; --paper-ink-2: #8e8a83; --paper-line: #2c2c34; }
+.nb-diary-book {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-radius: 6px 10px 10px 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 18px 40px -18px rgba(0,0,0,.55);
+  transform-style: preserve-3d;
+}
+.nb-diary-book[data-wide='true'] { grid-template-columns: 1fr 1fr; border-radius: 8px; }
+.nb-diary-page {
+  position: relative;
+  height: 440px;
+  padding: 22px 26px 34px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  overflow: hidden;
+}
+.nb-diary-page[data-side='single'] { border-radius: 6px 10px 10px 6px; box-shadow: inset 10px 0 14px -12px rgba(0,0,0,.35); }
+.nb-diary-page[data-side='left'] { border-radius: 8px 0 0 8px; box-shadow: inset -16px 0 18px -16px rgba(0,0,0,.35); }
+.nb-diary-page[data-side='right'] { border-radius: 0 8px 8px 0; box-shadow: inset 16px 0 18px -16px rgba(0,0,0,.35); }
+.nb-diary-date {
+  width: 22px;
+  background: transparent;
+  color: transparent;
+  outline: none;
+  cursor: pointer;
+}
+.nb-diary-date::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; margin: 0; }
+.nb-diary[data-paper='noite'] .nb-diary-date { color-scheme: dark; }
+.nb-diary-text {
+  flex: 1;
+  width: 100%;
+  margin-top: 10px;
+  resize: none;
+  background: transparent;
+  outline: none;
+  color: var(--paper-ink);
+  font-size: 16px;
+  font-style: italic;
+  line-height: var(--line-h);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line-h) - 1px), var(--paper-line) calc(var(--line-h) - 1px), var(--paper-line) var(--line-h));
+  background-attachment: local;
+  scrollbar-width: thin;
+}
+.nb-diary-text::placeholder { color: var(--paper-ink-2); opacity: 0.7; }
+.nb-diary-num {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--paper-ink-2);
+  font-family: var(--nb-literata), Georgia, serif;
+}
+.nb-turn-next { animation: nb-turn-next 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; transform-origin: left center; }
+.nb-turn-prev { animation: nb-turn-prev 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; transform-origin: right center; }
+@keyframes nb-turn-next { from { opacity: 0; transform: rotateY(-14deg) translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes nb-turn-prev { from { opacity: 0; transform: rotateY(14deg) translateX(-18px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nb-turn-next, .nb-turn-prev { animation: none; } }

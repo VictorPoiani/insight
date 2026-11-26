@@ -24,6 +24,17 @@ export interface CanvasNode {
   url?: string;
   /** nome do arquivo (imagem) ou título do grupo */
   label?: string;
+  /** travado: não move nem muda de tamanho */
+  locked?: boolean;
+  /** anexo no R2 (notebook_assets) */
+  assetId?: string | null;
+  /** extras do arquivo: tipo, tamanho, dimensões originais */
+  mime?: string;
+  bytes?: number;
+  natW?: number;
+  natH?: number;
+  /** só no navegador: envio em andamento (não é gravado) */
+  pending?: boolean;
 }
 
 export interface CanvasEdge {

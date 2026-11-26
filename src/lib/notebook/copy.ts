@@ -7,6 +7,12 @@ export const NOTEBOOK_NAME = 'My Notebook';
 export const NOTEBOOK_SHORT = 'Notebook';
 
 /**
+ * Caractere que abre o menu de menções no texto. O @ fica reservado para
+ * mencionar pessoas no Insight; aqui as menções são conceitos da obra.
+ */
+export const MENTION_TRIGGER = '+';
+
+/**
  * Recursos do Notebook que ainda estão em Preview (só aparecem para quem já
  * acessa o Notebook, hoje a equipe). Desligar aqui volta ao comportamento antigo.
  */

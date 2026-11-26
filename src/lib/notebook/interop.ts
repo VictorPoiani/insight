@@ -110,7 +110,7 @@ async function itemMarkdown(item: NotebookItem, api: NotebookApi): Promise<strin
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const WORKSPACES = new Set(['goals', 'habits', 'tasks', 'roadmap', 'mindmap', 'diet', 'agenda']);
+const WORKSPACES = new Set(['goals', 'habits', 'tasks', 'roadmap', 'mindmap', 'diet', 'agenda', 'map']);
 export const isWorkspace = (t: string) => WORKSPACES.has(t);
 
 // ============================================================ tabelas (CSV / Excel)

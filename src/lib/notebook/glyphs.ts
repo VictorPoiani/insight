@@ -43,6 +43,16 @@ export const GLYPHS = {
   quote: '<path d="M10 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5H7.2M18.5 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5h-2.8"/>',
   todo: '<rect x="4.5" y="4.5" width="15" height="15" rx="3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  map: '<path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5L3.5 20z"/><path d="M9 4v13.5M15 6.5V20"/>',
+  crown: '<path d="M4 17.5 3 7.5l5 4 4-6 4 6 5-4-1 10z"/><path d="M4.5 20.5h15"/>',
+  gem: '<path d="M6.5 4h11l3.5 5-9 11L3 9z"/><path d="M3 9h18M9 4l-1.8 5L12 20l4.8-11L15 4"/>',
+  castle: '<path d="M4 21V8h3v2.5h2.5V8h5V10.5H17V8h3v13z"/><path d="M10 21v-4.5a2 2 0 0 1 4 0V21"/><path d="M4 8V5.5h3V8M17 8V5.5h3V8"/>',
+  tower: '<path d="M8 21 9 9h6l1 12z"/><path d="M7.5 9h9V6h-2V4.5h-1.5V6h-2V4.5H9.5V6h-2z"/><path d="M11 13h2"/>',
+  anchor: '<circle cx="12" cy="5" r="2"/><path d="M12 7v13.5M8.5 10.5h7"/><path d="M4.5 13.5c0 4 3.4 7 7.5 7s7.5-3 7.5-7"/>',
+  mountain: '<path d="m2.5 19.5 6.5-11 4 6.5 2.5-3.5 6 8z"/><path d="m7.4 11.2 1.6 1.3 1.5-1.3"/>',
+  tree: '<path d="M12 3 6 11h3l-4 6h14l-4-6h3z"/><path d="M12 17v4"/>',
+  house: '<path d="M4 11 12 4.5 20 11"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
+  skull: '<path d="M12 3.5a7 7 0 0 0-7 7c0 2.4 1.2 4.3 3 5.5V19h8v-3c1.8-1.2 3-3.1 3-5.5a7 7 0 0 0-7-7z"/><circle cx="9.3" cy="11" r="1.4"/><circle cx="14.7" cy="11" r="1.4"/><path d="M10.5 19v2M13.5 19v2"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8h.01"/>',
 } as const;
 

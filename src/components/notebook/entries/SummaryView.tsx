@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookMarked, Plus, Search, Trash2 } from 'lucide-react';
-import { ENTRY_KINDS, entryKind, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
+import { BookMarked, ImagePlus, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { ENTRY_CATEGORIES, ENTRY_KINDS, entryLook, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
+import { EntryAvatar, EntrySidePanel, FamilyTree, MentionGraph, RelationsEditor } from './MentionViews';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { EntriesApi } from '@/lib/notebook/useEntries';
 import { Glyph } from '../icons/Glyph';
@@ -15,7 +16,7 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '');
 
 /**
- * Sumário: toda informação crucial vinculada pelo autor, por projeto,
+ * Sumário: todas as menções definidas pelo autor, por projeto,
  * para consultar e editar num lugar só.
  */
 export function SummaryView({
@@ -26,6 +27,8 @@ export function SummaryView({
   focusId,
   onProject,
   onOpen,
+  onReadMore,
+  onUploadImage,
 }: {
   items: NotebookItem[];
   projects: NotebookItem[];
@@ -35,7 +38,12 @@ export function SummaryView({
   focusId: string | null;
   onProject: (id: string | null | undefined) => void;
   onOpen: (id: string) => void;
+  onReadMore: (e: NotebookEntry) => void;
+  onUploadImage: (f: File) => Promise<string | null>;
 }) {
+  const [tab, setTab] = useState<'lista' | 'grafo' | 'genealogia'>('lista');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [root, setRoot] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<EntryKind | 'all'>('all');
   const all = Object.values(entriesApi.entries);
@@ -55,10 +63,29 @@ export function SummaryView({
     return m;
   }, [items]);
 
+  // menções (conceitos) do projeto, para o grafo
+  const scoped = useMemo(
+    () => all.filter((e) => e.kind === 'elemento' && (projectId === undefined || (e.project_id ?? null) === projectId)),
+    [all, projectId]
+  );
+  // pessoas com família registrada (as mais aparentadas primeiro)
+  const people = useMemo(() => {
+    const fam = new Map<string, number>();
+    entriesApi.links.forEach((l) => {
+      if (l.rel !== 'pai' && l.rel !== 'conjuge' && l.rel !== 'irmao') return;
+      fam.set(l.from_id, (fam.get(l.from_id) || 0) + 1);
+      fam.set(l.to_id, (fam.get(l.to_id) || 0) + 1);
+    });
+    return scoped
+      .filter((e) => e.category === 'personagem' || fam.has(e.id))
+      .sort((a, b) => (fam.get(b.id) || 0) - (fam.get(a.id) || 0) || a.title.localeCompare(b.title, 'pt-BR'));
+  }, [scoped, entriesApi.links]);
+  const treeRoot = root && entriesApi.entries[root] ? root : people[0]?.id || null;
+
   const notes = useMemo(() => items.filter((i) => i.kind === 'note' || i.template === 'book').sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [items]);
 
   async function addEntry() {
-    const e = await entriesApi.create({ kind: kind === 'all' ? 'elemento' : kind, title: 'Nova informação', summary: '', target_id: null, project_id: projectId ?? null });
+    const e = await entriesApi.create({ kind: kind === 'all' ? 'elemento' : kind, title: 'Nova menção', summary: '', target_id: null, project_id: projectId ?? null });
     if (e) setTimeout(() => document.getElementById(`entry-${e.id}`)?.querySelector('input')?.focus(), 50);
   }
 
@@ -71,9 +98,9 @@ export function SummaryView({
           </span>
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--nb-hl)]">Sumário</p>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Informação crucial</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Menções</h1>
             <p className="mt-1 text-[13px] text-[var(--nb-ink-3)] max-w-xl">
-              Elementos da história, notas do autor e avisos vinculados ao texto. Passe o mouse num trecho vinculado para ver o resumo; edite tudo aqui.
+              Os conceitos da sua obra (personagens, lugares, organizações…), notas do autor e avisos. Digite + no texto para mencionar; passe o mouse numa menção para ver a prévia.
             </p>
           </div>
         </header>
@@ -98,7 +125,7 @@ export function SummaryView({
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar no Sumário" className="flex-1 bg-transparent outline-none text-[13px]" />
           </label>
           <button type="button" onClick={() => void addEntry()} className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--nb-hl)] text-white text-[12px] font-bold">
-            <Plus className="w-3.5 h-3.5" /> Nova informação
+            <Plus className="w-3.5 h-3.5" /> Nova menção
           </button>
         </div>
 
@@ -121,7 +148,69 @@ export function SummaryView({
           })}
         </div>
 
-        {list.length ? (
+        <div className="flex gap-1 p-1 rounded-xl bg-[var(--nb-pane)] border border-[var(--nb-line)] w-max" role="tablist">
+          {(
+            [
+              ['lista', 'Lista'],
+              ['grafo', 'Grafo de conexões'],
+              ['genealogia', 'Genealogia'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => {
+                setTab(id);
+                setSelected(null);
+              }}
+              className={`h-8 px-3.5 rounded-lg text-[12px] font-bold ${tab === id ? 'bg-[var(--nb-pane-2)] text-[var(--nb-ink)]' : 'text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab !== 'lista' ? (
+          <div className="relative">
+            {tab === 'grafo' ? (
+              <MentionGraph
+                entries={scoped}
+                links={entriesApi.links}
+                storageKey={`insight-nb-graph:${projectId === undefined ? 'all' : projectId ?? 'none'}`}
+                selectedId={selected}
+                onSelect={setSelected}
+              />
+            ) : (
+              <>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-[var(--nb-ink-3)]">Árvore de</span>
+                  <select
+                    value={treeRoot || ''}
+                    onChange={(e) => {
+                      setRoot(e.target.value || null);
+                      setSelected(null);
+                    }}
+                    aria-label="Pessoa central da árvore"
+                    className="h-8 px-2 rounded-lg bg-[var(--nb-pane)] border border-[var(--nb-line)] text-[12px] font-semibold outline-none"
+                  >
+                    {!people.length && <option value="">nenhum personagem ainda</option>}
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <FamilyTree entries={entriesApi.entries} links={entriesApi.links} rootId={treeRoot} selectedId={selected} onSelect={setSelected} />
+              </>
+            )}
+            {selected && entriesApi.entries[selected] && (
+              <EntrySidePanel entry={entriesApi.entries[selected]} entriesApi={entriesApi} onClose={() => setSelected(null)} onReadMore={onReadMore} />
+            )}
+          </div>
+        ) : list.length ? (
           <div className="space-y-2.5">
             {list.map((e) => (
               <EntryCard
@@ -133,6 +222,7 @@ export function SummaryView({
                 projects={projects}
                 entriesApi={entriesApi}
                 onOpen={onOpen}
+                onUploadImage={onUploadImage}
               />
             ))}
           </div>
@@ -140,7 +230,7 @@ export function SummaryView({
           <div className="rounded-2xl border border-dashed border-[var(--nb-line)] p-8 text-center">
             <p className="text-[14px] font-bold">Nada por aqui ainda</p>
             <p className="mt-1 text-[13px] text-[var(--nb-ink-3)]">
-              Selecione um trecho em qualquer nota ou capítulo e use <span className="font-semibold text-[var(--nb-ink-2)]">Vincular informação</span> no menu que aparece.
+              Selecione um trecho em qualquer nota ou capítulo e use <span className="font-semibold text-[var(--nb-ink-2)]">Mencionar</span> no menu que aparece.
             </p>
           </div>
         )}
@@ -157,6 +247,7 @@ function EntryCard({
   projects,
   entriesApi,
   onOpen,
+  onUploadImage,
 }: {
   entry: NotebookEntry;
   focus: boolean;
@@ -165,8 +256,11 @@ function EntryCard({
   projects: NotebookItem[];
   entriesApi: EntriesApi;
   onOpen: (id: string) => void;
+  onUploadImage: (f: File) => Promise<string | null>;
 }) {
-  const k = entryKind(entry.kind);
+  const k = entryLook(entry);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState(entry.title);
   const [summary, setSummary] = useState(entry.summary);
   const [aliases, setAliases] = useState(entry.aliases.join(', '));
@@ -189,9 +283,32 @@ function EntryCard({
       className={`rounded-2xl border bg-[var(--nb-pane)] p-4 transition-colors ${focus ? 'border-[var(--nb-hl)]' : 'border-[var(--nb-line)]'}`}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 w-8 h-8 shrink-0 grid place-items-center rounded-lg text-[16px]" style={{ color: k.color, background: `color-mix(in srgb, ${k.color} 14%, transparent)` }}>
-          <Glyph name={k.glyph} />
-        </span>
+        <button
+          type="button"
+          title={entry.image_url ? 'Trocar imagem' : 'Adicionar imagem'}
+          onClick={() => fileRef.current?.click()}
+          className="relative mt-0.5 shrink-0 rounded-full group"
+        >
+          <EntryAvatar entry={entry} size={44} />
+          <span className="absolute inset-0 grid place-items-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (!f) return;
+            setUploading(true);
+            const url = await onUploadImage(f);
+            setUploading(false);
+            if (url) void entriesApi.update(entry.id, { image_url: url });
+          }}
+        />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <input
@@ -218,12 +335,12 @@ function EntryCard({
             </select>
             <button
               type="button"
-              aria-label="Apagar informação"
+              aria-label="Apagar menção"
               title="Apagar"
               onClick={() => {
                 const msg = usedIn.length
-                  ? `Esta informação está vinculada em ${usedIn.length} ${usedIn.length === 1 ? 'texto' : 'textos'}. Os trechos continuam, mas o balão some. Apagar?`
-                  : 'Apagar esta informação do Sumário?';
+                  ? `Esta menção aparece em ${usedIn.length} ${usedIn.length === 1 ? 'texto' : 'textos'}. Os trechos continuam, mas o balão some. Apagar?`
+                  : 'Apagar esta menção do Sumário?';
                 if (confirm(msg)) void entriesApi.remove(entry.id);
               }}
               className="p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-red-400"
@@ -292,6 +409,36 @@ function EntryCard({
               />
             </label>
           </div>
+          {entry.kind === 'elemento' && (
+            <>
+              <div className="flex flex-wrap gap-1">
+                {ENTRY_CATEGORIES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => void entriesApi.update(entry.id, { category: entry.category === c.id ? null : c.id })}
+                    aria-pressed={entry.category === c.id}
+                    className={`flex items-center gap-1 h-6 px-2 rounded-full text-[10px] font-bold border transition-colors ${
+                      entry.category === c.id ? 'border-transparent text-white' : 'border-[var(--nb-line)] text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'
+                    }`}
+                    style={entry.category === c.id ? { background: c.color } : undefined}
+                  >
+                    <Glyph name={c.glyph} className="text-[11px]" />
+                    {c.label}
+                  </button>
+                ))}
+                {entry.image_url && (
+                  <button type="button" onClick={() => void entriesApi.update(entry.id, { image_url: null })} className="h-6 px-2 rounded-full text-[10px] font-bold text-[var(--nb-ink-3)] hover:text-red-400">
+                    tirar imagem
+                  </button>
+                )}
+              </div>
+              <div className="pt-1">
+                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Relações</span>
+                <RelationsEditor entry={entry} entriesApi={entriesApi} />
+              </div>
+            </>
+          )}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)] mr-1">
               {usedIn.length ? `Aparece em ${usedIn.length}` : 'Ainda não vinculada a nenhum trecho'}

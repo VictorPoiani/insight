@@ -14,7 +14,7 @@ export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans'; 
   const out: PostBlock[] = [];
   const fontStyle = opts.font ?? 'sans';
 
-  // informação crucial: no post vira um trecho marcado com o resumo no balão nativo
+  // menção: no post vira um trecho marcado com o resumo no balão nativo
   root.querySelectorAll('[data-ref]').forEach((el) => {
     const e = opts.entries?.[(el as HTMLElement).dataset.ref || ''];
     if (!e) return el.replaceWith(doc.createTextNode(el.textContent || ''));

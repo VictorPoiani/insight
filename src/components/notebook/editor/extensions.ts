@@ -260,7 +260,7 @@ export function joinFrontmatter(props: [string, string][], body: string): string
   return `---\n${kept.map(([k, v]) => `${k.trim()}: ${v}`).join('\n')}\n---\n\n${body}`;
 }
 
-// ------------------------------------------------------------------ informação crucial
+// ------------------------------------------------------------------ menções
 /**
  * Trecho ligado a uma entrada do Sumário. Em markdown vira um link com
  * esquema próprio: [texto](ref:<uuid> "tipo").

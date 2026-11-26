@@ -52,7 +52,9 @@ import { CALLOUT_TYPES, Callout, EntryRef, TagHighlight, WikiLink, joinFrontmatt
 import { Illustration, PoemKeys } from './bookExtensions';
 import { ImageBar } from './ImageBar';
 import { useEditorTick } from './useEditorTick';
-import { useNotebookLinks } from './linkContext';
+import { useNotebookLinks, type NotebookLinks } from './linkContext';
+import { MENTION_TRIGGER } from '@/lib/notebook/copy';
+import { entryLook } from '@/lib/notebook/entries';
 
 export interface RichNoteEditorProps {
   item: NotebookItem;
@@ -70,9 +72,9 @@ export interface RichNoteEditorProps {
 }
 
 // ------------------------------------------------------------------ menus de sugestão
-type MenuItem = { id: string; label: string; hint?: string; icon: React.ReactNode; run: (editor: Editor, range: Range) => void };
-type MenuState = {
-  kind: 'slash' | 'link';
+export type MenuItem = { id: string; label: string; hint?: string; icon: React.ReactNode; run: (editor: Editor, range: Range) => void };
+export type MenuState = {
+  kind: 'slash' | 'link' | 'mention';
   items: MenuItem[];
   index: number;
   rect: DOMRect | null;
@@ -141,12 +143,72 @@ const norm = (s: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
 
+/** Itens do menu de menções (digitar + no texto). */
+export function mentionItems(query: string, links: NotebookLinks): MenuItem[] {
+  const q = norm(query.trim());
+  if (q.length > 40) return [];
+  const all = Object.values(links.entries).filter((e) => e.kind === 'elemento');
+  const found = all
+    .filter((e) => !q || norm(e.title).includes(q) || e.aliases.some((a) => norm(a).includes(q)))
+    .sort((a, b) => Number(norm(b.title).startsWith(q)) - Number(norm(a.title).startsWith(q)) || a.title.localeCompare(b.title, 'pt-BR'))
+    .slice(0, 8);
+  const items: MenuItem[] = found.map((e) => {
+    const look = entryLook(e);
+    return {
+      id: `m-${e.id}`,
+      label: e.title,
+      hint: look.label,
+      icon: e.image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={e.image_url} alt="" className="w-full h-full rounded-md object-cover" />
+      ) : (
+        <span style={{ color: look.color }} className="text-[15px] leading-none">
+          <Glyph name={look.glyph} />
+        </span>
+      ),
+      run: (ed, r) =>
+        ed
+          .chain()
+          .focus()
+          .deleteRange(r)
+          .insertContent([
+            { type: 'text', text: e.title, marks: [{ type: 'entryRef', attrs: { id: e.id, kind: e.kind } }] },
+            { type: 'text', text: ' ' },
+          ])
+          .run(),
+    };
+  });
+  const typed = query.trim();
+  if (typed && !all.some((e) => norm(e.title) === q)) {
+    items.push({
+      id: 'm-new',
+      label: `Criar menção “${typed}”`,
+      hint: 'nova',
+      icon: <Plus className="w-4 h-4" />,
+      run: (ed, r) => {
+        ed.chain().focus().deleteRange(r).run();
+        void links.requestEntry(typed).then((res) => {
+          if (!res) return;
+          ed.chain()
+            .focus()
+            .insertContent([
+              { type: 'text', text: links.entries[res.id]?.title || typed, marks: [{ type: 'entryRef', attrs: res }] },
+              { type: 'text', text: ' ' },
+            ])
+            .run();
+        });
+      },
+    });
+  }
+  return items;
+}
+
 /** Extensão genérica: liga um menu de sugestão (/ ou [[) ao estado React. */
-function makeSuggest(
+export function makeSuggest(
   name: string,
   char: string,
   getItems: (query: string) => MenuItem[],
-  kind: 'slash' | 'link',
+  kind: 'slash' | 'link' | 'mention',
   setMenu: React.MutableRefObject<(m: MenuState | ((p: MenuState) => MenuState)) => void>,
   menuRef: React.MutableRefObject<MenuState>
 ) {
@@ -160,7 +222,7 @@ function makeSuggest(
           editor: this.editor,
           pluginKey: new PluginKey(name),
           char,
-          allowSpaces: kind === 'link',
+          allowSpaces: kind !== 'slash',
           startOfLine: false,
           items: ({ query }) => getItems(query),
           command: ({ editor, range, props }) => props.run(editor, range),
@@ -264,6 +326,9 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const titlesRef = useRef(titles);
+  const links = useNotebookLinks();
+  const linksRef = useRef(links);
+  linksRef.current = links;
   titlesRef.current = titles;
   const existsRef = useRef(titleExists);
   existsRef.current = titleExists;
@@ -364,6 +429,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       TaskToggle,
       makeSuggest('slashMenu', '/', slashFilter, 'slash', setMenu, menuRef),
       makeSuggest('linkMenu', '[[', linkItems, 'link', setMenu, menuRef),
+      makeSuggest('mentionMenu', MENTION_TRIGGER, (q) => mentionItems(q, linksRef.current), 'mention', setMenu, menuRef),
     ];
   }, [pickImage, variant]);
 
@@ -670,14 +736,14 @@ export function EntryLinkButtons({ editor, size = 'md' }: { editor: Editor; size
         onClick={() => editor.chain().focus().extendMarkRange('entryRef').unsetMark('entryRef').run()}
         className={`${cls} flex items-center gap-1 rounded-md font-bold text-[var(--nb-ink-2)] hover:bg-[var(--nb-pane-2)]`}
       >
-        <Glyph name="cross" className="text-[13px]" /> Desvincular
+        <Glyph name="cross" className="text-[13px]" /> Tirar menção
       </button>
     );
   }
   return (
     <button
       type="button"
-      title="Vincular informação (resumo ao passar o mouse)"
+      title="Mencionar um conceito (prévia ao passar o mouse)"
       onMouseDown={(e) => e.preventDefault()}
       onClick={async () => {
         const { from, to } = editor.state.selection;
@@ -688,7 +754,7 @@ export function EntryLinkButtons({ editor, size = 'md' }: { editor: Editor; size
       }}
       className={`${cls} flex items-center gap-1 rounded-md font-bold text-[var(--nb-hl)] hover:bg-[var(--nb-hl-soft)]`}
     >
-      <Glyph name="sparkle" className="text-[13px]" /> Vincular
+      <Glyph name="sparkle" className="text-[13px]" /> Mencionar
     </button>
   );
 }
@@ -771,7 +837,7 @@ function SelectionMenu({ editor }: { editor: Editor }) {
   );
 }
 
-function SuggestMenu({ menu, onHover }: { menu: NonNullable<MenuState>; onHover: (i: number) => void }) {
+export function SuggestMenu({ menu, onHover }: { menu: NonNullable<MenuState>; onHover: (i: number) => void }) {
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current?.querySelector<HTMLElement>(`[data-i="${menu.index}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -780,9 +846,9 @@ function SuggestMenu({ menu, onHover }: { menu: NonNullable<MenuState>; onHover:
   const top = Math.min(menu.rect.bottom + 6, window.innerHeight - 320);
   const left = Math.min(menu.rect.left, window.innerWidth - 300);
   return createPortal(
-    <div ref={listRef} className="nb-rich-suggest nb-scroll" style={{ top, left }} role="listbox" aria-label={menu.kind === 'slash' ? 'Comandos' : 'Notas'}>
+    <div ref={listRef} className="nb-rich-suggest nb-scroll" style={{ top, left }} role="listbox" aria-label={menu.kind === 'slash' ? 'Comandos' : menu.kind === 'mention' ? 'Menções' : 'Notas'}>
       <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-wider text-[var(--nb-ink-3)]">
-        {menu.kind === 'slash' ? 'Inserir' : 'Ligar a uma nota'}
+        {menu.kind === 'slash' ? 'Inserir' : menu.kind === 'mention' ? 'Mencionar' : 'Ligar a uma nota'}
       </p>
       {menu.items.map((it, i) => (
         <button

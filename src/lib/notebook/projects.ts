@@ -42,6 +42,7 @@ export const PROJECT_TYPES: ProjectTypeDef[] = [
       { template: 'book', label: 'Livro', hint: 'capítulos, metas e estante' },
       { template: 'character', label: 'Ficha de personagem', hint: 'perfis, trajetória e entrevista' },
       { template: 'world', label: 'Worldbuilding', hint: 'lugares, regras e glossário' },
+      { template: 'map', label: 'Mapa', hint: 'marcadores, rotas e regiões' },
       { template: 'mindmap', label: 'Mapa da trama', hint: 'conexões entre cenas', title: 'Mapa da trama' },
       { template: 'roadmap', label: 'Linha do tempo', hint: 'eventos em ordem', title: 'Linha do tempo' },
       { template: 'idea', label: 'Banco de ideias', hint: 'cenas e diálogos soltos', title: 'Banco de ideias' },
@@ -77,6 +78,7 @@ export const PROJECT_TYPES: ProjectTypeDef[] = [
     pitch: 'Um universo inteiro: lugares, povos, história e regras.',
     suggestions: [
       { template: 'world', label: 'Lugar ou região', hint: 'geografia e cultura' },
+      { template: 'map', label: 'Mapa do mundo', hint: 'cartografia com marcadores e rotas' },
       { template: 'character', label: 'Ficha de personagem', hint: 'quem vive nesse mundo' },
       { template: 'mindmap', label: 'Mapa de relações', hint: 'facções e alianças', title: 'Mapa de relações' },
       { template: 'roadmap', label: 'Linha do tempo', hint: 'eras e eventos', title: 'Linha do tempo' },

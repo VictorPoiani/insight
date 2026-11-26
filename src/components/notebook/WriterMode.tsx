@@ -41,7 +41,9 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import { EntryRef } from './editor/extensions';
 import { Illustration, PageBreak } from './editor/bookExtensions';
 import { ImageBar } from './editor/ImageBar';
-import { EntryLinkButtons } from './editor/RichNoteEditor';
+import { EntryLinkButtons, SuggestMenu, makeSuggest, mentionItems, type MenuState } from './editor/RichNoteEditor';
+import { useNotebookLinks } from './editor/linkContext';
+import { MENTION_TRIGGER } from '@/lib/notebook/copy';
 import { Placeholder } from '@tiptap/extensions';
 import { countWords, htmlToText } from '@/lib/notebook/markdown';
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
@@ -271,6 +273,20 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
     pagingTimer.current = window.setTimeout(measure, 250);
   };
 
+  // menções: digitar + abre a lista de conceitos da obra
+  const links = useNotebookLinks();
+  const linksRef = useRef(links);
+  linksRef.current = links;
+  const [menu, setMenuState] = useState<MenuState>(null);
+  const menuRef = useRef<MenuState>(null);
+  const setMenu = useRef<(m: MenuState | ((p: MenuState) => MenuState)) => void>(() => {});
+  setMenu.current = (m) => {
+    const next = typeof m === 'function' ? m(menuRef.current) : m;
+    menuRef.current = next;
+    setMenuState(next);
+  };
+  const mentionExt = useMemo(() => makeSuggest('mentionMenu', MENTION_TRIGGER, (q) => mentionItems(q, linksRef.current), 'mention', setMenu, menuRef), []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -289,6 +305,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       Illustration.configure({ inline: false }),
       PageBreak,
       EntryRef,
+      mentionExt,
       Placeholder.configure({ placeholder: 'Era uma vez…' }),
       CurrentBlock,
     ],
@@ -553,6 +570,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
                 </div>
               </BubbleMenu>
               <EditorContent editor={editor} />
+              {menu && menu.items.length > 0 && <SuggestMenu menu={menu} onHover={(i) => setMenu.current({ ...menu, index: i })} />}
             </>
           ) : (
             <div className="py-10 grid place-items-center text-[var(--paper-ink-2)]">

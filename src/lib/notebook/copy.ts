@@ -15,4 +15,6 @@ export const NOTEBOOK_FEATURES = {
   characterSheet: true,
   /** editor universal (Tiptap) nas notas: modo Visual + modo Markdown */
   richEditor: true,
+  /** mapa mental em tela ampla com controles flutuantes */
+  studio: true,
 } as const;

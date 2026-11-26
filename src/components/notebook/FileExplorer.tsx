@@ -21,6 +21,7 @@ import {
   Search,
   X,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
@@ -35,6 +36,7 @@ interface Props {
   onNew: (opts: { parentId: string | null; template?: string; title?: string }) => void;
   onPickTemplate: (parentId: string | null) => void;
   onRename: (id: string, title: string) => void;
+  onImport?: (parentId: string | null) => void;
   onClose?: () => void;
 }
 
@@ -49,7 +51,7 @@ export function itemIcon(item: Pick<NotebookItem, 'icon' | 'template' | 'kind'>)
   return <Glyph name={itemGlyph(item)} />;
 }
 
-export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onRename, onClose }: Props) {
+export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onRename, onImport, onClose }: Props) {
   const [sort, setSort] = useState<SortMode>('manual');
   const [filter, setFilter] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -271,9 +273,11 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
           <IconBtn title="Novo projeto" onClick={() => onNew({ parentId: null, template: 'folder' })}>
             <FolderPlus className="w-4 h-4" />
           </IconBtn>
-          <IconBtn title="Novo livro" onClick={() => onNew({ parentId: null, template: 'book' })}>
-            <BookPlus className="w-4 h-4" />
-          </IconBtn>
+          {onImport && (
+            <IconBtn title="Importar arquivos (Word, Markdown, planilhas…)" onClick={() => onImport(null)}>
+              <Upload className="w-4 h-4" />
+            </IconBtn>
+          )}
           <IconBtn title="Novo a partir de modelo" onClick={() => onPickTemplate(null)}>
             <LayoutTemplate className="w-4 h-4" />
           </IconBtn>

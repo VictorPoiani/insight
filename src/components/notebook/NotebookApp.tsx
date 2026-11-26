@@ -36,6 +36,8 @@ import {
   Maximize2,
   Minimize2,
   BookMarked,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -56,6 +58,8 @@ import { BookDashboard } from './BookDashboard';
 import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
+import { ExportDialog, ImportResultDialog } from './interop/InteropDialogs';
+import { IMPORT_ACCEPT, exportAll, importFiles, type ImportResult } from '@/lib/notebook/interop';
 import { EntryDialog } from './entries/EntryDialog';
 import { EntryPopover } from './entries/EntryPopover';
 import { SummaryView } from './entries/SummaryView';
@@ -220,6 +224,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [immersive, setImmersive] = useState(false);
   const [sideHidden, setSideHidden] = useState(false);
   const [projectDialog, setProjectDialog] = useState(false);
+  const [exporting, setExporting] = useState<NotebookItem | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | 'busy' | null>(null);
+  const [exportingAll, setExportingAll] = useState(false);
+  const importTarget = useRef<string | null>(null);
+  const importInput = useRef<HTMLInputElement>(null);
   const [summaryProject, setSummaryProject] = useState<string | null | undefined>(undefined);
   const [summaryFocus, setSummaryFocus] = useState<string | null>(null);
   const [entryReq, setEntryReq] = useState<{ text: string; resolve: (v: { id: string; kind: EntryKind } | null) => void } | null>(null);
@@ -373,6 +382,20 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     },
     [api, open]
   );
+
+  const startImport = useCallback((parentId: string | null) => {
+    importTarget.current = parentId;
+    importInput.current?.click();
+  }, []);
+  const runExportAll = useCallback(async () => {
+    setExportingAll(true);
+    try {
+      await exportAll(api, entriesApi.entries);
+    } catch {
+      alert('Não foi possível gerar o arquivo .zip.');
+    }
+    setExportingAll(false);
+  }, [api, entriesApi.entries]);
 
   const createProject = useCallback(
     async (p: NewProjectInput) => {
@@ -633,6 +656,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                   onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
                   onPickTemplate={(parentId) => setPicker({ parentId })}
                   onRename={(id, t) => void rename(id, t)}
+                  onImport={(pid) => startImport(pid)}
                   onClose={typeof window !== 'undefined' && window.innerWidth < 1024 ? () => setLeft(null) : undefined}
                 />
               ) : (
@@ -767,6 +791,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 onCreate={(t) => void createAndOpen({ template: t })}
                 onDaily={() => void openDaily()}
                 onPicker={() => setPicker({ parentId: null })}
+                onImport={() => startImport(null)}
+                onExportAll={() => void runExportAll()}
+                exportingAll={exportingAll}
               />
             )}
 
@@ -794,7 +821,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               </div>
             )}
 
-            {shown === 'note' && active?._full && active.template !== 'chapter' && (
+            {shown === 'note' && active?._full && active.template === 'mindmap' && NOTEBOOK_FEATURES.studio && (
+              <MindmapStudio key={`${active.id}-${reloadKey}`} item={active} api={api} path={path} onOpen={open} onRename={(t) => void rename(active.id, t)} />
+            )}
+
+            {shown === 'note' && active?._full && active.template !== 'chapter' && !(active.template === 'mindmap' && NOTEBOOK_FEATURES.studio) && (
               <div className="nb-scroll absolute inset-0 overflow-y-auto">
                 {active.template === 'book' ? (
                   <BookDashboard
@@ -802,6 +833,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     api={api}
                     onOpen={open}
                     onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
+                    onExport={() => setExporting(active)}
                     role={viewer.role}
                     level={viewer.contributor_level}
                   />
@@ -849,6 +881,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                             <MenuRow icon={<LayoutTemplate />} onClick={() => (api.update(active.id, { is_template: !active.is_template }), setMenuOpen(false))}>
                               {active.is_template ? 'Deixar de ser modelo' : 'Usar como modelo'}
                             </MenuRow>
+                            <MenuRow icon={<Download />} onClick={() => (setExporting(active), setMenuOpen(false))}>
+                              Exportar…
+                            </MenuRow>
                             <MenuRow icon={<Trash2 />} danger onClick={() => (api.trash(active.id), setMenuOpen(false))}>
                               Mover para a lixeira
                             </MenuRow>
@@ -880,6 +915,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                       onOpen={open}
                       onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
                       onSummary={(pid) => openSummary(pid)}
+                      onImport={(pid) => startImport(pid)}
                       jump={jump}
                     />
                   </div>
@@ -915,6 +951,24 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           onClose={() => setSwitcher(false)}
         />
       )}
+
+      <input
+        ref={importInput}
+        type="file"
+        multiple
+        hidden
+        accept={IMPORT_ACCEPT}
+        onChange={async (e) => {
+          const files = Array.from(e.target.files || []);
+          e.target.value = '';
+          if (!files.length) return;
+          setImportResult('busy');
+          const res = await importFiles(files, importTarget.current, api, entriesApi);
+          setImportResult(res);
+        }}
+      />
+      {exporting && <ExportDialog item={exporting} api={api} onClose={() => setExporting(null)} />}
+      {importResult && <ImportResultDialog result={importResult} onOpen={open} onClose={() => setImportResult(null)} />}
 
       <EntryPopover
         entries={entriesApi.entries}
@@ -1015,6 +1069,7 @@ function NoteBody({
   onOpen,
   onNew,
   onSummary,
+  onImport,
   jump,
 }: {
   item: NotebookItem;
@@ -1027,6 +1082,7 @@ function NoteBody({
   onOpen: (id: string) => void;
   onNew: (o: { parentId: string | null; template?: string; title?: string }) => void;
   onSummary: (projectId: string) => void;
+  onImport: (parentId: string | null) => void;
   jump: { line: number; at: number } | null;
 }) {
   const onBlocks = useCallback((blocks: PostBlock[]) => api.update(item.id, { blocks }, { debounce: 1000 }), [api, item.id]);
@@ -1038,7 +1094,7 @@ function NoteBody({
   );
 
   if (item.kind === 'folder' && isProject(item)) {
-    return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} onSummary={onSummary} />;
+    return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} onSummary={onSummary} onImport={onImport} />;
   }
 
   if (item.kind === 'folder') {
@@ -1127,6 +1183,65 @@ function NoteBody({
   );
 }
 
+/** Estúdio 2D: o mapa mental ocupa toda a área da direita. */
+function MindmapStudio({
+  item,
+  api,
+  path,
+  onOpen,
+  onRename,
+}: {
+  item: NotebookItem;
+  api: NotebookApi;
+  path: NotebookItem[];
+  onOpen: (id: string) => void;
+  onRename: (t: string) => void;
+}) {
+  const [title, setTitle] = useState(item.title);
+  useEffect(() => setTitle(item.title), [item.title]);
+  const persist = useCallback(
+    (data: TopicWorkspaceData) => {
+      api.update(item.id, { data: data as NotebookItem['data'] }, { debounce: 400 });
+    },
+    [api, item.id]
+  );
+  const parent = path[path.length - 1];
+  return (
+    <div className="absolute inset-0 nb-studio">
+      <TopicWorkspaceView
+        topicId={item.id}
+        topicColor={item.color || getTemplate(item.template).color}
+        templateType="mindmap"
+        initialData={(item.data || {}) as TopicWorkspaceData}
+        isAdmin
+        persistOverride={persist}
+        studio
+        studioLead={
+          <div className="flex items-center gap-1.5 h-8 pl-1.5 pr-2 mr-1 border-r border-zinc-700 max-w-[260px]">
+            <Glyph name="mindmap" className="text-[15px] text-[#a855f7] shrink-0" />
+            {parent && (
+              <>
+                <button type="button" onClick={() => onOpen(parent.id)} className="text-[11px] text-zinc-400 hover:text-white truncate max-w-[110px]">
+                  {parent.title}
+                </button>
+                <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0" />
+              </>
+            )}
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, 200))}
+              onBlur={() => title.trim() && title !== item.title && onRename(title.trim())}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              aria-label="Título do mapa"
+              className="min-w-0 w-36 bg-transparent outline-none text-[13px] font-bold text-white"
+            />
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
 function TitleInput({ item, onRename }: { item: NotebookItem; onRename: (t: string) => void }) {
   const [v, setV] = useState(item.title);
   useEffect(() => setV(item.title), [item.title]);
@@ -1160,6 +1275,9 @@ function HomeView({
   onCreate,
   onDaily,
   onPicker,
+  onImport,
+  onExportAll,
+  exportingAll,
 }: {
   api: NotebookApi;
   viewer: Viewer;
@@ -1167,6 +1285,9 @@ function HomeView({
   onCreate: (t: string) => void;
   onDaily: () => void;
   onPicker: () => void;
+  onImport: () => void;
+  onExportAll: () => void;
+  exportingAll: boolean;
 }) {
   const live = Object.values(api.items).filter((i) => !i.archived_at);
   const recent = live.filter((i) => i.kind === 'note').sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 8);
@@ -1293,6 +1414,42 @@ function HomeView({
             </div>
           </section>
         )}
+
+        <section className="rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] p-5">
+          <h2 className="nb-pane-title mb-1">Seus dados</h2>
+          <p className="text-[13px] text-[var(--nb-ink-3)] mb-3">
+            Traga textos de outros programas ou leve tudo com você: nada fica preso aqui.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={onImport}
+              className="group flex items-center gap-3 p-3 rounded-xl border border-[var(--nb-line)] hover:border-[var(--nb-hl)] text-left"
+            >
+              <span className="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-[var(--nb-pane-2)] text-[var(--nb-ink-2)] group-hover:text-[var(--nb-hl)]">
+                <Upload className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-bold">Importar arquivos</span>
+                <span className="block text-[11px] text-[var(--nb-ink-3)]">Word, Markdown, HTML, CSV, Excel, agenda (.ics) e backup</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onExportAll}
+              disabled={exportingAll}
+              className="group flex items-center gap-3 p-3 rounded-xl border border-[var(--nb-line)] hover:border-[var(--nb-hl)] text-left disabled:opacity-60"
+            >
+              <span className="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-[var(--nb-pane-2)] text-[var(--nb-ink-2)] group-hover:text-[var(--nb-hl)]">
+                {exportingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-bold">{exportingAll ? 'Preparando…' : 'Exportar tudo (.zip)'}</span>
+                <span className="block text-[11px] text-[var(--nb-ink-3)]">Markdown de tudo + backup completo para reimportar</span>
+              </span>
+            </button>
+          </div>
+        </section>
 
         <section className="rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] p-5">
           <h2 className="nb-pane-title mb-3">Atalhos</h2>

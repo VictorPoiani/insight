@@ -31,6 +31,7 @@ interface Props {
   api: NotebookApi;
   onOpen: (id: string) => void;
   onNew: (opts: { parentId: string | null; template?: string; title?: string }) => void;
+  onExport?: () => void;
   role?: string | null;
   level?: number | null;
 }
@@ -44,7 +45,7 @@ const BOOK_STATUS: { id: NonNullable<BookData['bookStatus']>; label: string }[] 
 
 const GENRES = ['Romance', 'Fantasia', 'Ficção científica', 'Suspense', 'Terror', 'Drama', 'Aventura', 'Poesia', 'Fanfic', 'Não ficção', 'Infantojuvenil', 'Outro'];
 
-export function BookDashboard({ book, api, onOpen, onNew, role, level }: Props) {
+export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [statusMap, setStatusMap] = useState<Record<string, ChapterStatus>>({});
   const [uploading, setUploading] = useState(false);
@@ -430,6 +431,15 @@ export function BookDashboard({ book, api, onOpen, onNew, role, level }: Props) 
             >
               <Glyph name="mindmap" className="text-[14px]" /> Mapa da trama
             </button>
+            {onExport && (
+              <button
+                type="button"
+                onClick={onExport}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-xs font-bold hover:text-[var(--nb-hl)]"
+              >
+                <Download className="w-3.5 h-3.5" /> Exportar livro
+              </button>
+            )}
           </div>
         </div>
         {extras.length > 0 ? (

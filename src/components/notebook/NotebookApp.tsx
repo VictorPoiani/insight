@@ -31,6 +31,10 @@ import {
   PenLine,
   Brain,
   Layers,
+  PanelLeftOpen,
+  PanelLeftClose,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -42,6 +46,9 @@ import { itemToPostBlocks } from '@/lib/notebook/toPostBlocks';
 import type { NotebookItem, NotebookTemplate } from '@/lib/notebook/types';
 import type { PostBlock, TopicTemplateType, TopicWorkspaceData } from '@/types/database';
 import { FileExplorer, itemIcon } from './FileExplorer';
+import { Glyph } from './icons/Glyph';
+import { NotebookSplash, NotebookSplashExit } from './NotebookSplash';
+import type { GlyphName } from '@/lib/notebook/glyphs';
 import { MarkdownEditor } from './MarkdownEditor';
 import { WriterMode } from './WriterMode';
 import { BookDashboard } from './BookDashboard';
@@ -114,8 +121,8 @@ export function NotebookApp() {
 
   if (access === 'loading') {
     return (
-      <div className="nb-app grid place-items-center">
-        <InsightAsterisk fill="solid" className="w-9 h-9 animate-spin text-[var(--nb-hl)]" style={{ animationDuration: '1.2s' }} />
+      <div className="nb-app">
+        <NotebookSplash />
       </div>
     );
   }
@@ -199,6 +206,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [picker, setPicker] = useState<{ parentId: string | null } | null>(null);
   const [publishing, setPublishing] = useState<{ item: NotebookItem; blocks: PostBlock[] } | null>(null);
   const [immersive, setImmersive] = useState(false);
+  const [sideHidden, setSideHidden] = useState(false);
   const [searchSeed, setSearchSeed] = useState<string | undefined>();
   const [jump, setJump] = useState<{ line: number; at: number } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -214,6 +222,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       if (l) {
         setLeft(small ? null : l.left ?? 'files');
         setRight(small ? false : !!l.right);
+        setSideHidden(!!l.sideHidden);
       } else if (small) setLeft(null);
     } catch {
       /* ignora */
@@ -222,11 +231,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   useEffect(() => {
     if (typeof window === 'undefined' || window.innerWidth < 1024) return;
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left, right }));
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left, right, sideHidden }));
     } catch {
       /* ignora */
     }
-  }, [left, right]);
+  }, [left, right, sideHidden]);
 
   // abas + nota da URL
   useEffect(() => {
@@ -373,7 +382,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     if (existing) return open(existing.id);
     let folder = Object.values(api.items).find((i) => !i.archived_at && i.kind === 'folder' && !i.parent_id && i.title === 'Diário');
     if (!folder) folder = (await api.create({ template: 'folder', parentId: null, title: 'Diário' })) || undefined;
-    if (folder && !folder.icon) api.update(folder.id, { icon: '📔' });
+    if (folder && !folder.icon) api.update(folder.id, { icon: 'journal' });
     await createAndOpen({ template: 'journal', parentId: folder?.id ?? null, title: today });
   }, [api, createAndOpen, open]);
 
@@ -404,9 +413,23 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   // ------------------------------------------------------------ atalhos
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        setImmersive((v) => (v ? false : v));
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const k = e.key.toLowerCase();
+      if (e.code === 'Backslash' && e.shiftKey) {
+        e.preventDefault();
+        setSideHidden((v) => !v);
+        return;
+      }
+      if (k === '.') {
+        e.preventDefault();
+        setImmersive((v) => !v);
+        return;
+      }
       if (k === 'o' || (k === 'k' && !(e.target as HTMLElement)?.closest?.('textarea'))) {
         e.preventDefault();
         setSwitcher(true);
@@ -469,11 +492,13 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   );
 
   const isWriter = active?.template === 'chapter' && view === 'note';
-  const showChrome = !(immersive && isWriter);
+  // modo foco: some tudo menos o conteúdo (vale para qualquer nota)
+  const showChrome = !immersive;
 
   // ------------------------------------------------------------ render
   return (
-    <div className="nb-app" data-immersive={immersive}>
+    <div className="nb-app" data-immersive={immersive} data-side-hidden={sideHidden} data-enter="true">
+      <NotebookSplashExit />
       <div className="flex flex-1 min-h-0 flex-col md:flex-row relative">
         {/* RIBBON */}
         {showChrome && (
@@ -557,6 +582,16 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         <main className="flex-1 min-w-0 min-h-0 flex flex-col">
           {showChrome && (
             <div className="nb-tabs" role="tablist">
+              <button
+                type="button"
+                title={sideHidden ? 'Mostrar barra lateral (Ctrl+Shift+\\)' : 'Ocultar barra lateral (Ctrl+Shift+\\)'}
+                aria-label={sideHidden ? 'Mostrar barra lateral' : 'Ocultar barra lateral'}
+                aria-pressed={sideHidden}
+                onClick={() => setSideHidden((v) => !v)}
+                className="hidden md:grid self-center place-items-center mr-1 p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)] hover:bg-[var(--nb-pane-2)]"
+              >
+                {sideHidden ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+              </button>
               {liveTabs.map((id) => {
                 const it = api.items[id];
                 if (!it) return null;
@@ -600,6 +635,15 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               <SaveBadge state={api.saveState} />
               <button
                 type="button"
+                title="Modo foco (Ctrl+.)"
+                aria-label="Entrar no modo foco"
+                onClick={() => setImmersive(true)}
+                className="self-center p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
                 title="Painel de detalhes"
                 aria-pressed={right}
                 onClick={() => setRight((r) => !r)}
@@ -620,7 +664,16 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             </div>
           )}
 
-          <div className="flex-1 min-h-0 relative">
+          <div className="nb-main-body flex-1 min-h-0 relative">
+            {immersive && !isWriter && (
+              <button
+                type="button"
+                onClick={() => setImmersive(false)}
+                className="nb-focus-exit flex items-center gap-1.5 h-8 px-3 rounded-full border border-[var(--nb-line)] bg-[var(--nb-pane)] text-[11px] font-bold text-[var(--nb-ink-2)]"
+              >
+                <Minimize2 className="w-3.5 h-3.5" /> Sair do foco · Esc
+              </button>
+            )}
             {shown === 'graph' && (
               <div className="absolute inset-0">
                 <GraphView items={Object.values(api.items)} activeId={activeId} onOpen={open} />
@@ -1003,19 +1056,19 @@ function HomeView({
   const name = viewer.display_name || viewer.full_name || viewer.username;
 
   const quick = [
-    { t: 'markdown', icon: '📝', label: 'Nota livre', sub: 'markdown + [[links]]' },
-    { t: 'book', icon: '📖', label: 'Novo livro', sub: 'modo escritor' },
-    { t: 'daily', icon: '📔', label: 'Nota de hoje', sub: new Date().toLocaleDateString('pt-BR') },
-    { t: 'blocks', icon: '🧱', label: 'Página em blocos', sub: 'editor do Insight' },
-    { t: 'mindmap', icon: '🕸️', label: 'Mapa mental', sub: 'ideias conectadas' },
-    { t: 'picker', icon: '✨', label: 'Mais modelos', sub: 'roteiro, estudo, metas…' },
+    { t: 'markdown', icon: 'note' as GlyphName, label: 'Nota livre', sub: 'markdown + [[links]]' },
+    { t: 'book', icon: 'book' as GlyphName, label: 'Novo livro', sub: 'modo escritor' },
+    { t: 'daily', icon: 'journal' as GlyphName, label: 'Nota de hoje', sub: new Date().toLocaleDateString('pt-BR') },
+    { t: 'blocks', icon: 'blocks' as GlyphName, label: 'Página em blocos', sub: 'editor do Insight' },
+    { t: 'mindmap', icon: 'mindmap' as GlyphName, label: 'Mapa mental', sub: 'ideias conectadas' },
+    { t: 'picker', icon: 'sparkle' as GlyphName, label: 'Mais modelos', sub: 'roteiro, estudo, metas…' },
   ];
 
   return (
     <div className="nb-scroll absolute inset-0 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 space-y-10">
         <header>
-          <p className="text-[11px] font-black tracking-[0.3em] text-[var(--nb-hl)]">MY NOTEBOOK · BETA</p>
+          <p className="text-[11px] font-black tracking-[0.3em] text-[var(--nb-hl)]">{NOTEBOOK_NAME.toUpperCase()} · PREVIEW</p>
           <h1 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">
             {hello}, {name.split(' ')[0]}.
           </h1>
@@ -1032,7 +1085,9 @@ function HomeView({
               onClick={() => (q.t === 'daily' ? onDaily() : q.t === 'picker' ? onPicker() : onCreate(q.t))}
               className="group flex items-center gap-3 p-4 rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left transition-colors"
             >
-              <span className="text-2xl transition-transform group-hover:scale-110">{q.icon}</span>
+              <span className="w-11 h-11 shrink-0 grid place-items-center rounded-xl bg-[var(--nb-pane-2)] text-[22px] text-[var(--nb-ink-2)] transition-all group-hover:text-[var(--nb-hl)] group-hover:bg-[var(--nb-hl-soft)] group-hover:scale-105">
+                <Glyph name={q.icon} />
+              </span>
               <span className="min-w-0">
                 <span className="block font-bold text-sm">{q.label}</span>
                 <span className="block text-[12px] text-[var(--nb-ink-3)] truncate">{q.sub}</span>
@@ -1098,7 +1153,9 @@ function HomeView({
               ['Ctrl E', 'ler / editar markdown'],
               ['Ctrl \\', 'mostrar arquivos'],
               ['[[', 'link para outra nota'],
-              ['Ctrl Enter', 'tarefa ☐/☑'],
+              ['Ctrl Enter', 'marcar tarefa'],
+              ['Ctrl .', 'modo foco (Esc sai)'],
+              ['Ctrl Shift \\', 'ocultar barra lateral'],
             ].map(([k, d]) => (
               <div key={k} className="flex items-center justify-between gap-3">
                 <span>{d}</span>

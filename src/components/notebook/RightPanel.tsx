@@ -7,12 +7,13 @@ import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { extractHeadings, htmlToText, countWords } from '@/lib/notebook/markdown';
 import { getTemplate } from '@/lib/notebook/templates';
 import { GraphView } from './GraphView';
-import { itemIcon } from './FileExplorer';
+import { itemGlyph, itemIcon } from './FileExplorer';
+import { Glyph } from './icons/Glyph';
+import { ICON_CHOICES } from '@/lib/notebook/glyphs';
 
 type Tab = 'outline' | 'links' | 'info' | 'history';
 
 const COLORS = ['#64748b', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#d97706', '#ca8a04', '#16a34a', '#0d9488', '#0284c7'];
-const ICONS = ['📝', '📖', '📄', '💡', '🎭', '🗺️', '📔', '🎬', '🎓', '🎯', '✅', '🧭', '🕸️', '📅', '⭐', '🔥', '🌙', '🌱', '🎵', '🧪', '💼', '❤️', '🐉', '🚀'];
 
 interface Props {
   item: NotebookItem | null;
@@ -140,7 +141,7 @@ export function RightPanel({ item, api, onOpen, onJump, onClose }: Props) {
   );
 }
 
-function LinkList({ title, rows, empty }: { title: string; empty: string; rows: { key: string; icon: string; label: string; muted?: boolean; onClick: () => void }[] }) {
+function LinkList({ title, rows, empty }: { title: string; empty: string; rows: { key: string; icon: React.ReactNode; label: string; muted?: boolean; onClick: () => void }[] }) {
   return (
     <div>
       <p className="px-2 pb-1 text-[11px] font-semibold text-[var(--nb-ink-3)]">{title}</p>
@@ -177,7 +178,12 @@ function InfoTab({ item, api }: { item: NotebookItem; api: NotebookApi }) {
   return (
     <div className="px-2 py-1 space-y-4">
       <div>
-        {row('Tipo', `${def.icon} ${def.name}`)}
+        {row(
+          'Tipo',
+          <span className="inline-flex items-center gap-1.5">
+            <Glyph name={def.icon} /> {def.name}
+          </span>
+        )}
         {item.kind === 'note' && row('Palavras', words.toLocaleString('pt-BR'))}
         {item.kind === 'note' && row('Caracteres', chars.toLocaleString('pt-BR'))}
         {item.kind === 'note' && row('Leitura', `${Math.max(1, Math.round(words / 220))} min`)}
@@ -203,14 +209,19 @@ function InfoTab({ item, api }: { item: NotebookItem; api: NotebookApi }) {
       <div>
         <p className="nb-pane-title mb-2">Ícone</p>
         <div className="grid grid-cols-8 gap-1">
-          {ICONS.map((ic) => (
+          {ICON_CHOICES.map((ic) => (
             <button
               key={ic}
               type="button"
+              title={ic}
+              aria-label={`Ícone ${ic}`}
+              aria-pressed={itemGlyph(item) === ic}
               onClick={() => api.update(item.id, { icon: ic })}
-              className={`h-8 rounded-lg text-base hover:bg-[var(--nb-pane-2)] ${item.icon === ic ? 'bg-[var(--nb-hl-soft)] ring-1 ring-[var(--nb-hl)]' : ''}`}
+              className={`h-8 grid place-items-center rounded-lg text-[17px] text-[var(--nb-ink-2)] hover:text-[var(--nb-ink)] hover:bg-[var(--nb-pane-2)] ${
+                itemGlyph(item) === ic ? 'bg-[var(--nb-hl-soft)] text-[var(--nb-hl)] ring-1 ring-[var(--nb-hl)]' : ''
+              }`}
             >
-              {ic}
+              <Glyph name={ic} />
             </button>
           ))}
         </div>

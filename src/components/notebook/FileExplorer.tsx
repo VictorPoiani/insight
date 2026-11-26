@@ -1,5 +1,8 @@
 'use client';
 
+import { Glyph } from './icons/Glyph';
+import { resolveGlyph, type GlyphName } from '@/lib/notebook/glyphs';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronRight,
@@ -37,8 +40,13 @@ interface Props {
 
 const OPEN_KEY = 'insight-notebook-open-folders';
 
+export function itemGlyph(item: Pick<NotebookItem, 'icon' | 'template' | 'kind'>): GlyphName {
+  return resolveGlyph(item.icon, item.kind === 'folder' ? 'folder' : getTemplate(item.template).icon);
+}
+
+/** Ícone do item (autoral, sem emoji). */
 export function itemIcon(item: Pick<NotebookItem, 'icon' | 'template' | 'kind'>) {
-  return item.icon || getTemplate(item.template).icon;
+  return <Glyph name={itemGlyph(item)} />;
 }
 
 export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onRename, onClose }: Props) {

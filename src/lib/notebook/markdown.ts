@@ -1,3 +1,4 @@
+import { glyphSvg } from './glyphs';
 /**
  * Markdown do My Notebook (estilo Obsidian), sem dependências.
  *
@@ -31,19 +32,19 @@ export function slugify(s: string) {
 const SAFE_URL = /^(https?:\/\/|mailto:|\/(?!\/)|#)/i;
 
 const CALLOUTS: Record<string, { icon: string; cls: string; label: string }> = {
-  note: { icon: '✎', cls: 'note', label: 'Nota' },
-  nota: { icon: '✎', cls: 'note', label: 'Nota' },
+  note: { icon: glyphSvg('pen'), cls: 'note', label: 'Nota' },
+  nota: { icon: glyphSvg('pen'), cls: 'note', label: 'Nota' },
   info: { icon: 'ℹ', cls: 'info', label: 'Info' },
-  tip: { icon: '✦', cls: 'tip', label: 'Dica' },
-  dica: { icon: '✦', cls: 'tip', label: 'Dica' },
-  warning: { icon: '⚠', cls: 'warn', label: 'Atenção' },
-  atencao: { icon: '⚠', cls: 'warn', label: 'Atenção' },
-  danger: { icon: '✕', cls: 'danger', label: 'Perigo' },
-  quote: { icon: '❝', cls: 'quote', label: 'Citação' },
-  citacao: { icon: '❝', cls: 'quote', label: 'Citação' },
-  todo: { icon: '☐', cls: 'todo', label: 'A fazer' },
-  ideia: { icon: '💡', cls: 'tip', label: 'Ideia' },
-  idea: { icon: '💡', cls: 'tip', label: 'Ideia' },
+  tip: { icon: glyphSvg('sparkle'), cls: 'tip', label: 'Dica' },
+  dica: { icon: glyphSvg('sparkle'), cls: 'tip', label: 'Dica' },
+  warning: { icon: glyphSvg('alert'), cls: 'warn', label: 'Atenção' },
+  atencao: { icon: glyphSvg('alert'), cls: 'warn', label: 'Atenção' },
+  danger: { icon: glyphSvg('cross'), cls: 'danger', label: 'Perigo' },
+  quote: { icon: glyphSvg('quote'), cls: 'quote', label: 'Citação' },
+  citacao: { icon: glyphSvg('quote'), cls: 'quote', label: 'Citação' },
+  todo: { icon: glyphSvg('todo'), cls: 'todo', label: 'A fazer' },
+  ideia: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
+  idea: { icon: glyphSvg('idea'), cls: 'tip', label: 'Ideia' },
 };
 
 /** Inline: recebe texto CRU, devolve HTML seguro. */

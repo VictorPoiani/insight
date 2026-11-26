@@ -6,6 +6,7 @@ import type { NotebookItem } from '@/lib/notebook/types';
 import { NOTEBOOK_TEMPLATES, SECTION_LABELS, type NotebookTemplateDef, type TemplateSection } from '@/lib/notebook/templates';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import { itemIcon } from './FileExplorer';
+import { Glyph } from './icons/Glyph';
 
 /** Busca difusa simples: todas as letras em ordem; pontua sequências e começo. */
 export function fuzzyScore(text: string, q: string): number {
@@ -214,7 +215,7 @@ export function TemplatePicker({
                 <p className="nb-pane-title mb-2">{SECTION_LABELS[s]}</p>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {items.map((t) => (
-                    <Card key={t.id} icon={t.icon} name={t.name} desc={t.description} color={t.color} onClick={() => onPick(t)} />
+                    <Card key={t.id} icon={<Glyph name={t.icon} />} name={t.name} desc={t.description} color={t.color} onClick={() => onPick(t)} />
                   ))}
                 </div>
               </section>
@@ -229,7 +230,7 @@ export function TemplatePicker({
   );
 }
 
-function Card({ icon, name, desc, color, onClick }: { icon: string; name: string; desc: string; color: string; onClick: () => void }) {
+function Card({ icon, name, desc, color, onClick }: { icon: React.ReactNode; name: string; desc: string; color: string; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -238,7 +239,7 @@ function Card({ icon, name, desc, color, onClick }: { icon: string; name: string
     >
       <span
         className="w-10 h-10 shrink-0 grid place-items-center rounded-xl text-xl"
-        style={{ background: `color-mix(in srgb, ${color} 18%, transparent)` }}
+        style={{ background: `color-mix(in srgb, ${color} 18%, transparent)`, color }}
       >
         {icon}
       </span>

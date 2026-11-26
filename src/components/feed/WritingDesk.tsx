@@ -6,6 +6,7 @@ import { BookOpen, Feather, NotebookPen, Plus, Trash2, Pencil, Check, X, Downloa
 import { createClient } from '@/lib/supabase/client';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import type { TopicWorkspaceData, WritingPiece } from '@/types/database';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 const KIND_LABEL: Record<WritingPiece['kind'], string> = {
   poem: 'Poema',
@@ -106,7 +107,7 @@ export function WritingDesk({
       {/* Cabeçalho com atalhos */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-secondary max-w-md">
-          Poemas, crônicas e trechos de livros. Escreva aqui ou traga do <strong>My Notebook</strong>, onde ficam os livros completos.
+          Poemas, crônicas e trechos de livros. Escreva aqui ou traga do <strong>{NOTEBOOK_NAME}</strong>, onde ficam os livros completos.
         </p>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
@@ -135,10 +136,10 @@ export function WritingDesk({
               </>
             ) : (
               <span
-                title="O My Notebook ainda está em testes fechados"
+                title={`O ${NOTEBOOK_NAME} ainda está em testes fechados`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-xs font-bold text-muted opacity-70"
               >
-                <Lock className="w-3.5 h-3.5" /> My Notebook em breve
+                <Lock className="w-3.5 h-3.5" /> {NOTEBOOK_NAME} em breve
               </span>
             )}
           </div>
@@ -148,7 +149,7 @@ export function WritingDesk({
       {/* Lista do notebook para importar */}
       {importOpen && (
         <div className="rounded-xl border border-border bg-elevated/40 p-3 space-y-1.5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Seus textos no My Notebook</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Seus textos no {NOTEBOOK_NAME}</p>
           {!nbItems ? (
             <p className="text-xs text-muted py-2">Carregando…</p>
           ) : nbItems.length === 0 ? (
@@ -248,7 +249,7 @@ export function WritingDesk({
                 <span>{new Date(p.updatedAt).toLocaleDateString('pt-BR')}</span>
                 <span className="flex items-center gap-1">
                   {p.notebookId && notebookAllowed && isAdmin && (
-                    <Link href={`/notebook?n=${encodeURIComponent(p.notebookId)}`} title="Abrir original no My Notebook" className="p-1 rounded hover:text-amber-500">
+                    <Link href={`/notebook?n=${encodeURIComponent(p.notebookId)}`} title={`Abrir original no ${NOTEBOOK_NAME}`} className="p-1 rounded hover:text-amber-500">
                       <NotebookPen className="w-3.5 h-3.5" />
                     </Link>
                   )}

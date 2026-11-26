@@ -59,6 +59,7 @@ import {
   ArrowLeft,
   Feather,
 } from 'lucide-react';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 interface TopicWorkspaceViewProps {
   topicId: string;
@@ -498,7 +499,7 @@ export function TopicWorkspaceView({
             {templateType === 'roadmap' && 'Roadmap de Arquitetura & Entregas'}
             {templateType === 'mindmap' && 'Estúdio 2D · Arquitetura & Brainstorm'}
             {templateType === 'diet' && 'Plano Nutricional & Macronutrientes'}
-            {templateType === 'writing' && 'Poemas & Livros · My Notebook'}
+            {templateType === 'writing' && `Poemas & Livros · ${NOTEBOOK_NAME}`}
             {templateType === 'agenda' && 'Agenda Técnica & Cronograma'}
             {templateType === 'blank_db' && 'Base de Dados Estruturada'}
           </span>

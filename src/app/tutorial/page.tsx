@@ -28,6 +28,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { Kbd, SHORTCUTS } from '@/components/layout/GlobalShortcuts';
+import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
 const ImageLightbox = dynamic(() => import('@/components/media/ImageLightbox').then((m) => m.ImageLightbox), { ssr: false });
 
@@ -146,7 +147,7 @@ const FIGS: Record<string, Fig> = {
   'carousel': F('carousel', 'Post com carrossel de imagens', 'Carrossel no feed: a mídia da vez em destaque, a próxima esmaecida e o contador embaixo.'),
   'mention': F('mention', 'Sugestões de membros ao digitar arroba', 'Sugestões ao digitar “@ma”: quem combina com o começo do nome aparece primeiro.'),
   'topic-gallery': F('topic-gallery', 'Galeria de modelos de tópico', 'A galeria de modelos: cada cartão mostra uma prévia de como o tópico vai ficar.'),
-  'topic-poemas': F('topic-poemas', 'Tópico Poemas e Livros', 'Poemas & Livros: um mural de escritos com tipografia de livro, ligado ao My Notebook.'),
+  'topic-poemas': F('topic-poemas', 'Tópico Poemas e Livros', `Poemas & Livros: um mural de escritos com tipografia de livro, ligado ao ${NOTEBOOK_NAME}.`),
   'topic-habitos': F('topic-habitos', 'Tópico de hábitos', 'Matriz de hábitos: marque os dias e acompanhe a consistência da semana.'),
   'ranking': F('ranking', 'Card do ranking semanal', 'O card de domingo: a manchete muda conforme o que aconteceu na semana.'),
   'notifs': F('notifs', 'Seleção de notificações', 'Modo seleção: notificações marcadas e o botão Apagar à direita.'),
@@ -275,7 +276,7 @@ const CHAPTERS: Chapter[] = [
         <Figure n="5.2" onOpen={open} tilt={-0.5} fig={FIGS['topic-poemas']} />
         <Figure n="5.3" onOpen={open} tilt={0.3} fig={FIGS['topic-habitos']} />
         <Tip>
-          Em Poemas &amp; Livros, o botão “Trazer do Notebook” copia um capítulo do My Notebook para o mural, e o ícone de caderno abre o original para continuar escrevendo.
+          Em Poemas &amp; Livros, o botão “Trazer do Notebook” copia um capítulo do {NOTEBOOK_NAME} para o mural, e o ícone de caderno abre o original para continuar escrevendo.
         </Tip>
       </>
     ),
@@ -395,7 +396,7 @@ const CHAPTERS: Chapter[] = [
   {
     id: 'notebook',
     kicker: 'Em breve',
-    title: 'My Notebook',
+    title: NOTEBOOK_NAME,
     lead: 'Um caderno privado para pensar antes de publicar. Ainda está em testes fechados.',
     body: () => (
       <P>

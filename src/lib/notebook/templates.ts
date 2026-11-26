@@ -1,6 +1,7 @@
 import type { TopicTemplateType } from '@/types/database';
 import { buildInitialWorkspaceData } from '@/components/feed/TopicTabsManager';
 import type { NotebookItemData, NotebookTemplate } from './types';
+import { characterToMarkdown, emptyCharacter } from './character';
 
 export type TemplateSection = 'escrita' | 'livro' | 'textos' | 'workspaces';
 
@@ -94,34 +95,13 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     id: 'character',
     section: 'livro',
     name: 'Ficha de personagem',
-    description: 'Aparência, personalidade, motivação, arco e relações.',
+    description: 'Essência, cadernos, três perfis, trajetória e entrevista guiada.',
     icon: '🎭',
     color: '#db2777',
     kind: 'note',
     title: () => 'Novo personagem',
-    content: () =>
-      [
-        '---',
-        'papel: protagonista',
-        'idade: ',
-        'tags: personagem',
-        '---',
-        '',
-        '## Aparência',
-        '',
-        '## Personalidade',
-        '- Qualidades: ',
-        '- Defeitos: ',
-        '',
-        '## O que deseja × o que precisa',
-        '',
-        '## Arco',
-        '> [!ideia] Onde começa e onde termina',
-        '',
-        '## Relações',
-        '- [[ ]] — ',
-        '',
-      ].join('\n'),
+    data: () => ({ character: emptyCharacter() }),
+    content: () => characterToMarkdown(emptyCharacter()),
   },
   {
     id: 'world',

@@ -30,7 +30,7 @@ interface Props {
   book: NotebookItem;
   api: NotebookApi;
   onOpen: (id: string) => void;
-  onNew: (opts: { parentId: string | null; template?: string }) => void;
+  onNew: (opts: { parentId: string | null; template?: string; title?: string }) => void;
   role?: string | null;
   level?: number | null;
 }

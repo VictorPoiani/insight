@@ -54,6 +54,10 @@ import { WriterMode } from './WriterMode';
 import { BookDashboard } from './BookDashboard';
 import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
+import { ProjectHome } from './projects/ProjectHome';
+import { NewProjectDialog, type NewProjectInput } from './projects/NewProjectDialog';
+import { isProject, projectType } from '@/lib/notebook/projects';
+import { NotebookLinksContext } from './editor/linkContext';
 import { convertCharacterItem } from './character/convert';
 import { NOTEBOOK_FEATURES } from '@/lib/notebook/copy';
 import { GraphView } from './GraphView';
@@ -208,6 +212,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [publishing, setPublishing] = useState<{ item: NotebookItem; blocks: PostBlock[] } | null>(null);
   const [immersive, setImmersive] = useState(false);
   const [sideHidden, setSideHidden] = useState(false);
+  const [projectDialog, setProjectDialog] = useState(false);
   const [searchSeed, setSearchSeed] = useState<string | undefined>();
   const [jump, setJump] = useState<{ line: number; at: number } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -341,6 +346,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const createAndOpen = useCallback(
     async (opts: { template?: string; parentId?: string | null; title?: string; from?: NotebookItem }) => {
       const template = (opts.template || 'markdown') as NotebookTemplate;
+      // pasta no primeiro nível = projeto: abre a criação guiada
+      if (template === 'folder' && !opts.parentId && !opts.from && !opts.title) {
+        setProjectDialog(true);
+        return null;
+      }
       const item = await api.create({ template, parentId: opts.parentId ?? null, title: opts.title, from: opts.from });
       if (item) {
         open(item.id);
@@ -350,6 +360,23 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         }
       }
       return item;
+    },
+    [api, open]
+  );
+
+  const createProject = useCallback(
+    async (p: NewProjectInput) => {
+      const def = projectType(p.type);
+      const proj = await api.create({ template: 'folder', parentId: null, title: p.name });
+      if (!proj) return;
+      api.update(proj.id, { icon: def.glyph, data: { ...(proj.data || {}), project: { type: p.type, description: p.description } } });
+      if (p.starter) {
+        for (const st of def.starter) {
+          const child = await api.create({ template: st.template, parentId: proj.id, title: st.title || p.name });
+          if (child?.template === 'book') await api.create({ template: 'chapter', parentId: child.id, title: 'Capítulo 1' });
+        }
+      }
+      open(proj.id);
     },
     [api, open]
   );
@@ -496,8 +523,11 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   // modo foco: some tudo menos o conteúdo (vale para qualquer nota)
   const showChrome = !immersive;
 
+  const linkCtx = useMemo(() => ({ titles, exists: titleExists, open: (t: string) => void openOrCreateLink(t) }), [titles, titleExists, openOrCreateLink]);
+
   // ------------------------------------------------------------ render
   return (
+    <NotebookLinksContext.Provider value={linkCtx}>
     <div className="nb-app" data-immersive={immersive} data-side-hidden={sideHidden} data-enter="true">
       <NotebookSplashExit />
       <div className="flex flex-1 min-h-0 flex-col md:flex-row relative">
@@ -567,7 +597,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                   api={api}
                   activeId={shown === 'note' ? activeId : null}
                   onOpen={open}
-                  onNew={({ parentId, template }) => void createAndOpen({ parentId, template })}
+                  onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
                   onPickTemplate={(parentId) => setPicker({ parentId })}
                   onRename={(id, t) => void rename(id, t)}
                   onClose={typeof window !== 'undefined' && window.innerWidth < 1024 ? () => setLeft(null) : undefined}
@@ -723,7 +753,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     book={active}
                     api={api}
                     onOpen={open}
-                    onNew={({ parentId, template }) => void createAndOpen({ parentId, template })}
+                    onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
                     role={viewer.role}
                     level={viewer.contributor_level}
                   />
@@ -740,9 +770,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                             <ChevronRight className="w-3 h-3 shrink-0" />
                           </span>
                         ))}
-                        <span className="truncate text-[var(--nb-ink-2)]">{getTemplate(active.template).name}</span>
+                        <span className="truncate text-[var(--nb-ink-2)]">{active.kind === 'folder' ? (isProject(active) ? 'Projeto' : 'Seção') : getTemplate(active.template).name}</span>
                       </nav>
-                      {(active.template === 'markdown' || active.template === 'blocks' || ['journal', 'screenplay', 'study', 'idea', 'character', 'world', 'meeting'].includes(active.template)) && (
+                      {(active.template === 'markdown' || active.template === 'blocks' || ['journal', 'screenplay', 'study', 'idea', 'character', 'world', 'meeting', 'poem', 'article'].includes(active.template)) && (
                         <button
                           type="button"
                           onClick={() => void startPublish(active)}
@@ -800,7 +830,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                         setLeft('search');
                       }}
                       onOpen={open}
-                      onNew={({ parentId, template }) => void createAndOpen({ parentId, template })}
+                      onNew={({ parentId, template, title }) => void createAndOpen({ parentId, template, title })}
                       jump={jump}
                     />
                   </div>
@@ -834,6 +864,16 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           onOpen={open}
           onCreate={(title) => void createAndOpen({ title, parentId: null })}
           onClose={() => setSwitcher(false)}
+        />
+      )}
+
+      {projectDialog && (
+        <NewProjectDialog
+          onClose={() => setProjectDialog(false)}
+          onCreate={(p) => {
+            setProjectDialog(false);
+            void createProject(p);
+          }}
         />
       )}
 
@@ -883,6 +923,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         </div>
       )}
     </div>
+    </NotebookLinksContext.Provider>
   );
 }
 
@@ -910,7 +951,7 @@ function NoteBody({
   onOpenLink: (t: string) => void;
   onTag: (t: string) => void;
   onOpen: (id: string) => void;
-  onNew: (o: { parentId: string | null; template?: string }) => void;
+  onNew: (o: { parentId: string | null; template?: string; title?: string }) => void;
   jump: { line: number; at: number } | null;
 }) {
   const onBlocks = useCallback((blocks: PostBlock[]) => api.update(item.id, { blocks }, { debounce: 1000 }), [api, item.id]);
@@ -920,6 +961,10 @@ function NoteBody({
     },
     [api, item.id]
   );
+
+  if (item.kind === 'folder' && isProject(item)) {
+    return <ProjectHome item={item} api={api} onOpen={onOpen} onNew={onNew} />;
+  }
 
   if (item.kind === 'folder') {
     const kids = Object.values(api.items)
@@ -932,7 +977,7 @@ function NoteBody({
             <FilePlus2 className="w-3.5 h-3.5" /> Nota
           </button>
           <button type="button" onClick={() => onNew({ parentId: item.id, template: 'folder' })} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--nb-pane-2)] text-xs font-bold">
-            <FolderPlus className="w-3.5 h-3.5" /> Pasta
+            <FolderPlus className="w-3.5 h-3.5" /> Seção
           </button>
         </div>
         {kids.length ? (
@@ -948,14 +993,14 @@ function NoteBody({
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{k.title}</span>
                   <span className="text-[11px] text-[var(--nb-ink-3)]">
-                    {k.kind === 'folder' ? 'pasta' : `${k.word_count} palavras`} · {new Date(k.updated_at).toLocaleDateString('pt-BR')}
+                    {k.kind === 'folder' ? 'seção' : `${k.word_count} palavras`} · {new Date(k.updated_at).toLocaleDateString('pt-BR')}
                   </span>
                 </span>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--nb-ink-3)]">Pasta vazia.</p>
+          <p className="text-sm text-[var(--nb-ink-3)]">Seção vazia.</p>
         )}
       </div>
     );
@@ -1051,6 +1096,7 @@ function HomeView({
   const live = Object.values(api.items).filter((i) => !i.archived_at);
   const recent = live.filter((i) => i.kind === 'note').sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 8);
   const books = live.filter((i) => i.template === 'book');
+  const projects = live.filter((i) => isProject(i)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const words = live.reduce((n, i) => n + (i.word_count || 0), 0);
   const links = live.reduce((n, i) => n + i.links.length, 0);
   const hour = new Date().getHours();
@@ -1061,7 +1107,7 @@ function HomeView({
     { t: 'markdown', icon: 'note' as GlyphName, label: 'Nota livre', sub: 'markdown + [[links]]' },
     { t: 'book', icon: 'book' as GlyphName, label: 'Novo livro', sub: 'modo escritor' },
     { t: 'daily', icon: 'journal' as GlyphName, label: 'Nota de hoje', sub: new Date().toLocaleDateString('pt-BR') },
-    { t: 'blocks', icon: 'blocks' as GlyphName, label: 'Página em blocos', sub: 'editor do Insight' },
+    { t: 'folder', icon: 'folder' as GlyphName, label: 'Novo projeto', sub: 'livro, poesia, mundo, artigos…' },
     { t: 'mindmap', icon: 'mindmap' as GlyphName, label: 'Mapa mental', sub: 'ideias conectadas' },
     { t: 'picker', icon: 'sparkle' as GlyphName, label: 'Mais modelos', sub: 'roteiro, estudo, metas…' },
   ];
@@ -1097,6 +1143,35 @@ function HomeView({
             </button>
           ))}
         </section>
+
+        {projects.length > 0 && (
+          <section>
+            <h2 className="nb-pane-title mb-3">Projetos</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {projects.map((pr) => {
+                const n = live.filter((i) => i.parent_id === pr.id).length;
+                return (
+                  <button
+                    key={pr.id}
+                    type="button"
+                    onClick={() => onOpen(pr.id)}
+                    className="group flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left transition-colors"
+                  >
+                    <span className="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-[var(--nb-pane-2)] text-[19px] text-[var(--nb-ink-2)] group-hover:text-[var(--nb-hl)]">
+                      {itemIcon(pr)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold text-sm">{pr.title}</span>
+                      <span className="block text-[11px] text-[var(--nb-ink-3)]">
+                        {n} {n === 1 ? 'item' : 'itens'} · {new Date(pr.updated_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {books.length > 0 && (
           <section>

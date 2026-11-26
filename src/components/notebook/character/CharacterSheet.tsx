@@ -19,6 +19,7 @@ import {
 import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { DiaryBook } from './DiaryBook';
+import { RichField } from '../editor/RichField';
 import { ArtArc, ArtBackstory, ArtEssence, ArtInterview, ArtMixed, ArtNotebooks, ArtPhysical, ArtPsych } from './Illustrations';
 
 const SERIF = "var(--nb-literata), Georgia, 'Times New Roman', serif";
@@ -378,10 +379,9 @@ function Notebooks({ ch, save, name }: SecProps & { name: string }) {
 
         <div className="p-5">
           {tab === 'escritor' ? (
-            <Grow
+            <RichField
               value={ch.notes || ''}
               onChange={(v) => save({ notes: v })}
-              minRows={4}
               label="Notas do escritor"
               placeholder="A ideia inicial, uma frase solta, algo para usar mais tarde. Fique à vontade: é o seu bloco de notas."
               className="text-[14px]"
@@ -428,11 +428,10 @@ function Profiles({ ch, save }: SecProps) {
           })}
         </div>
         <div className="p-5">
-          <Grow
+          <RichField
             key={p.id}
             value={ch.profiles?.[p.id] || ''}
             onChange={(v) => save({ profiles: { ...ch.profiles, [p.id]: v } })}
-            minRows={5}
             serif
             label={`Perfil ${p.label}`}
             placeholder={p.hint}
@@ -472,10 +471,9 @@ function Trajectory({ ch, save }: SecProps) {
           <div className="min-w-0 flex-1">
             <h3 className="text-[13px] font-extrabold">Backstory</h3>
             <p className="text-[12px] text-[var(--nb-ink-3)] mb-2">O passado define como ele age ao longo da narrativa.</p>
-            <Grow
+            <RichField
               value={ch.backstory || ''}
               onChange={(v) => save({ backstory: v })}
-              minRows={4}
               serif
               label="Backstory"
               placeholder="De onde ele vem, o que viveu, o que ninguém sabe…"

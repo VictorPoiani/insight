@@ -32,7 +32,7 @@ interface Props {
   api: NotebookApi;
   activeId: string | null;
   onOpen: (id: string) => void;
-  onNew: (opts: { parentId: string | null; template?: string }) => void;
+  onNew: (opts: { parentId: string | null; template?: string; title?: string }) => void;
   onPickTemplate: (parentId: string | null) => void;
   onRename: (id: string, title: string) => void;
   onClose?: () => void;
@@ -179,7 +179,7 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
           onDragLeave={() => setDrop((d) => (d?.id === item.id ? null : d))}
           onDrop={(e) => onDrop(e, item)}
           onClick={() => {
-            if (isFolder && item.template === 'folder') setOpen((o) => ({ ...o, [item.id]: !isOpen }));
+            if (isFolder && item.template === 'folder' && item.parent_id) setOpen((o) => ({ ...o, [item.id]: !isOpen }));
             else {
               onOpen(item.id);
               if (isFolder) setOpen((o) => ({ ...o, [item.id]: true }));
@@ -268,7 +268,7 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
           <IconBtn title="Nova nota (Ctrl+N)" onClick={() => onNew({ parentId: null })}>
             <FilePlus2 className="w-4 h-4" />
           </IconBtn>
-          <IconBtn title="Nova pasta" onClick={() => onNew({ parentId: null, template: 'folder' })}>
+          <IconBtn title="Novo projeto" onClick={() => onNew({ parentId: null, template: 'folder' })}>
             <FolderPlus className="w-4 h-4" />
           </IconBtn>
           <IconBtn title="Novo livro" onClick={() => onNew({ parentId: null, template: 'book' })}>
@@ -426,7 +426,7 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
                   {isBook ? 'Novo capítulo' : 'Nova nota aqui'}
                 </MenuBtn>
                 <MenuBtn icon={<FolderPlus />} onClick={() => (onNew({ parentId: parentForNew, template: 'folder' }), close())}>
-                  Nova pasta aqui
+                  {parentForNew ? 'Nova seção aqui' : 'Novo projeto'}
                 </MenuBtn>
                 <MenuBtn icon={<LayoutTemplate />} onClick={() => (onPickTemplate(parentForNew), close())}>
                   Novo a partir de modelo…

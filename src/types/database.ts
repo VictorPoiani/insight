@@ -27,7 +27,8 @@ export interface Profile {
   nickname?: string | null;
   nickname_color?: string | null;
   location?: string | null;
-  birthday?: string | null;
+  /** dia/mês público 'MM-DD' (a data completa fica em profile_birthdays) */
+  birthday_md?: string | null;
   bio: string | null;
   avatar_url: string | null;
   banner_url: string | null;

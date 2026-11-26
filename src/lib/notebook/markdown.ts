@@ -72,11 +72,21 @@ function inline(raw: string, ctx: RenderCtx): string {
       `<a class="nb-wikilink${exists ? '' : ' nb-wikilink--new'}" data-wikilink="${esc(t)}">${esc((alias || t).trim())}</a>`
     );
   });
-  // imagens e links markdown
-  s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_, alt, url) =>
-    SAFE_URL.test(url)
-      ? keep(`<img class="nb-img" src="${esc(url)}" alt="${esc(alt)}" loading="lazy" />`)
-      : esc(alt)
+  // imagens (título "Legenda|layout|largura" vira figura com legenda) e links markdown
+  s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_, alt, url, title) => {
+    if (!SAFE_URL.test(url)) return esc(alt);
+    const [cap = '', layout = 'center', width = '100'] = String(title || '').split('|');
+    const lay = /^(center|full|wide|left|right)$/.test(layout) ? layout : 'center';
+    const w = /^(30|40|50|60|70|80|90|100)$/.test(width) ? width : '100';
+    return keep(
+      `<figure class="nb-fig" data-figure data-layout="${lay}" data-width="${w}"><img class="nb-img" src="${esc(url)}" alt="${esc(alt)}" loading="lazy" />${
+        cap.trim() ? `<figcaption>${esc(cap.trim())}</figcaption>` : ''
+      }</figure>`
+    );
+  });
+  // informação crucial: [trecho](ref:<uuid> "tipo")
+  s = s.replace(/\[([^\]\n]+)\]\(ref:([0-9a-f-]{36})(?:\s+"(elemento|nota_autor|aviso)")?\)/gi, (_, text, id, kind) =>
+    keep(`<span class="nb-ref nb-ref--${kind || 'elemento'}" data-ref="${esc(id.toLowerCase())}" data-kind="${kind || 'elemento'}">${esc(text)}</span>`)
   );
   s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_, text, url) =>
     SAFE_URL.test(url)

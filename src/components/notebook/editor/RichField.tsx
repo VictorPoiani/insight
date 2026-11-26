@@ -9,7 +9,8 @@ import Highlight from '@tiptap/extension-highlight';
 import { Placeholder } from '@tiptap/extensions';
 import { Bold, Highlighter, Italic, List, Quote, Strikethrough } from 'lucide-react';
 import { Glyph } from '../icons/Glyph';
-import { TagHighlight, WikiLink } from './extensions';
+import { EntryRef, TagHighlight, WikiLink } from './extensions';
+import { EntryLinkButtons } from './RichNoteEditor';
 import { useNotebookLinks } from './linkContext';
 
 /**
@@ -47,6 +48,7 @@ export function RichField({
       Markdown,
       WikiLink.configure({ exists: (t: string) => existsRef.current(t) }),
       TagHighlight,
+      EntryRef,
       Placeholder.configure({ placeholder: placeholder || '' }),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,6 +124,8 @@ export function RichField({
               },
               <Glyph name="mindmap" className="text-[14px]" />
             )}
+            <span className="w-px h-4 mx-0.5 bg-[var(--nb-line)]" />
+            <EntryLinkButtons editor={editor} size="sm" />
           </div>
         </BubbleMenu>
       )}

@@ -3,16 +3,27 @@
 import type { PostBlock, PostBlockType } from '@/types/database';
 import { renderMarkdown } from './markdown';
 import type { NotebookItem } from './types';
+import type { NotebookEntry } from './entries';
 
 const uid = () => `nb-${Math.random().toString(36).slice(2, 10)}`;
 
 /** Converte HTML (capítulo ou markdown renderizado) em blocos de post. */
-export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans' } = {}): PostBlock[] {
+export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans'; entries?: Record<string, NotebookEntry> } = {}): PostBlock[] {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
   const root = doc.body.firstElementChild as HTMLElement;
   const out: PostBlock[] = [];
   const fontStyle = opts.font ?? 'sans';
 
+  // informação crucial: no post vira um trecho marcado com o resumo no balão nativo
+  root.querySelectorAll('[data-ref]').forEach((el) => {
+    const e = opts.entries?.[(el as HTMLElement).dataset.ref || ''];
+    if (!e) return el.replaceWith(doc.createTextNode(el.textContent || ''));
+    const span = doc.createElement('span');
+    span.className = `ins-ref ins-ref--${e.kind}`;
+    span.setAttribute('title', `${e.title}${e.summary ? ` — ${e.summary}` : ''}`.slice(0, 600));
+    span.textContent = el.textContent || '';
+    el.replaceWith(span);
+  });
   // links internos viram texto simples no post
   root.querySelectorAll('[data-wikilink]').forEach((a) => a.replaceWith(doc.createTextNode(a.textContent || '')));
   root.querySelectorAll('input').forEach((i) => i.replaceWith(doc.createTextNode((i as HTMLInputElement).checked ? '☑ ' : '☐ ')));
@@ -32,6 +43,22 @@ export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans' }
     if (tag === 'pre') return push('code', (el.textContent || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'), { fontStyle: 'mono' });
     if (tag === 'ul' || tag === 'ol') {
       el.querySelectorAll(':scope > li').forEach((li) => push('bullet', li.innerHTML));
+      return;
+    }
+    if (tag === 'figure') {
+      const img = el.querySelector('img');
+      const src = img?.getAttribute('src');
+      const w = el.getAttribute('data-width') || '100';
+      const lay = el.getAttribute('data-layout');
+      if (src)
+        out.push({
+          id: uid(),
+          type: 'image',
+          imageUrl: src,
+          imageCaption: el.querySelector('figcaption')?.textContent || img?.alt || '',
+          imageWidth: `${lay === 'full' || lay === 'wide' ? 100 : Number(w)}%`,
+          imageAlign: lay === 'left' ? 'left' : lay === 'right' ? 'right' : 'center',
+        } as PostBlock);
       return;
     }
     if (tag === 'img') {
@@ -64,14 +91,14 @@ export function htmlToPostBlocks(html: string, opts: { font?: 'serif' | 'sans' }
   return out;
 }
 
-export function itemToPostBlocks(item: NotebookItem, book?: NotebookItem | null): PostBlock[] {
+export function itemToPostBlocks(item: NotebookItem, book?: NotebookItem | null, entries?: Record<string, NotebookEntry>): PostBlock[] {
   if (item.template === 'blocks') return (item.blocks || []).map((b) => ({ ...b, id: uid() }));
   if (item.template === 'chapter') {
     const head: PostBlock[] = [];
     if (book) head.push({ id: uid(), type: 'callout', html: escapeHtml(book.title), calloutIcon: '📖', fontStyle: 'serif' });
     head.push({ id: uid(), type: 'h1', html: escapeHtml(item.title), fontStyle: 'serif', align: 'center' });
     const note = String(item.data?.authorNote || '').trim();
-    const body = htmlToPostBlocks(String(item.data?.html || ''), { font: 'serif' });
+    const body = htmlToPostBlocks(String(item.data?.html || ''), { font: 'serif', entries });
     const tail: PostBlock[] = note
       ? [
           { id: uid(), type: 'divider' },
@@ -82,7 +109,7 @@ export function itemToPostBlocks(item: NotebookItem, book?: NotebookItem | null)
   }
   return [
     { id: uid(), type: 'h1', html: escapeHtml(item.title), fontStyle: 'sans' },
-    ...htmlToPostBlocks(renderMarkdown(item.content.replace(/^---\n[\s\S]*?\n---\n?/, ''))),
+    ...htmlToPostBlocks(renderMarkdown(item.content.replace(/^---\n[\s\S]*?\n---\n?/, '')), { entries }),
   ];
 }
 

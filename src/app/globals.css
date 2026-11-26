@@ -265,3 +265,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .nitro-rainbow-border { animation: none; }
 }
+
+/* Notebook → post: trecho com informação crucial (resumo no balão nativo) */
+.ins-ref { cursor: help; text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.ins-ref--nota_autor { text-decoration-style: dashed; text-decoration-color: #a78bfa; }
+.ins-ref--aviso { text-decoration-style: wavy; text-decoration-color: #f59e0b; }

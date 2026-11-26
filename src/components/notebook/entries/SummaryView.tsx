@@ -1,0 +1,315 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BookMarked, Plus, Search, Trash2 } from 'lucide-react';
+import { ENTRY_KINDS, entryKind, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
+import type { NotebookItem } from '@/lib/notebook/types';
+import type { EntriesApi } from '@/lib/notebook/useEntries';
+import { Glyph } from '../icons/Glyph';
+import { itemIcon } from '../FileExplorer';
+
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+/**
+ * Sumário: toda informação crucial vinculada pelo autor, por projeto,
+ * para consultar e editar num lugar só.
+ */
+export function SummaryView({
+  items,
+  projects,
+  entriesApi,
+  projectId,
+  focusId,
+  onProject,
+  onOpen,
+}: {
+  items: NotebookItem[];
+  projects: NotebookItem[];
+  entriesApi: EntriesApi;
+  /** undefined = todos; null = sem projeto */
+  projectId: string | null | undefined;
+  focusId: string | null;
+  onProject: (id: string | null | undefined) => void;
+  onOpen: (id: string) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [kind, setKind] = useState<EntryKind | 'all'>('all');
+  const all = Object.values(entriesApi.entries);
+
+  const list = useMemo(() => {
+    const s = norm(q.trim());
+    return all
+      .filter((e) => (projectId === undefined ? true : (e.project_id ?? null) === projectId))
+      .filter((e) => kind === 'all' || e.kind === kind)
+      .filter((e) => !s || norm(e.title).includes(s) || norm(e.summary).includes(s) || e.aliases.some((a) => norm(a).includes(s)))
+      .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  }, [all, q, kind, projectId]);
+
+  const usage = useMemo(() => {
+    const m = new Map<string, NotebookItem[]>();
+    for (const it of items) for (const id of it.entry_refs || []) m.set(id, [...(m.get(id) || []), it]);
+    return m;
+  }, [items]);
+
+  const notes = useMemo(() => items.filter((i) => i.kind === 'note' || i.template === 'book').sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [items]);
+
+  async function addEntry() {
+    const e = await entriesApi.create({ kind: kind === 'all' ? 'elemento' : kind, title: 'Nova informação', summary: '', target_id: null, project_id: projectId ?? null });
+    if (e) setTimeout(() => document.getElementById(`entry-${e.id}`)?.querySelector('input')?.focus(), 50);
+  }
+
+  return (
+    <div className="nb-scroll absolute inset-0 overflow-y-auto">
+      <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 space-y-6">
+        <header className="flex items-start gap-4">
+          <span className="w-12 h-12 shrink-0 grid place-items-center rounded-2xl bg-[var(--nb-hl-soft)] text-[var(--nb-hl)]">
+            <BookMarked className="w-5 h-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--nb-hl)]">Sumário</p>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Informação crucial</h1>
+            <p className="mt-1 text-[13px] text-[var(--nb-ink-3)] max-w-xl">
+              Elementos da história, notas do autor e avisos vinculados ao texto. Passe o mouse num trecho vinculado para ver o resumo; edite tudo aqui.
+            </p>
+          </div>
+        </header>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={projectId === undefined ? '__all' : projectId === null ? '__none' : projectId}
+            onChange={(e) => onProject(e.target.value === '__all' ? undefined : e.target.value === '__none' ? null : e.target.value)}
+            aria-label="Projeto"
+            className="h-9 px-2 rounded-xl bg-[var(--nb-pane)] border border-[var(--nb-line)] text-[13px] font-semibold outline-none"
+          >
+            <option value="__all">Todos os projetos</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+            <option value="__none">Sem projeto</option>
+          </select>
+          <label className="flex-1 min-w-[180px] flex items-center gap-2 h-9 px-3 rounded-xl bg-[var(--nb-pane)] border border-[var(--nb-line)] focus-within:border-[var(--nb-hl)]">
+            <Search className="w-3.5 h-3.5 text-[var(--nb-ink-3)]" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar no Sumário" className="flex-1 bg-transparent outline-none text-[13px]" />
+          </label>
+          <button type="button" onClick={() => void addEntry()} className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--nb-hl)] text-white text-[12px] font-bold">
+            <Plus className="w-3.5 h-3.5" /> Nova informação
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {[{ id: 'all' as const, short: 'Tudo' }, ...ENTRY_KINDS].map((k) => {
+            const n = k.id === 'all' ? list.length : all.filter((e) => e.kind === k.id && (projectId === undefined || (e.project_id ?? null) === projectId)).length;
+            return (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => setKind(k.id)}
+                aria-pressed={kind === k.id}
+                className={`h-7 px-3 rounded-full text-[11px] font-bold border ${
+                  kind === k.id ? 'bg-[var(--nb-pane-2)] text-[var(--nb-ink)] border-[var(--nb-line)]' : 'border-transparent text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]'
+                }`}
+              >
+                {k.short} {k.id !== 'all' && <span className="opacity-60">{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {list.length ? (
+          <div className="space-y-2.5">
+            {list.map((e) => (
+              <EntryCard
+                key={e.id}
+                entry={e}
+                focus={focusId === e.id}
+                usedIn={usage.get(e.id) || []}
+                notes={notes}
+                projects={projects}
+                entriesApi={entriesApi}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[var(--nb-line)] p-8 text-center">
+            <p className="text-[14px] font-bold">Nada por aqui ainda</p>
+            <p className="mt-1 text-[13px] text-[var(--nb-ink-3)]">
+              Selecione um trecho em qualquer nota ou capítulo e use <span className="font-semibold text-[var(--nb-ink-2)]">Vincular informação</span> no menu que aparece.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EntryCard({
+  entry,
+  focus,
+  usedIn,
+  notes,
+  projects,
+  entriesApi,
+  onOpen,
+}: {
+  entry: NotebookEntry;
+  focus: boolean;
+  usedIn: NotebookItem[];
+  notes: NotebookItem[];
+  projects: NotebookItem[];
+  entriesApi: EntriesApi;
+  onOpen: (id: string) => void;
+}) {
+  const k = entryKind(entry.kind);
+  const [title, setTitle] = useState(entry.title);
+  const [summary, setSummary] = useState(entry.summary);
+  const [aliases, setAliases] = useState(entry.aliases.join(', '));
+  const timer = useRef<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focus) ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focus]);
+
+  const later = (patch: Parameters<EntriesApi['update']>[1]) => {
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => void entriesApi.update(entry.id, patch), 600);
+  };
+
+  return (
+    <div
+      id={`entry-${entry.id}`}
+      ref={ref}
+      className={`rounded-2xl border bg-[var(--nb-pane)] p-4 transition-colors ${focus ? 'border-[var(--nb-hl)]' : 'border-[var(--nb-line)]'}`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 w-8 h-8 shrink-0 grid place-items-center rounded-lg text-[16px]" style={{ color: k.color, background: `color-mix(in srgb, ${k.color} 14%, transparent)` }}>
+          <Glyph name={k.glyph} />
+        </span>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value.slice(0, 160));
+                if (e.target.value.trim()) later({ title: e.target.value.trim().slice(0, 160) });
+              }}
+              aria-label="Título"
+              className="flex-1 min-w-0 bg-transparent outline-none text-[15px] font-extrabold"
+            />
+            <select
+              value={entry.kind}
+              onChange={(e) => void entriesApi.update(entry.id, { kind: e.target.value as EntryKind })}
+              aria-label="Tipo"
+              className="h-7 px-1.5 rounded-lg bg-[var(--nb-pane-2)] text-[11px] font-bold outline-none"
+              style={{ color: k.color }}
+            >
+              {ENTRY_KINDS.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.short}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              aria-label="Apagar informação"
+              title="Apagar"
+              onClick={() => {
+                const msg = usedIn.length
+                  ? `Esta informação está vinculada em ${usedIn.length} ${usedIn.length === 1 ? 'texto' : 'textos'}. Os trechos continuam, mas o balão some. Apagar?`
+                  : 'Apagar esta informação do Sumário?';
+                if (confirm(msg)) void entriesApi.remove(entry.id);
+              }}
+              className="p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-red-400"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <textarea
+            value={summary}
+            onChange={(e) => {
+              setSummary(e.target.value.slice(0, 1200));
+              later({ summary: e.target.value.slice(0, 1200) });
+            }}
+            rows={Math.min(8, Math.max(2, Math.ceil(summary.length / 90)))}
+            placeholder="Resumo que aparece no balão"
+            aria-label="Resumo"
+            className="w-full resize-none bg-transparent outline-none text-[13px] leading-relaxed text-[var(--nb-ink-2)] placeholder:text-[var(--nb-ink-3)]"
+          />
+          <div className="grid sm:grid-cols-3 gap-2">
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Ler mais abre</span>
+              <select
+                value={entry.target_id || ''}
+                onChange={(e) => void entriesApi.update(entry.id, { target_id: e.target.value || null })}
+                className="mt-0.5 w-full h-8 px-1.5 rounded-lg bg-[var(--nb-bg)] border border-[var(--nb-line)] text-[12px] outline-none"
+              >
+                <option value="">esta entrada</option>
+                {notes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Projeto</span>
+              <select
+                value={entry.project_id || ''}
+                onChange={(e) => void entriesApi.update(entry.id, { project_id: e.target.value || null })}
+                className="mt-0.5 w-full h-8 px-1.5 rounded-lg bg-[var(--nb-bg)] border border-[var(--nb-line)] text-[12px] outline-none"
+              >
+                <option value="">sem projeto</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Outros nomes</span>
+              <input
+                value={aliases}
+                onChange={(e) => {
+                  setAliases(e.target.value);
+                  later({
+                    aliases: e.target.value
+                      .split(',')
+                      .map((a) => a.trim())
+                      .filter(Boolean)
+                      .slice(0, 20),
+                  });
+                }}
+                placeholder="separados por vírgula"
+                className="mt-0.5 w-full h-8 px-2 rounded-lg bg-[var(--nb-bg)] border border-[var(--nb-line)] text-[12px] outline-none"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)] mr-1">
+              {usedIn.length ? `Aparece em ${usedIn.length}` : 'Ainda não vinculada a nenhum trecho'}
+            </span>
+            {usedIn.slice(0, 12).map((it) => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => onOpen(it.id)}
+                className="flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--nb-pane-2)] text-[11px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-hl)]"
+              >
+                <span className="text-[12px]">{itemIcon(it)}</span>
+                {it.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

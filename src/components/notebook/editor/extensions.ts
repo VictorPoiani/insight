@@ -8,7 +8,7 @@
  *   > [!ideia] Título             callout (destaque)
  *   #tag                          marcação visual (texto simples)
  */
-import { Extension, Node, mergeAttributes, type JSONContent } from '@tiptap/core';
+import { Extension, Mark, Node, mergeAttributes, type JSONContent } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as PMNode } from '@tiptap/pm/model';
@@ -259,3 +259,68 @@ export function joinFrontmatter(props: [string, string][], body: string): string
   if (!kept.length) return body;
   return `---\n${kept.map(([k, v]) => `${k.trim()}: ${v}`).join('\n')}\n---\n\n${body}`;
 }
+
+// ------------------------------------------------------------------ informação crucial
+/**
+ * Trecho ligado a uma entrada do Sumário. Em markdown vira um link com
+ * esquema próprio: [texto](ref:<uuid> "tipo").
+ */
+export const EntryRef = Mark.create({
+  name: 'entryRef',
+  inclusive: false,
+
+  addAttributes() {
+    return {
+      id: { default: null },
+      kind: { default: 'elemento' },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-ref]',
+        getAttrs: (el) => {
+          const id = (el as HTMLElement).getAttribute('data-ref') || '';
+          if (!/^[0-9a-f-]{36}$/i.test(id)) return false;
+          const kind = (el as HTMLElement).getAttribute('data-kind') || 'elemento';
+          return { id, kind: ['elemento', 'nota_autor', 'aviso'].includes(kind) ? kind : 'elemento' };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ mark, HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        'data-ref': mark.attrs.id,
+        'data-kind': mark.attrs.kind,
+        class: `nb-ref nb-ref--${mark.attrs.kind}`,
+      }),
+      0,
+    ];
+  },
+
+  markdownTokenName: 'entryRef',
+  markdownTokenizer: {
+    name: 'entryRef',
+    level: 'inline',
+    start: (src: string) => {
+      const m = /\[[^\]\n]+\]\(ref:/.exec(src);
+      return m ? m.index : -1;
+    },
+    tokenize(src: string, _tokens, lexer) {
+      const m = /^\[([^\]\n]+)\]\(ref:([0-9a-f-]{36})(?:\s+"(elemento|nota_autor|aviso)")?\)/i.exec(src);
+      if (!m) return undefined;
+      return { type: 'entryRef', raw: m[0], text: m[1], id: m[2].toLowerCase(), kind: m[3] || 'elemento', tokens: lexer.inlineTokens(m[1]) };
+    },
+  },
+  parseMarkdown(token, h) {
+    return h.applyMark('entryRef', h.parseInline(token.tokens || []), { id: token.id, kind: token.kind });
+  },
+  renderMarkdown(node: JSONContent, h) {
+    const a = node.attrs || {};
+    return `[${h.renderChildren(node)}](ref:${a.id}${a.kind && a.kind !== 'elemento' ? ` "${a.kind}"` : ''})`;
+  },
+});

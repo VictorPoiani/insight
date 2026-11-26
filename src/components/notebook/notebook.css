@@ -776,3 +776,156 @@
 .nb-field .ProseMirror .nb-wl { color: var(--nb-link); font-weight: 600; cursor: pointer; border-bottom: 1px dotted color-mix(in srgb, var(--nb-link) 60%, transparent); }
 .nb-field .ProseMirror .nb-wl.is-missing { opacity: 0.65; border-bottom-style: dashed; }
 .nb-field .ProseMirror .nb-rtag { color: var(--nb-hl); background: var(--nb-hl-soft); border-radius: 999px; padding: 0 6px; font-size: 0.9em; font-weight: 600; }
+
+/* ============================================================ informação crucial */
+.nb-ref {
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1.6px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, #60a5fa 85%, transparent);
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.nb-ref:hover { background: color-mix(in srgb, #60a5fa 14%, transparent); }
+.nb-ref--nota_autor { text-decoration-style: dashed; text-decoration-color: #a78bfa; }
+.nb-ref--nota_autor:hover { background: color-mix(in srgb, #a78bfa 14%, transparent); }
+.nb-ref--aviso { text-decoration-style: wavy; text-decoration-color: #f59e0b; text-decoration-thickness: 1px; }
+.nb-ref--aviso:hover { background: color-mix(in srgb, #f59e0b 14%, transparent); }
+/* marcador discreto depois de notas do autor e avisos */
+.nb-ref--nota_autor::after, .nb-ref--aviso::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-left: 0.12em;
+  vertical-align: super;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+.nb-ref--nota_autor::after { background: #a78bfa; opacity: 0.9; }
+.nb-ref--aviso::after { background: #f59e0b; opacity: 0.9; }
+.nb-entry-pop {
+  position: fixed;
+  z-index: 95;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--nb-line);
+  background: var(--nb-pane);
+  color: var(--nb-ink);
+  box-shadow: 0 22px 48px -18px rgba(0, 0, 0, 0.7);
+  animation: nb-pop-in 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+}
+@keyframes nb-pop-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* ============================================================ ilustrações (figura) */
+.nb-fig { margin: 1.6em auto; text-align: center; clear: both; }
+.nb-fig img { display: block; width: 100%; height: auto; margin: 0 auto; border-radius: 6px; }
+.nb-fig figcaption {
+  margin-top: 0.6em;
+  font-size: 0.82em;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--paper-ink-2, var(--nb-ink-3));
+  text-indent: 0;
+}
+.nb-fig[data-layout='center'] { width: 70%; }
+.nb-fig[data-layout='full'] { width: 100%; }
+.nb-fig[data-layout='left'], .nb-fig[data-layout='right'] { width: 42%; margin-top: 0.3em; margin-bottom: 0.8em; clear: none; }
+.nb-fig[data-layout='left'] { float: left; margin-right: 1.6em; margin-left: 0; }
+.nb-fig[data-layout='right'] { float: right; margin-left: 1.6em; margin-right: 0; }
+.nb-fig[data-layout='center'][data-width='30'], .nb-fig[data-layout='left'][data-width='30'], .nb-fig[data-layout='right'][data-width='30'] { width: 30%; }
+.nb-fig[data-layout='center'][data-width='40'], .nb-fig[data-layout='left'][data-width='40'], .nb-fig[data-layout='right'][data-width='40'] { width: 40%; }
+.nb-fig[data-layout='center'][data-width='50'], .nb-fig[data-layout='left'][data-width='50'], .nb-fig[data-layout='right'][data-width='50'] { width: 50%; }
+.nb-fig[data-layout='center'][data-width='60'] { width: 60%; }
+.nb-fig[data-layout='center'][data-width='80'] { width: 80%; }
+.nb-fig[data-layout='center'][data-width='90'] { width: 90%; }
+.nb-fig[data-layout='center'][data-width='100'] { width: 100%; }
+/* sangria: a imagem ocupa a folha inteira, de borda a borda */
+.nb-paper .nb-fig[data-layout='wide'] { width: auto; margin-left: -3.5rem; margin-right: -3.5rem; }
+.nb-paper .nb-fig[data-layout='wide'] img { border-radius: 0; }
+.nb-paper .nb-fig[data-layout='wide'] figcaption { padding: 0 3.5rem; }
+@media (max-width: 639px) { .nb-paper .nb-fig[data-layout='wide'] { margin-left: -1.5rem; margin-right: -1.5rem; } }
+.nb-rich-doc .nb-fig[data-layout='wide'] { width: 100%; }
+.nb-fig.ProseMirror-selectednode img { outline: 2px solid var(--nb-hl); outline-offset: 3px; }
+.nb-paper p, .nb-paper h2, .nb-paper h3, .nb-paper blockquote { overflow-wrap: break-word; }
+.nb-paper::after { content: ''; display: block; clear: both; }
+@media (max-width: 639px) {
+  .nb-fig[data-layout='left'], .nb-fig[data-layout='right'] { float: none; width: 80% !important; margin: 1.2em auto; }
+}
+
+/* ============================================================ paginação do livro */
+.nb-paper { counter-reset: nb-page 1; }
+.nb-paper hr.nb-pagebreak {
+  counter-increment: nb-page;
+  position: relative;
+  height: 44px;
+  margin: 3em -3.5rem;
+  border: 0;
+  background: var(--paper-desk);
+  box-shadow: inset 0 10px 12px -10px rgba(0, 0, 0, 0.45), inset 0 -10px 12px -10px rgba(0, 0, 0, 0.45);
+  overflow: visible;
+}
+.nb-paper hr.nb-pagebreak::after {
+  content: 'página ' counter(nb-page);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 10px/1 var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--nb-ink-3);
+}
+.nb-paper hr.nb-pagebreak.ProseMirror-selectednode { outline: 2px solid var(--nb-hl); }
+@media (max-width: 639px) { .nb-paper hr.nb-pagebreak { margin-left: -1.5rem; margin-right: -1.5rem; } }
+.nb-page-full {
+  position: sticky;
+  bottom: 16px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin: 16px auto 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, var(--nb-line));
+  background: var(--nb-pane);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+  animation: nb-pop-in 0.25s ease both;
+}
+
+/* ============================================================ tipografia de livro */
+.nb-paper {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-variant-numeric: oldstyle-nums;
+  widows: 2;
+  orphans: 2;
+  hanging-punctuation: first;
+}
+.nb-paper [style*='text-align: justify'] { text-align-last: left; word-spacing: -0.01em; }
+.nb-rich-doc { text-rendering: optimizeLegibility; font-kerning: normal; }
+.nb-rich-doc p { max-width: 72ch; }
+
+/* ============================================================ modo poesia */
+.nb-rich-doc.nb-poem {
+  font-family: var(--nb-literata), Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  line-height: 1.85;
+  max-width: 34em;
+  margin: 0 auto;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+}
+.nb-rich-doc.nb-poem > p { margin-top: 1.5em; }
+.nb-rich-doc.nb-poem > p:first-child { margin-top: 0; }
+.nb-rich-doc.nb-poem p { max-width: none; }
+.nb-rich-doc.nb-poem .nb-fig { margin: 2em auto; }
+.nb-rich-doc.nb-poem .nb-rc { font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif; font-size: 14px; line-height: 1.6; }

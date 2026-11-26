@@ -5,6 +5,9 @@ import { ArrowUpRight, Maximize, Minus, Plus, X } from 'lucide-react';
 import { ENTRY_RELS, entryLook, entryRel, type EntryLink, type EntryRel, type NotebookEntry } from '@/lib/notebook/entries';
 import type { EntriesApi } from '@/lib/notebook/useEntries';
 import { Glyph } from '../icons/Glyph';
+import { useNotebookMenu } from '../menu/ContextMenu';
+import { useNotebookLinks } from '../editor/linkContext';
+import { GitFork, PanelRight } from 'lucide-react';
 
 // ============================================================ peças comuns
 export function EntryAvatar({ entry, size = 32, ring = true }: { entry: NotebookEntry; size?: number; ring?: boolean }) {
@@ -277,6 +280,8 @@ export function MentionGraph({
   const boxRef = useRef<HTMLDivElement>(null);
   const { view, setView, props } = useZoom();
   const dragNode = useRef<{ id: string; sx: number; sy: number; px: number; py: number; moved: boolean } | null>(null);
+  const menu = useNotebookMenu();
+  const nbLinks = useNotebookLinks();
 
   // posições salvas no aparelho; o layout de forças completa as que faltam
   useEffect(() => {
@@ -363,7 +368,18 @@ export function MentionGraph({
               data-node
               className={`nb-gnode ${selectedId === e.id ? 'is-selected' : ''}`}
               style={{ left: p.x, top: p.y, opacity: dim ? 0.25 : 1 }}
+              onContextMenu={(ev) =>
+                menu.open(
+                  ev,
+                  [
+                    { label: 'Ver detalhes e relações', icon: <PanelRight className="w-3.5 h-3.5" />, run: () => onSelect(e.id) },
+                    { label: 'Abrir (Ler mais)', icon: <ArrowUpRight className="w-3.5 h-3.5" />, run: () => nbLinks.readMore?.(e.id) },
+                  ],
+                  e.title
+                )
+              }
               onPointerDown={(ev) => {
+                if (ev.button !== 0) return;
                 ev.stopPropagation();
                 (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
                 dragNode.current = { id: e.id, sx: ev.clientX, sy: ev.clientY, px: p.x, py: p.y, moved: false };
@@ -516,7 +532,9 @@ export function FamilyTree({
   rootId,
   selectedId,
   onSelect,
+  onRoot,
 }: {
+  onRoot?: (id: string) => void;
   entries: Record<string, NotebookEntry>;
   links: EntryLink[];
   rootId: string | null;
@@ -525,6 +543,8 @@ export function FamilyTree({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const { view, setView, props } = useZoom();
+  const menu = useNotebookMenu();
+  const nbLinks = useNotebookLinks();
   const layout = useMemo(() => (rootId ? familyLayout(rootId, links) : null), [rootId, links]);
   const ROW = 150;
   const posOf = (id: string) => {
@@ -589,6 +609,17 @@ export function FamilyTree({
               key={n.id}
               data-node
               onClick={() => onSelect(e.id)}
+              onContextMenu={(ev) =>
+                menu.open(
+                  ev,
+                  [
+                    { label: 'Ver detalhes e relações', icon: <PanelRight className="w-3.5 h-3.5" />, run: () => onSelect(e.id) },
+                    ...(onRoot && n.id !== rootId ? [{ label: 'Árvore a partir desta pessoa', icon: <GitFork className="w-3.5 h-3.5" />, run: () => onRoot(e.id) }] : []),
+                    { label: 'Abrir (Ler mais)', icon: <ArrowUpRight className="w-3.5 h-3.5" />, run: () => nbLinks.readMore?.(e.id) },
+                  ],
+                  e.title
+                )
+              }
               className={`nb-fnode ${selectedId === e.id ? 'is-selected' : ''} ${n.id === rootId ? 'is-root' : ''}`}
               style={{ left: p.x, top: p.y }}
             >

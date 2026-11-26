@@ -18,12 +18,14 @@ import { entryLook } from '@/lib/notebook/entries';
 import { useNotebookLinks } from '../editor/linkContext';
 import { MentionPicker } from '../map/MapStudio';
 import { MoonPhase } from './MoonPhase';
+import { useNotebookMenu } from '../menu/ContextMenu';
 
 const EVENT_COLORS = ['#a78bfa', '#34d399', '#f59e0b', '#f87171', '#38bdf8', '#f472b6'];
 
 /** Calendário do mundo: meses, semana e luas próprios, com eventos ligados às menções. */
 export function WorldCalendar({ item, api }: { item: NotebookItem; api: NotebookApi }) {
   const links = useNotebookLinks();
+  const menu = useNotebookMenu();
   const [cal, setCal] = useState<WorldCalendarData>(() => normalizeCalendar((item.data as Record<string, unknown>)?.worldcal));
   const calRef = useRef(cal);
   const itemRef = useRef(item);
@@ -165,6 +167,34 @@ export function WorldCalendar({ item, api }: { item: NotebookItem; api: Notebook
                   key={i}
                   type="button"
                   onClick={() => setSelDay(d)}
+                  onContextMenu={(e) =>
+                    menu.open(
+                      e,
+                      [
+                        {
+                          label: 'Evento neste dia',
+                          icon: <Plus className="w-3.5 h-3.5" />,
+                          run: () => {
+                            setSelDay(d);
+                            save({ ...calRef.current, events: [...calRef.current.events, { id: uid(), year: view.year, month: view.month, day: d, title: 'Novo evento', color: EVENT_COLORS[0] }] }, 0);
+                          },
+                        },
+                        { label: 'É hoje na história', icon: <Sun className="w-3.5 h-3.5" />, disabled: isToday(d), run: () => save({ ...calRef.current, today: { year: view.year, month: view.month, day: d } }, 0) },
+                        ...(ev.length
+                          ? [
+                              'sep' as const,
+                              {
+                                label: ev.length === 1 ? 'Apagar o evento do dia' : `Apagar os ${ev.length} eventos do dia`,
+                                icon: <Trash2 className="w-3.5 h-3.5" />,
+                                danger: true,
+                                run: () => save({ ...calRef.current, events: calRef.current.events.filter((x) => !ev.some((y) => y.id === x.id)) }, 0),
+                              },
+                            ]
+                          : []),
+                      ],
+                      `${d} de ${month.name}`
+                    )
+                  }
                   className={`nb-wcal-day ${selDay === d ? 'is-selected' : ''} ${isToday(d) ? 'is-today' : ''}`}
                 >
                   <span className="flex items-center justify-between gap-1">

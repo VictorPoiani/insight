@@ -448,7 +448,8 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
               <button
                 key={x.id}
                 type="button"
-                onClick={() => onOpen(x.id)}
+                data-item-id={x.id}
+                  onClick={() => onOpen(x.id)}
                 className="flex items-center gap-3 p-3 rounded-xl border border-[var(--nb-line)] bg-[var(--nb-pane)] hover:border-[var(--nb-hl)] text-left"
               >
                 <span className="text-xl">{itemIcon(x)}</span>

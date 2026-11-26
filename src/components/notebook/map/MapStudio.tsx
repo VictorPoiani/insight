@@ -10,6 +10,8 @@ import { uploadMediaToInsight } from '@/lib/mediaCompressor';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { Glyph } from '../icons/Glyph';
 import { useNotebookLinks } from '../editor/linkContext';
+import { useNotebookMenu } from '../menu/ContextMenu';
+import { Copy, Maximize as Fit, Pencil } from 'lucide-react';
 
 // ------------------------------------------------------------------ dados
 export interface MapMarker {
@@ -93,6 +95,7 @@ export function MapStudio({
   level?: number | null;
 }) {
   const links = useNotebookLinks();
+  const menu = useNotebookMenu();
   const [map, setMap] = useState<MapData>(() => normalize((item.data as Record<string, unknown>)?.map));
   const mapRef = useRef(map);
   const itemRef = useRef(item);
@@ -288,6 +291,42 @@ export function MapStudio({
       <div
         ref={boxRef}
         className={`nb-map-view ${mode === 'select' ? 'cursor-grab' : 'cursor-crosshair'}`}
+        onContextMenu={(e) => {
+          if ((e.target as HTMLElement).closest('[data-map-el],[data-pz-stop]')) return;
+          const [x, y] = toWorld(e.clientX, e.clientY);
+          const inside = x >= 0 && y >= 0 && x <= map.w && y <= map.h;
+          menu.open(
+            e,
+            [
+              ...(inside
+                ? [
+                    {
+                      label: 'Marcador aqui',
+                      icon: <MapPin className="w-3.5 h-3.5" />,
+                      run: () => {
+                        const mk: MapMarker = { id: uid(), x, y, label: 'Novo lugar', icon: 'castle', entryId: null };
+                        save({ ...mapRef.current, markers: [...mapRef.current.markers, mk] }, 0);
+                        setSel({ type: 'marker', id: mk.id });
+                      },
+                    },
+                    {
+                      label: 'Começar região aqui',
+                      icon: <Pentagon className="w-3.5 h-3.5" />,
+                      run: () => {
+                        setMode('region');
+                        setDraft([[x, y]]);
+                      },
+                    },
+                    'sep' as const,
+                  ]
+                : []),
+              { label: 'Enquadrar o mapa', icon: <Fit className="w-3.5 h-3.5" />, run: fit },
+              { label: map.image ? 'Trocar imagem do mapa' : 'Usar imagem própria', icon: <ImagePlus className="w-3.5 h-3.5" />, run: () => fileRef.current?.click() },
+              ...(map.image ? [{ label: 'Voltar ao pergaminho', icon: <X className="w-3.5 h-3.5" />, run: () => save({ ...mapRef.current, image: null }, 0) }] : []),
+            ],
+            'Mapa'
+          );
+        }}
         onWheel={(e) => {
           const r = boxRef.current!.getBoundingClientRect();
           const mx = e.clientX - r.left;
@@ -348,6 +387,17 @@ export function MapStudio({
                   data-ref={r.entryId || undefined}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => mode === 'select' && setSel({ type: 'region', id: r.id })}
+                  onContextMenu={(e) =>
+                    menu.open(
+                      e,
+                      [
+                        { label: 'Editar região', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'region', id: r.id }) },
+                        'sep',
+                        { label: 'Apagar região', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, run: () => save({ ...mapRef.current, regions: mapRef.current.regions.filter((x) => x.id !== r.id) }, 0) },
+                      ],
+                      r.label
+                    )
+                  }
                   style={{ cursor: 'pointer' }}
                 >
                   <polygon points={r.points.map((p) => p.join(',')).join(' ')} fill={r.color} fillOpacity={on ? 0.32 : 0.2} stroke={r.color} strokeWidth={on ? 3 : 2} strokeDasharray="7 5" />
@@ -367,7 +417,24 @@ export function MapStudio({
               const my = (a.y + b.y) / 2 - Math.hypot(b.x - a.x, b.y - a.y) * 0.12;
               const on = sel?.type === 'route' && sel.id === rt.id;
               return (
-                <g key={rt.id} data-map-el onPointerDown={(e) => e.stopPropagation()} onClick={() => mode === 'select' && setSel({ type: 'route', id: rt.id })} style={{ cursor: 'pointer' }}>
+                <g
+                  key={rt.id}
+                  data-map-el
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => mode === 'select' && setSel({ type: 'route', id: rt.id })}
+                  onContextMenu={(e) =>
+                    menu.open(
+                      e,
+                      [
+                        { label: 'Editar rota', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'route', id: rt.id }) },
+                        'sep',
+                        { label: 'Apagar rota', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, run: () => save({ ...mapRef.current, routes: mapRef.current.routes.filter((x) => x.id !== rt.id) }, 0) },
+                      ],
+                      rt.label || 'Rota'
+                    )
+                  }
+                  style={{ cursor: 'pointer' }}
+                >
                   <path d={`M${a.x} ${a.y} Q${mx} ${my} ${b.x} ${b.y}`} fill="none" stroke="transparent" strokeWidth={18} />
                   <path d={`M${a.x} ${a.y} Q${mx} ${my} ${b.x} ${b.y}`} fill="none" stroke={on ? '#fff' : st.color} strokeWidth={on ? 4 : 3} strokeDasharray={st.dash} strokeLinecap="round" />
                   {rt.label && (
@@ -411,6 +478,36 @@ export function MapStudio({
                 data-ref={m.entryId || undefined}
                 className={`nb-map-marker ${on ? 'is-selected' : ''} ${routeFrom === m.id ? 'is-from' : ''}`}
                 style={{ left: m.x, top: m.y, ['--mk' as string]: color }}
+                onContextMenu={(ev) =>
+                  menu.open(
+                    ev,
+                    [
+                      ...(e ? [{ label: `Abrir “${e.title.slice(0, 24)}”`, icon: <Glyph name="sparkle" />, run: () => links.readMore?.(e.id) }, 'sep' as const] : []),
+                      { label: 'Editar marcador', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'marker', id: m.id }) },
+                      {
+                        label: 'Rota a partir daqui',
+                        icon: <RouteIcon className="w-3.5 h-3.5" />,
+                        run: () => {
+                          setMode('route');
+                          setRouteFrom(m.id);
+                        },
+                      },
+                      {
+                        label: 'Duplicar',
+                        icon: <Copy className="w-3.5 h-3.5" />,
+                        run: () => save({ ...mapRef.current, markers: [...mapRef.current.markers, { ...m, id: uid(), x: m.x + 40, y: m.y + 40 }] }, 0),
+                      },
+                      'sep',
+                      {
+                        label: 'Apagar marcador',
+                        icon: <Trash2 className="w-3.5 h-3.5" />,
+                        danger: true,
+                        run: () => save({ ...mapRef.current, markers: mapRef.current.markers.filter((x) => x.id !== m.id), routes: mapRef.current.routes.filter((r) => r.from !== m.id && r.to !== m.id) }, 0),
+                      },
+                    ],
+                    e ? e.title : m.label
+                  )
+                }
                 onPointerDown={(ev) => {
                   ev.stopPropagation();
                   if (mode !== 'select') return;

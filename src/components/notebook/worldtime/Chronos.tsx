@@ -8,6 +8,8 @@ import { ERA_COLORS, normalizeChronos, uid, type ChronoEra, type ChronoEvent, ty
 import { entryLook } from '@/lib/notebook/entries';
 import { useNotebookLinks } from '../editor/linkContext';
 import { MentionPicker } from '../map/MapStudio';
+import { useNotebookMenu } from '../menu/ContextMenu';
+import { ArrowUpRight, Copy, Maximize, Pencil } from 'lucide-react';
 
 /** Intervalo "bonito" entre marcas da régua. */
 function niceStep(span: number, px: number) {
@@ -20,6 +22,7 @@ function niceStep(span: number, px: number) {
 /** Cronos: a história do mundo numa linha (eras, marcos e eventos). */
 export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi }) {
   const links = useNotebookLinks();
+  const menu = useNotebookMenu();
   const [data, setData] = useState<ChronosData>(() => normalizeChronos((item.data as Record<string, unknown>)?.chronos));
   const dataRef = useRef(data);
   const itemRef = useRef(item);
@@ -130,7 +133,32 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
       </div>
 
       {/* linha do tempo */}
-      <div ref={scrollRef} className="nb-chronos nb-scroll" onWheel={(e) => e.shiftKey || (scrollRef.current && (scrollRef.current.scrollLeft += e.deltaY))}>
+ <div
+        ref={scrollRef}
+        className="nb-chronos nb-scroll"
+        onContextMenu={(e) => {
+          const inner = (e.currentTarget.firstElementChild as HTMLElement).getBoundingClientRect();
+          const year = Math.round(from + ((e.clientX - inner.left) / width) * (to - from));
+          menu.open(
+            e,
+            [
+              { label: `Acontecimento em ${year}`, icon: <Plus className="w-3.5 h-3.5" />, run: () => addEvent(year) },
+              {
+                label: `Nova era a partir de ${year}`,
+                icon: <Plus className="w-3.5 h-3.5" />,
+                run: () => {
+                  const era: ChronoEra = { id: uid(), name: 'Nova era', start: year, end: year + 50, color: ERA_COLORS[dataRef.current.eras.length % ERA_COLORS.length] };
+                  save({ ...dataRef.current, eras: [...dataRef.current.eras, era] }, 0);
+                  setSel({ type: 'era', id: era.id });
+                },
+              },
+              'sep',
+              { label: 'Enquadrar toda a história', icon: <Maximize className="w-3.5 h-3.5" />, run: fitAll },
+            ],
+            'Cronos'
+          );
+        }}
+        onWheel={(e) => e.shiftKey || (scrollRef.current && (scrollRef.current.scrollLeft += e.deltaY))}>
         <div className="relative" style={{ width, height: AXIS * 2 - 40 }}>
           {/* eras */}
           {eraLanes.map((lane, li) =>
@@ -165,6 +193,29 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
                 key={ev.id}
                 type="button"
                 onClick={() => setSel({ type: 'event', id: ev.id })}
+                onContextMenu={(e) =>
+                  menu.open(
+                    e,
+                    [
+                      ...(ev.entryId ? [{ label: 'Abrir a menção', icon: <ArrowUpRight className="w-3.5 h-3.5" />, run: () => links.readMore?.(ev.entryId!) }, 'sep' as const] : []),
+                      { label: 'Editar', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'event', id: ev.id }) },
+                      { label: ev.major ? 'Deixar de ser marco' : 'Marcar como marco', icon: <Star className="w-3.5 h-3.5" />, run: () => updEvent(ev.id, { major: !ev.major }, 0) },
+                      {
+                        label: 'Duplicar no ano seguinte',
+                        icon: <Copy className="w-3.5 h-3.5" />,
+                        run: () => save({ ...dataRef.current, events: [...dataRef.current.events, { ...ev, id: uid(), year: ev.year + 1 }] }, 0),
+                      },
+                      'sep',
+                      {
+                        label: 'Apagar',
+                        icon: <Trash2 className="w-3.5 h-3.5" />,
+                        danger: true,
+                        run: () => save({ ...dataRef.current, events: dataRef.current.events.filter((x) => x.id !== ev.id) }, 0),
+                      },
+                    ],
+                    `${ev.year} · ${ev.title}`
+                  )
+                }
                 className={`nb-chronos-event ${ev.major ? 'is-major' : ''} ${sel?.id === ev.id ? 'is-selected' : ''}`}
                 style={{ left: xOf(ev.year), top: AXIS, ['--ev' as string]: color }}
               >

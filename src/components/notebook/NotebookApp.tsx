@@ -98,6 +98,8 @@ import { isWorld } from '@/lib/notebook/projects';
 import { WorldContext, useSecrets, type WorldTools } from './world/WorldContext';
 import { WorldHub } from './world/WorldHub';
 import { projectOf } from './entries/MentionContext';
+import { StudioVerbetesDialog, useStudioTagger } from './world/StudioLinks';
+import type { EntriesApi } from '@/lib/notebook/useEntries';
 import './notebook.css';
 import { NOTEBOOK_NAME } from '@/lib/notebook/copy';
 
@@ -761,7 +763,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     if (it.template === 'map')
       return <MapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
     if (it.template === 'mindmap' && NOTEBOOK_FEATURES.studio)
-      return <MindmapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} />;
+      return <MindmapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} entriesApi={entriesApi} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} />;
     if (it.template === 'book')
       return (
         <BookDashboard
@@ -1277,7 +1279,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             )}
 
             {shown === 'note' && active?._full && active.template === 'mindmap' && NOTEBOOK_FEATURES.studio && (
-              <MindmapStudio key={`${active.id}-${reloadKey}`} item={active} api={api} path={path} onOpen={open} onRename={(t) => void rename(active.id, t)} />
+              <MindmapStudio key={`${active.id}-${reloadKey}`} item={active} api={api} entriesApi={entriesApi} path={path} onOpen={open} onRename={(t) => void rename(active.id, t)} />
             )}
 
             {shown === 'note' && active?._full && active.template === 'map' && (
@@ -1723,17 +1725,22 @@ function NoteBody({
 function MindmapStudio({
   item,
   api,
+  entriesApi,
   path,
   onOpen,
   onRename,
 }: {
   item: NotebookItem;
   api: NotebookApi;
+  entriesApi: EntriesApi;
   path: NotebookItem[];
   onOpen: (id: string) => void;
   onRename: (t: string) => void;
 }) {
   const [title, setTitle] = useState(item.title);
+  const [bring, setBring] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useStudioTagger(rootRef, entriesApi.entries);
   useEffect(() => setTitle(item.title), [item.title]);
   const persist = useCallback(
     (data: TopicWorkspaceData) => {
@@ -1743,7 +1750,8 @@ function MindmapStudio({
   );
   const parent = path[path.length - 1];
   return (
-    <div className="absolute inset-0 nb-studio">
+    <div ref={rootRef} className="absolute inset-0 nb-studio">
+      {bring && <StudioVerbetesDialog item={api.items[item.id] || item} api={api} entriesApi={entriesApi} projectId={projectOf(api.items, item)} onClose={() => setBring(false)} />}
       <TopicWorkspaceView
         topicId={item.id}
         topicColor={item.color || getTemplate(item.template).color}
@@ -1753,7 +1761,7 @@ function MindmapStudio({
         persistOverride={persist}
         studio
         studioLead={
-          <div className="flex items-center gap-1.5 h-8 pl-1.5 pr-2 mr-1 border-r border-zinc-700 max-w-[260px]">
+          <div className="flex items-center gap-1.5 h-8 pl-1.5 pr-2 mr-1 border-r border-zinc-700 max-w-[360px]">
             <Glyph name="mindmap" className="text-[15px] text-[#a855f7] shrink-0" />
             {parent && (
               <>
@@ -1771,6 +1779,14 @@ function MindmapStudio({
               aria-label="Título do mapa"
               className="min-w-0 w-36 bg-transparent outline-none text-[13px] font-bold text-white"
             />
+            <button
+              type="button"
+              onClick={() => setBring(true)}
+              title="Trazer verbetes do mundo, com as relações entre eles"
+              className="ml-1 shrink-0 h-6 px-2 rounded-md border border-zinc-700 text-[11px] font-semibold text-zinc-300 hover:text-white hover:border-zinc-500"
+            >
+              Verbetes
+            </button>
           </div>
         }
       />

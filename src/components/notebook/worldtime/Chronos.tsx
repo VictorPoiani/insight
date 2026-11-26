@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, Star, Trash2, X } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
-import { ERA_COLORS, normalizeChronos, uid, type ChronoEra, type ChronoEvent, type ChronosData } from '@/lib/notebook/worldtime';
+import { ERA_COLORS, eventEntries, formatWorldDate, formatWorldYear, normalizeCalendar, normalizeChronos, uid, type ChronoEra, type ChronoEvent, type ChronosData, type WorldCalendarData } from '@/lib/notebook/worldtime';
+import { ENTRY_CATEGORIES } from '@/lib/notebook/entries';
+import { WorldContext } from '../world/WorldContext';
+import { RefList } from '../world/Infobox';
 import { entryLook } from '@/lib/notebook/entries';
 import { useNotebookLinks } from '../editor/linkContext';
-import { MentionPicker } from '../map/MapStudio';
 import { useNotebookMenu } from '../menu/ContextMenu';
 import { ArrowUpRight, Copy, Maximize, Pencil } from 'lucide-react';
 
@@ -30,6 +32,38 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
   const [sel, setSel] = useState<{ type: 'event' | 'era'; id: string } | null>(null);
   const [pxPerYear, setPxPerYear] = useState(24);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const world = useContext(WorldContext);
+  const [filter, setFilter] = useState('');
+
+  // calendário do mundo ligado (dia e mês dos acontecimentos)
+  const [cal, setCal] = useState<WorldCalendarData | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!data.calendarId) return setCal(null);
+    void api.loadFull(data.calendarId).then((c) => alive && setCal(c && !c.archived_at ? normalizeCalendar((c.data as Record<string, unknown>)?.worldcal) : null));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.calendarId]);
+  const calendars = Object.values(api.items).filter((i) => i.template === 'calendar' && !i.archived_at);
+  const chapterItems = Object.values(api.items)
+    .filter((i) => i.template === 'chapter' && !i.archived_at)
+    .sort((a, b) => (a.parent_id || '').localeCompare(b.parent_id || '') || a.position - b.position);
+
+  // filtro por categoria ou por menção
+  const matches = (ev: ChronoEvent) => {
+    if (!filter) return true;
+    const ids = eventEntries(ev);
+    if (filter.startsWith('entry:')) return ids.includes(filter.slice(6));
+    if (filter.startsWith('cat:')) return ids.some((id) => (links.entries[id]?.category || 'conceito') === filter.slice(4));
+    return true;
+  };
+  const involved = Array.from(new Set(data.events.flatMap(eventEntries)))
+    .map((id) => links.entries[id])
+    .filter(Boolean)
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  const dateOf = (ev: ChronoEvent) => formatWorldDate(data, ev, cal);
 
   const save = useCallback(
     (next: ChronosData, debounce = 500) => {
@@ -40,7 +74,7 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
     [api]
   );
 
-  const events = useMemo(() => [...data.events].sort((a, b) => a.year - b.year), [data.events]);
+  const events = useMemo(() => [...data.events].sort((a, b) => a.year - b.year || (a.month ?? -1) - (b.month ?? -1) || (a.day ?? 0) - (b.day ?? 0)), [data.events]);
   const years = [...events.map((e) => e.year), ...data.eras.flatMap((e) => [e.start, e.end])];
   const min = years.length ? Math.min(...years) : 0;
   const max = years.length ? Math.max(...years) : 100;
@@ -118,6 +152,45 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
           Calendário
           <input value={data.era} onChange={(e) => save({ ...dataRef.current, era: e.target.value.slice(0, 16) })} placeholder="ex.: D.C." className={`w-20 ${input}`} />
         </label>
+        <label className="flex items-center gap-1.5 text-[12px] text-[var(--nb-ink-3)] cursor-pointer" title="Conta os anos a partir do início de cada era (ex.: ano 120 da 3ª Era)">
+          <input type="checkbox" checked={!!data.eraDates} onChange={(e) => save({ ...dataRef.current, eraDates: e.target.checked }, 0)} className="accent-[var(--nb-ink-2)]" />
+          Datas pela era
+        </label>
+        {calendars.length > 0 && (
+          <label className="flex items-center gap-1.5 text-[12px] text-[var(--nb-ink-3)]">
+            Meses de
+            <select value={data.calendarId || ''} onChange={(e) => save({ ...dataRef.current, calendarId: e.target.value || null }, 0)} className={input} aria-label="Calendário do mundo">
+              <option value="">nenhum calendário</option>
+              {calendars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {involved.length > 0 && (
+          <label className="flex items-center gap-1.5 text-[12px] text-[var(--nb-ink-3)]">
+            Mostrar
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`max-w-[200px] ${input}`} aria-label="Filtrar acontecimentos">
+              <option value="">toda a história</option>
+              <optgroup label="Por tipo">
+                {ENTRY_CATEGORIES.filter((c) => involved.some((e) => (e.category || 'conceito') === c.id)).map((c) => (
+                  <option key={c.id} value={`cat:${c.id}`}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Envolvendo">
+                {involved.map((e) => (
+                  <option key={e.id} value={`entry:${e.id}`}>
+                    {e.title}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+        )}
         <span className="flex-1" />
         <div className="flex items-center gap-0.5 p-1 rounded-xl bg-[var(--nb-pane)] border border-[var(--nb-line)]">
           <button type="button" aria-label="Afastar" onClick={() => setPxPerYear((p) => Math.max(1, p / 1.5))} className="p-1.5 rounded-lg text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]">
@@ -169,7 +242,7 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
                 onClick={() => setSel({ type: 'era', id: era.id })}
                 className={`nb-chronos-era ${sel?.id === era.id ? 'is-selected' : ''}`}
                 style={{ left: xOf(era.start), width: Math.max(24, xOf(era.end) - xOf(era.start)), top: 16 + li * 30, ['--era' as string]: era.color }}
-                title={`${era.name} (${era.start}–${era.end} ${data.era})`}
+                title={`${era.name} (${formatWorldYear({ ...data, eraDates: false }, era.start)} – ${formatWorldYear({ ...data, eraDates: false }, era.end)})`}
               >
                 {era.name}
               </button>
@@ -213,17 +286,17 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
                         run: () => save({ ...dataRef.current, events: dataRef.current.events.filter((x) => x.id !== ev.id) }, 0),
                       },
                     ],
-                    `${ev.year} · ${ev.title}`
+                    `${dateOf(ev)} · ${ev.title}`
                   )
                 }
-                className={`nb-chronos-event ${ev.major ? 'is-major' : ''} ${sel?.id === ev.id ? 'is-selected' : ''}`}
+                className={`nb-chronos-event ${ev.major ? 'is-major' : ''} ${sel?.id === ev.id ? 'is-selected' : ''} ${matches(ev) ? '' : 'is-dim'}`}
                 style={{ left: xOf(ev.year), top: AXIS, ['--ev' as string]: color }}
               >
                 <span className="nb-chronos-dot" />
                 <span className="nb-chronos-stem" style={{ height: stem, [up ? 'bottom' : 'top']: 6 }} />
                 <span className="nb-chronos-card" style={{ [up ? 'bottom' : 'top']: stem + 4 }} data-ref={ev.entryId || undefined}>
                   <span className="block text-[10px] font-black tabular-nums" style={{ color }}>
-                    {ev.year} {data.era}
+                    {dateOf(ev)}
                   </span>
                   <span className="block text-[12px] font-bold leading-tight">{ev.title}</span>
                 </span>
@@ -291,12 +364,91 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
                   className="w-full resize-y px-3 py-2 rounded-xl bg-[var(--nb-bg)] border border-[var(--nb-line)] text-[13px] leading-relaxed outline-none focus:border-[var(--nb-hl)]"
                 />
               </div>
-              <MentionPicker value={selEvent.entryId || null} label={selEvent.title} onChange={(id) => updEvent(selEvent.id, { entryId: id }, 0)} />
+              <div className="space-y-3 text-[12px]">
+                {cal && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selEvent.day ?? ''}
+                      onChange={(e) => updEvent(selEvent.id, { day: e.target.value ? Number(e.target.value) : null }, 0)}
+                      aria-label="Dia"
+                      className={`w-16 ${input}`}
+                    >
+                      <option value="">dia</option>
+                      {Array.from({ length: cal.months[selEvent.month ?? 0]?.days || 30 }, (_, i) => (
+                        <option key={i} value={i + 1}>
+                          {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selEvent.month ?? ''}
+                      onChange={(e) => updEvent(selEvent.id, { month: e.target.value === '' ? null : Number(e.target.value) }, 0)}
+                      aria-label="Mês"
+                      className={`flex-1 ${input}`}
+                    >
+                      <option value="">mês</option>
+                      {cal.months.map((m, i) => (
+                        <option key={m.id} value={i}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Envolvidos</span>
+                  <RefList
+                    refs={eventEntries(selEvent)}
+                    multi
+                    label={selEvent.title}
+                    onOpen={(id) => links.readMore?.(id)}
+                    onChange={(ids) => updEvent(selEvent.id, { entryId: ids[0] ?? null, links: ids.slice(1).map((entryId) => ({ entryId })) }, 0)}
+                  />
+                </div>
+                <div>
+                  <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--nb-ink-3)]">Narrado em</span>
+                  <div className="flex flex-wrap gap-x-2 gap-y-1">
+                    {(selEvent.chapters || []).map((cid) => {
+                      const ch = api.items[cid];
+                      if (!ch) return null;
+                      return (
+                        <span key={cid} className="nb-ibx-ref-wrap">
+                          <button type="button" data-item-id={cid} className="nb-ibx-ref" onClick={() => world?.open(cid)}>
+                            {ch.title}
+                          </button>
+                          <button type="button" aria-label={`Tirar ${ch.title}`} className="nb-ibx-x" onClick={() => updEvent(selEvent.id, { chapters: (selEvent.chapters || []).filter((x) => x !== cid) }, 0)}>
+                            <X />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {chapterItems.length > 0 && (
+                    <select
+                      value=""
+                      onChange={(e) => e.target.value && updEvent(selEvent.id, { chapters: Array.from(new Set([...(selEvent.chapters || []), e.target.value])) }, 0)}
+                      aria-label="Ligar a um capítulo"
+                      className={`mt-1.5 w-full ${input}`}
+                    >
+                      <option value="">ligar a um capítulo…</option>
+                      {chapterItems
+                        .filter((c) => !(selEvent.chapters || []).includes(c.id))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.parent_id && api.items[c.parent_id] ? `${api.items[c.parent_id].title} · ` : ''}
+                            {c.title}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           {selEra && (
             <div className="flex flex-wrap items-center gap-2">
               <input value={selEra.name} onChange={(e) => updEra(selEra.id, { name: e.target.value.slice(0, 60) })} className={`flex-1 min-w-[160px] font-semibold ${input}`} aria-label="Nome da era" />
+              <input value={selEra.short || ''} onChange={(e) => updEra(selEra.id, { short: e.target.value.slice(0, 12) })} placeholder="sigla (3ª E.)" className={`w-28 ${input}`} aria-label="Sigla da era" />
               <label className="flex items-center gap-1 text-[12px] text-[var(--nb-ink-3)]">
                 de
                 <input type="number" value={selEra.start} onChange={(e) => updEra(selEra.id, { start: Math.round(Number(e.target.value) || 0) })} className={`w-24 ${input}`} />
@@ -320,15 +472,15 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
         <div className="rounded-2xl border border-[var(--nb-line)] bg-[var(--nb-pane)] p-4">
           <p className="nb-pane-title mb-3">A história, em ordem</p>
           <ol className="relative border-l border-[var(--nb-line)] ml-2 space-y-3">
-            {events.map((ev) => {
+            {events.filter(matches).map((ev) => {
               const era = eraOf(ev.year);
               return (
                 <li key={ev.id} className="pl-4 relative">
                   <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full" style={{ background: era?.color || 'var(--nb-hl)' }} />
                   <button type="button" onClick={() => setSel({ type: 'event', id: ev.id })} className="text-left">
                     <span className="text-[11px] font-black tabular-nums text-[var(--nb-ink-3)]">
-                      {ev.year} {data.era}
-                      {era ? ` · ${era.name}` : ''}
+                      {dateOf(ev)}
+                      {era && !data.eraDates ? ` · ${era.name}` : ''}
                     </span>
                     <span className="block text-[14px] font-bold hover:text-[var(--nb-hl)]" data-ref={ev.entryId || undefined}>
                       {ev.major && <Star className="inline w-3 h-3 mr-1 text-amber-500 -mt-0.5" />}
@@ -336,6 +488,26 @@ export function Chronos({ item, api }: { item: NotebookItem; api: NotebookApi })
                     </span>
                     {ev.summary && <span className="block text-[12px] text-[var(--nb-ink-2)] line-clamp-2">{ev.summary}</span>}
                   </button>
+                  {(eventEntries(ev).length > 1 || (ev.chapters || []).length > 0) && (
+                    <span className="flex flex-wrap gap-x-2 mt-0.5 text-[11px] text-[var(--nb-ink-3)]">
+                      {eventEntries(ev)
+                        .slice(1)
+                        .map((id) =>
+                          links.entries[id] ? (
+                            <span key={id} data-ref={id} className="underline decoration-dotted underline-offset-2">
+                              {links.entries[id].title}
+                            </span>
+                          ) : null
+                        )}
+                      {(ev.chapters || []).map((cid) =>
+                        api.items[cid] ? (
+                          <button key={cid} type="button" data-item-id={cid} onClick={() => world?.open(cid)} className="hover:text-[var(--nb-ink)]">
+                            cap. {api.items[cid].title}
+                          </button>
+                        ) : null
+                      )}
+                    </span>
+                  )}
                 </li>
               );
             })}

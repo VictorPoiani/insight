@@ -1918,3 +1918,74 @@ tr:hover .nb-ibx-add, .nb-ibx-add:focus-visible { opacity: 1; }
   .nb-split-body .nb-art-title { font-size: 28px; }
 }
 .nb-art-head { margin-bottom: 22px; }
+
+/* camadas do mapa */
+.nb-map-layers {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  z-index: 25;
+  width: 260px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--nb-pane);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  font-size: 13px;
+}
+.nb-map-layers li { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.nb-map-layers li input { flex: 1; min-width: 0; background: transparent; outline: none; color: var(--nb-ink); }
+.nb-map-layer-eye { display: grid; place-items: center; width: 22px; height: 22px; color: var(--nb-ink-2); }
+.nb-map-layer-eye > svg { width: 13px; height: 13px; }
+.nb-map-layer-eye[aria-pressed='true'] { color: var(--nb-ink-3); }
+.nb-map-layer-del { padding: 3px; color: var(--nb-ink-3); opacity: 0; }
+.nb-map-layer-del > svg { width: 12px; height: 12px; }
+.nb-map-layers li:hover .nb-map-layer-del { opacity: 1; }
+.nb-map-layer-del:hover { color: #f87171; }
+@media (max-width: 767px) { .nb-map-layers { top: auto; bottom: 64px; left: 8px; right: 8px; width: auto; } }
+.nb-chronos-event.is-dim { opacity: 0.14; }
+
+/* organograma (hierarquia do mundo) */
+.nb-org { overflow-x: auto; padding-bottom: 12px; }
+.nb-org ul { display: flex; justify-content: center; position: relative; padding-top: 22px; margin: 0; }
+.nb-org > ul { padding-top: 0; width: max-content; min-width: 100%; }
+.nb-org li { position: relative; list-style: none; padding: 22px 6px 0; display: flex; flex-direction: column; align-items: center; }
+.nb-org > ul > li { padding-top: 0; }
+.nb-org li::before,
+.nb-org li::after { content: ''; position: absolute; top: 0; right: 50%; width: 50%; height: 22px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.nb-org li::after { right: auto; left: 50%; border-left: 1px solid rgba(255, 255, 255, 0.14); }
+.nb-org li:only-child::before, .nb-org li:only-child::after { display: none; }
+.nb-org li:only-child { padding-top: 22px; }
+.nb-org > ul > li:only-child { padding-top: 0; }
+.nb-org li:first-child::before, .nb-org li:last-child::after { border: 0 none; }
+.nb-org li:last-child::before { border-right: 1px solid rgba(255, 255, 255, 0.14); border-radius: 0 4px 0 0; }
+.nb-org li:first-child::after { border-radius: 4px 0 0 0; }
+.nb-org ul ul::before { content: ''; position: absolute; top: 0; left: 50%; height: 22px; border-left: 1px solid rgba(255, 255, 255, 0.14); }
+.nb-org li:only-child > .nb-org-node { position: relative; }
+.nb-org li:only-child::before { display: block; border: 0; border-left: 1px solid rgba(255, 255, 255, 0.14); width: 0; left: 50%; right: auto; }
+.nb-org > ul > li:only-child::before { display: none; }
+.nb-org-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+  max-width: 190px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: var(--nb-bg);
+  text-align: center;
+}
+.nb-org-node:hover { border-color: rgba(255, 255, 255, 0.3); }
+.nb-org-name { font-family: var(--nb-literata), Georgia, serif; font-size: 14px; font-weight: 600; color: var(--nb-ink); line-height: 1.25; }
+.nb-org-rel { margin-bottom: 2px; font-size: 10px; color: var(--nb-ink-3); }
+.nb-org-kind { margin-top: 3px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.nb-art-history { border-top: 1px solid var(--w-line); }
+.nb-art-history li { display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--w-line); }
+.nb-art-history li > span:last-child { grid-column: 2; }
+.nb-art-history-date { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--nb-ink-3); padding-top: 2px; }
+.nb-art-history-title { text-align: left; font-family: var(--w-serif); font-size: 15px; font-weight: 600; color: var(--nb-ink); }
+.nb-art-history-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 639px) { .nb-art-history li { grid-template-columns: minmax(0, 1fr); } .nb-art-history li > span:last-child { grid-column: 1; } }
+/* nó do Estúdio 2D ligado a um verbete */
+.nb-studio-ref > input[type='text'] { text-decoration: underline; text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, var(--mc, #a1a1aa) 80%, transparent); text-underline-offset: 3px; }

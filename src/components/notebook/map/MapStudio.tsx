@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Hand, ImagePlus, Loader2, Maximize, MapPin, Minus, Pentagon, Plus, Route as RouteIcon, Trash2, X } from 'lucide-react';
+import { ChevronRight, CornerDownRight, Eye, EyeOff, Hand, ImagePlus, Layers, Loader2, Maximize, MapPin, Minus, Pentagon, Plus, Route as RouteIcon, Trash2, X } from 'lucide-react';
+import { useContext } from 'react';
+import { WorldContext } from '../world/WorldContext';
+import { projectOf } from '../entries/MentionContext';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
 import type { GlyphName } from '@/lib/notebook/glyphs';
@@ -21,6 +24,10 @@ export interface MapMarker {
   label: string;
   icon: GlyphName;
   entryId?: string | null;
+  /** camada (null = sempre visível) */
+  layer?: string | null;
+  /** mapa detalhado deste lugar */
+  submapId?: string | null;
 }
 export interface MapRoute {
   id: string;
@@ -28,6 +35,7 @@ export interface MapRoute {
   to: string;
   label: string;
   style: 'estrada' | 'mar' | 'trilha';
+  layer?: string | null;
 }
 export interface MapRegion {
   id: string;
@@ -35,6 +43,13 @@ export interface MapRegion {
   label: string;
   color: string;
   entryId?: string | null;
+  layer?: string | null;
+  submapId?: string | null;
+}
+export interface MapLayer {
+  id: string;
+  name: string;
+  visible: boolean;
 }
 export interface MapData {
   image: string | null;
@@ -43,7 +58,12 @@ export interface MapData {
   markers: MapMarker[];
   routes: MapRoute[];
   regions: MapRegion[];
+  layers: MapLayer[];
+  /** mapa de cima (quando este é um sub-mapa) */
+  parent?: string | null;
 }
+
+const SUGGESTED_LAYERS = ['Cidades', 'Rotas comerciais', 'Territórios', 'Ruínas'];
 
 const MARKER_ICONS: GlyphName[] = ['castle', 'tower', 'house', 'anchor', 'mountain', 'tree', 'skull', 'star', 'flame', 'gem', 'crown', 'roadmap'];
 const REGION_COLORS = ['#a78bfa', '#34d399', '#f59e0b', '#f87171', '#38bdf8', '#f472b6', '#94a3b8'];
@@ -63,7 +83,19 @@ function normalize(raw: unknown): MapData {
     markers: Array.isArray(m.markers) ? m.markers : [],
     routes: Array.isArray(m.routes) ? m.routes : [],
     regions: Array.isArray(m.regions) ? m.regions : [],
+    layers: Array.isArray(m.layers) ? m.layers : [],
+    parent: typeof m.parent === 'string' ? m.parent : null,
   };
+}
+
+/** Pedido para abrir um mapa já focado num verbete (vindo do Codex). */
+const FOCUS_KEY = 'insight-nb-map-focus';
+export function focusOnMap(mapId: string, entryId: string) {
+  try {
+    sessionStorage.setItem(FOCUS_KEY, JSON.stringify({ mapId, entryId }));
+  } catch {
+    /* ignora */
+  }
 }
 
 type Mode = 'select' | 'marker' | 'route' | 'region';
@@ -109,6 +141,8 @@ export function MapStudio({
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 0.6 });
+  const [layersOpen, setLayersOpen] = useState(false);
+  const world = useContext(WorldContext);
   const pan = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
   const dragMarker = useRef<{ id: string; sx: number; sy: number; mx: number; my: number; moved: boolean } | null>(null);
 
@@ -133,6 +167,95 @@ export function MapStudio({
     if (boxRef.current) ro.observe(boxRef.current);
     return () => ro.disconnect();
   }, [fit]);
+
+  // veio do Codex ("No mundo"): seleciona e centraliza o verbete
+  useEffect(() => {
+    let req: { mapId: string; entryId: string } | null = null;
+    try {
+      req = JSON.parse(sessionStorage.getItem(FOCUS_KEY) || 'null');
+    } catch {
+      /* ignora */
+    }
+    if (!req || req.mapId !== item.id) return;
+    sessionStorage.removeItem(FOCUS_KEY);
+    const m = mapRef.current;
+    const mk = m.markers.find((x) => x.entryId === req!.entryId);
+    const rg = m.regions.find((x) => x.entryId === req!.entryId);
+    const pt = mk ? [mk.x, mk.y] : rg ? [rg.points.reduce((a, p) => a + p[0], 0) / rg.points.length, rg.points.reduce((a, p) => a + p[1], 0) / rg.points.length] : null;
+    if (!pt) return;
+    setSel(mk ? { type: 'marker', id: mk.id } : { type: 'region', id: rg!.id });
+    // mostra a camada dele se estiver oculta
+    const layer = (mk || rg)!.layer;
+    if (layer && m.layers.some((l) => l.id === layer && !l.visible)) save({ ...m, layers: m.layers.map((l) => (l.id === layer ? { ...l, visible: true } : l)) }, 0);
+    setTimeout(() => {
+      const box = boxRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const k = 1;
+      setView({ k, x: box.width / 2 - pt![0] * k, y: box.height / 2 - pt![1] * k });
+    }, 80);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
+  // trilha dos mapas de cima (sub-mapas)
+  const [trail, setTrail] = useState<NotebookItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const out: NotebookItem[] = [];
+      let pid = map.parent;
+      const seen = new Set([item.id]);
+      while (pid && !seen.has(pid) && out.length < 5) {
+        seen.add(pid);
+        const p = api.items[pid]?._full ? api.items[pid] : await api.loadFull(pid);
+        if (!p || p.archived_at || p.template !== 'map') break;
+        out.unshift(p);
+        pid = normalize((p.data as Record<string, unknown>)?.map).parent;
+      }
+      if (alive) setTrail(out);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map.parent, item.id]);
+
+  const hidden = useMemo(() => new Set(map.layers.filter((l) => !l.visible).map((l) => l.id)), [map.layers]);
+  const shown = <T extends { layer?: string | null }>(x: T) => !x.layer || !hidden.has(x.layer);
+  const otherMaps = useMemo(
+    () => Object.values(api.items).filter((i) => i.template === 'map' && !i.archived_at && i.id !== item.id).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')),
+    [api.items, item.id]
+  );
+
+  /** liga um sub-mapa e marca este como o mapa de cima dele */
+  async function linkSubmap(kind: 'marker' | 'region', id: string, submapId: string | null) {
+    const m = mapRef.current;
+    if (kind === 'marker') save({ ...m, markers: m.markers.map((x) => (x.id === id ? { ...x, submapId } : x)) }, 0);
+    else save({ ...m, regions: m.regions.map((x) => (x.id === id ? { ...x, submapId } : x)) }, 0);
+    if (!submapId) return;
+    const sub = await api.loadFull(submapId);
+    if (!sub) return;
+    const sm = normalize((sub.data as Record<string, unknown>)?.map);
+    if (sm.parent !== item.id) api.update(submapId, { data: { ...(sub.data || {}), map: { ...sm, parent: item.id } } });
+  }
+  async function createSubmap(kind: 'marker' | 'region', id: string, label: string) {
+    const sub = await api.create({ template: 'map', parentId: item.parent_id, title: label || 'Sub-mapa' });
+    if (!sub) return;
+    api.update(sub.id, { data: { ...(sub.data || {}), map: { ...normalize(null), parent: item.id } } });
+    await linkSubmap(kind, id, sub.id);
+    onOpen(sub.id);
+  }
+  /** cria o verbete do lugar no Codex do mundo e liga ao marcador/região */
+  const worldProject = world ? projectOf(api.items, item) : null;
+  async function createVerbete(kind: 'marker' | 'region', id: string, label: string) {
+    if (!world || !worldProject) return;
+    const cat = world.codex.ofProject(worldProject).find((c) => !c.parent_id && c.kind === 'lugar') || null;
+    const it = await world.newVerbete(worldProject, cat?.id ?? null, label || 'Novo lugar');
+    const entryId = (it?.data as { codex?: { entry: string } })?.codex?.entry;
+    if (!entryId) return;
+    const m = mapRef.current;
+    if (kind === 'marker') save({ ...m, markers: m.markers.map((x) => (x.id === id ? { ...x, entryId } : x)) }, 0);
+    else save({ ...m, regions: m.regions.map((x) => (x.id === id ? { ...x, entryId } : x)) }, 0);
+  }
 
   const toWorld = (cx: number, cy: number): [number, number] => {
     const r = boxRef.current!.getBoundingClientRect();
@@ -238,14 +361,23 @@ export function MapStudio({
       <div className="nb-map-bar">
         <div className="flex items-center gap-1.5 h-8 pl-1.5 pr-2 mr-1 border-r border-zinc-700 max-w-[260px]">
           <Glyph name="map" className="text-[15px] text-[#2dd4bf] shrink-0" />
-          {parent && (
-            <>
-              <button type="button" onClick={() => onOpen(parent.id)} className="text-[11px] text-zinc-400 hover:text-white truncate max-w-[110px]">
-                {parent.title}
-              </button>
-              <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0" />
-            </>
-          )}
+          {trail.length
+            ? trail.map((t) => (
+                <span key={t.id} className="flex items-center gap-1.5 min-w-0">
+                  <button type="button" onClick={() => onOpen(t.id)} className="text-[11px] text-zinc-400 hover:text-white truncate max-w-[110px]" title={`Voltar para ${t.title}`}>
+                    {t.title}
+                  </button>
+                  <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0" />
+                </span>
+              ))
+            : parent && (
+                <>
+                  <button type="button" onClick={() => onOpen(parent.id)} className="text-[11px] text-zinc-400 hover:text-white truncate max-w-[110px]">
+                    {parent.title}
+                  </button>
+                  <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0" />
+                </>
+              )}
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value.slice(0, 200))}
@@ -260,6 +392,15 @@ export function MapStudio({
         {tool('route', 'Rota', <RouteIcon />)}
         {tool('region', 'Região', <Pentagon />)}
         <span className="w-px h-5 bg-zinc-700 mx-1" />
+        <button
+          type="button"
+          aria-pressed={layersOpen}
+          onClick={() => setLayersOpen((v) => !v)}
+          className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12px] font-semibold ${layersOpen ? 'bg-white/10 text-white' : 'text-zinc-300 hover:text-white hover:bg-white/10'}`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span className="nb-map-tool-label">Camadas{hidden.size ? ` · ${hidden.size} oculta${hidden.size > 1 ? 's' : ''}` : ''}</span>
+        </button>
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
@@ -376,7 +517,7 @@ export function MapStudio({
 
           <svg className="absolute inset-0 overflow-visible" width={map.w} height={map.h}>
             {/* regiões */}
-            {map.regions.map((r) => {
+            {map.regions.filter(shown).map((r) => {
               const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
               const cy = r.points.reduce((s, p) => s + p[1], 0) / r.points.length;
               const on = sel?.type === 'region' && sel.id === r.id;
@@ -387,10 +528,13 @@ export function MapStudio({
                   data-ref={r.entryId || undefined}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => mode === 'select' && setSel({ type: 'region', id: r.id })}
+                  onDoubleClick={() => (r.submapId ? onOpen(r.submapId) : r.entryId && links.readMore?.(r.entryId))}
                   onContextMenu={(e) =>
                     menu.open(
                       e,
                       [
+                        ...(r.submapId ? [{ label: 'Entrar no mapa detalhado', icon: <CornerDownRight className="w-3.5 h-3.5" />, run: () => onOpen(r.submapId!) }] : []),
+                        ...(r.entryId ? [{ label: 'Abrir o verbete', icon: <Glyph name="sparkle" />, run: () => links.readMore?.(r.entryId!) }] : []),
                         { label: 'Editar região', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'region', id: r.id }) },
                         'sep',
                         { label: 'Apagar região', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, run: () => save({ ...mapRef.current, regions: mapRef.current.regions.filter((x) => x.id !== r.id) }, 0) },
@@ -403,15 +547,16 @@ export function MapStudio({
                   <polygon points={r.points.map((p) => p.join(',')).join(' ')} fill={r.color} fillOpacity={on ? 0.32 : 0.2} stroke={r.color} strokeWidth={on ? 3 : 2} strokeDasharray="7 5" />
                   <text x={cx} y={cy} textAnchor="middle" className="nb-map-region-label" fill="#fff">
                     {r.label}
+                    {r.submapId ? ' ›' : ''}
                   </text>
                 </g>
               );
             })}
             {/* rotas */}
-            {map.routes.map((rt) => {
+            {map.routes.filter(shown).map((rt) => {
               const a = markerById.get(rt.from);
               const b = markerById.get(rt.to);
-              if (!a || !b) return null;
+              if (!a || !b || !shown(a) || !shown(b)) return null;
               const st = ROUTE_STYLES.find((s) => s.id === rt.style) || ROUTE_STYLES[0];
               const mx = (a.x + b.x) / 2;
               const my = (a.y + b.y) / 2 - Math.hypot(b.x - a.x, b.y - a.y) * 0.12;
@@ -467,7 +612,7 @@ export function MapStudio({
           </svg>
 
           {/* marcadores */}
-          {map.markers.map((m) => {
+          {map.markers.filter(shown).map((m) => {
             const e = m.entryId ? links.entries[m.entryId] : null;
             const on = sel?.type === 'marker' && sel.id === m.id;
             const color = e ? entryLook(e).color : '#2dd4bf';
@@ -477,12 +622,15 @@ export function MapStudio({
                 data-map-el
                 data-ref={m.entryId || undefined}
                 className={`nb-map-marker ${on ? 'is-selected' : ''} ${routeFrom === m.id ? 'is-from' : ''}`}
+                onDoubleClick={() => mode === 'select' && (m.submapId ? onOpen(m.submapId) : e && links.readMore?.(e.id))}
                 style={{ left: m.x, top: m.y, ['--mk' as string]: color }}
                 onContextMenu={(ev) =>
                   menu.open(
                     ev,
                     [
-                      ...(e ? [{ label: `Abrir “${e.title.slice(0, 24)}”`, icon: <Glyph name="sparkle" />, run: () => links.readMore?.(e.id) }, 'sep' as const] : []),
+                      ...(m.submapId ? [{ label: 'Entrar no mapa detalhado', icon: <CornerDownRight className="w-3.5 h-3.5" />, run: () => onOpen(m.submapId!) }] : []),
+                      ...(e ? [{ label: `Abrir “${e.title.slice(0, 24)}”`, icon: <Glyph name="sparkle" />, run: () => links.readMore?.(e.id) }] : []),
+                      ...(m.submapId || e ? ['sep' as const] : []),
                       { label: 'Editar marcador', icon: <Pencil className="w-3.5 h-3.5" />, run: () => setSel({ type: 'marker', id: m.id }) },
                       {
                         label: 'Rota a partir daqui',
@@ -545,7 +693,10 @@ export function MapStudio({
                 <span className="nb-map-pin">
                   <Glyph name={m.icon} />
                 </span>
-                <span className="nb-map-label">{e ? e.title : m.label}</span>
+                <span className="nb-map-label">
+                  {e ? e.title : m.label}
+                  {m.submapId && <CornerDownRight className="inline w-3 h-3 ml-1 -mt-0.5 opacity-70" aria-label="tem mapa detalhado" />}
+                </span>
               </div>
             );
           })}
@@ -564,6 +715,20 @@ export function MapStudio({
           </button>
         </div>
       </div>
+
+      {/* camadas */}
+      {layersOpen && (
+        <LayersPanel
+          map={map}
+          onClose={() => setLayersOpen(false)}
+          onChange={(layers) => save({ ...mapRef.current, layers }, 0)}
+          onDelete={(id) => {
+            const m = mapRef.current;
+            const clear = <T extends { layer?: string | null }>(x: T) => (x.layer === id ? { ...x, layer: null } : x);
+            save({ ...m, layers: m.layers.filter((l) => l.id !== id), markers: m.markers.map(clear), routes: m.routes.map(clear), regions: m.regions.map(clear) }, 0);
+          }}
+        />
+      )}
 
       {/* painel do item selecionado */}
       {(selMarker || selRoute || selRegion) && (
@@ -584,6 +749,24 @@ export function MapStudio({
             <MarkerEditor
               marker={selMarker}
               onChange={(patch) => save({ ...mapRef.current, markers: mapRef.current.markers.map((k) => (k.id === selMarker.id ? { ...k, ...patch } : k)) })}
+            />
+          )}
+          {(selMarker || selRegion) && (
+            <WorldLinks
+              layer={(selMarker || selRegion)!.layer || null}
+              layers={map.layers}
+              onLayer={(layer) =>
+                selMarker
+                  ? save({ ...mapRef.current, markers: mapRef.current.markers.map((k) => (k.id === selMarker.id ? { ...k, layer } : k)) }, 0)
+                  : save({ ...mapRef.current, regions: mapRef.current.regions.map((k) => (k.id === selRegion!.id ? { ...k, layer } : k)) }, 0)
+              }
+              submapId={(selMarker || selRegion)!.submapId || null}
+              maps={otherMaps}
+              onSubmap={(id) => void linkSubmap(selMarker ? 'marker' : 'region', (selMarker || selRegion)!.id, id)}
+              onNewSubmap={() => void createSubmap(selMarker ? 'marker' : 'region', (selMarker || selRegion)!.id, (selMarker || selRegion)!.label)}
+              onEnter={(id) => onOpen(id)}
+              canVerbete={!!worldProject && !(selMarker || selRegion)!.entryId}
+              onVerbete={() => void createVerbete(selMarker ? 'marker' : 'region', (selMarker || selRegion)!.id, (selMarker || selRegion)!.label)}
             />
           )}
           {selRoute && (
@@ -609,6 +792,11 @@ export function MapStudio({
               <p className="text-[12px] text-[var(--nb-ink-3)]">
                 {markerById.get(selRoute.from)?.label} → {markerById.get(selRoute.to)?.label}
               </p>
+              <LayerSelect
+                value={selRoute.layer || null}
+                layers={map.layers}
+                onChange={(layer) => save({ ...mapRef.current, routes: mapRef.current.routes.map((k) => (k.id === selRoute.id ? { ...k, layer } : k)) }, 0)}
+              />
             </div>
           )}
           {selRegion && (
@@ -756,5 +944,138 @@ function Parchment({ w, h }: { w: number; h: number }) {
         </text>
       </g>
     </svg>
+  );
+}
+
+// ============================================================================
+// Camadas e ligações com o mundo
+// ============================================================================
+
+function LayersPanel({ map, onChange, onDelete, onClose }: { map: MapData; onChange: (l: MapLayer[]) => void; onDelete: (id: string) => void; onClose: () => void }) {
+  const count = (id: string) => map.markers.filter((m) => m.layer === id).length + map.routes.filter((m) => m.layer === id).length + map.regions.filter((m) => m.layer === id).length;
+  const loose = map.markers.filter((m) => !m.layer).length + map.routes.filter((m) => !m.layer).length + map.regions.filter((m) => !m.layer).length;
+  return (
+    <div className="nb-map-layers" data-pz-stop>
+      <div className="flex items-center justify-between mb-1">
+        <p className="nb-world-kicker">Camadas</p>
+        <button type="button" aria-label="Fechar camadas" onClick={onClose} className="p-1 rounded text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <ul>
+        {map.layers.map((l) => (
+          <li key={l.id} className="group">
+            <button
+              type="button"
+              aria-label={l.visible ? `Ocultar ${l.name}` : `Mostrar ${l.name}`}
+              aria-pressed={!l.visible}
+              onClick={() => onChange(map.layers.map((x) => (x.id === l.id ? { ...x, visible: !x.visible } : x)))}
+              className="nb-map-layer-eye"
+            >
+              {l.visible ? <Eye /> : <EyeOff />}
+            </button>
+            <input
+              value={l.name}
+              onChange={(e) => onChange(map.layers.map((x) => (x.id === l.id ? { ...x, name: e.target.value.slice(0, 40) } : x)))}
+              aria-label="Nome da camada"
+              className={!l.visible ? 'opacity-50' : ''}
+            />
+            <span className="nb-world-count">{count(l.id)}</span>
+            <button type="button" aria-label={`Apagar camada ${l.name}`} onClick={() => onDelete(l.id)} className="nb-map-layer-del">
+              <Trash2 />
+            </button>
+          </li>
+        ))}
+        <li className="text-[var(--nb-ink-3)]">
+          <span className="nb-map-layer-eye opacity-40">
+            <Eye />
+          </span>
+          <span className="flex-1 text-[12px]">Sem camada (sempre visível)</span>
+          <span className="nb-world-count">{loose}</span>
+        </li>
+      </ul>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+        <button type="button" onClick={() => onChange([...map.layers, { id: uid(), name: 'Nova camada', visible: true }])} className="text-[12px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-ink)]">
+          + Camada
+        </button>
+        {!map.layers.length && (
+          <button type="button" onClick={() => onChange(SUGGESTED_LAYERS.map((name) => ({ id: uid(), name, visible: true })))} className="text-[12px] text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]">
+            Usar sugeridas ({SUGGESTED_LAYERS.join(', ')})
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LayerSelect({ value, layers, onChange }: { value: string | null; layers: MapLayer[]; onChange: (id: string | null) => void }) {
+  if (!layers.length) return null;
+  return (
+    <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--nb-ink-3)]">
+      Camada
+      <select value={value || ''} onChange={(e) => onChange(e.target.value || null)} className="nb-world-select flex-1 max-w-[180px]">
+        <option value="">sem camada</option>
+        {layers.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function WorldLinks({
+  layer,
+  layers,
+  onLayer,
+  submapId,
+  maps,
+  onSubmap,
+  onNewSubmap,
+  onEnter,
+  canVerbete,
+  onVerbete,
+}: {
+  layer: string | null;
+  layers: MapLayer[];
+  onLayer: (id: string | null) => void;
+  submapId: string | null;
+  maps: NotebookItem[];
+  onSubmap: (id: string | null) => void;
+  onNewSubmap: () => void;
+  onEnter: (id: string) => void;
+  canVerbete: boolean;
+  onVerbete: () => void;
+}) {
+  return (
+    <div className="mt-3 pt-3 border-t border-[var(--nb-line)] space-y-2.5">
+      {canVerbete && (
+        <button type="button" onClick={onVerbete} className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-ink)]">
+          <Plus className="w-3 h-3" /> Criar verbete no Codex com este nome
+        </button>
+      )}
+      <LayerSelect value={layer} layers={layers} onChange={onLayer} />
+      <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--nb-ink-3)]">
+        Mapa detalhado
+        <select value={submapId || ''} onChange={(e) => onSubmap(e.target.value || null)} className="nb-world-select flex-1 max-w-[180px]">
+          <option value="">nenhum</option>
+          {maps.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      {submapId ? (
+        <button type="button" onClick={() => onEnter(submapId)} className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--nb-ink)] hover:underline">
+          <CornerDownRight className="w-3.5 h-3.5" /> Entrar no mapa detalhado
+        </button>
+      ) : (
+        <button type="button" onClick={onNewSubmap} className="flex items-center gap-1.5 text-[12px] text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]">
+          <Plus className="w-3 h-3" /> Criar mapa detalhado deste lugar
+        </button>
+      )}
+    </div>
   );
 }

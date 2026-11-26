@@ -10,6 +10,7 @@ import { useWorld, useSecrets } from './WorldContext';
 import { CategoryDialog } from './Infobox';
 import { CodexArticle } from './CodexArticle';
 import { convertWorldNote } from './convertWorld';
+import { Hierarchy, treeToMindmap } from './Hierarchy';
 import { useNotebookMenu } from '../menu/ContextMenu';
 import { Glyph } from '../icons/Glyph';
 import { itemIcon } from '../FileExplorer';
@@ -159,12 +160,32 @@ export function WorldHub({ project, article, body }: { project: NotebookItem; ar
           create={[{ label: 'Novo diagrama no Estúdio 2D', template: 'mindmap' }]}
           project={project}
           extra={
-            <div className="nb-world-rows mb-8">
-              <button type="button" className="nb-world-row" onClick={() => w.openSummary(project.id)}>
-                <span className="nb-world-row-title">Grafo de conexões e genealogia</span>
-                <span className="nb-world-row-meta">{w.entriesApi.links.filter((l) => entries.some((e) => e.id === l.from_id)).length} relações</span>
-              </button>
-            </div>
+            <>
+              <section className="mb-10">
+                <h3 className="nb-world-h3">Hierarquia</h3>
+                <Hierarchy
+                  entries={entries}
+                  links={w.entriesApi.links}
+                  onOpen={(e) => w.readMore(e)}
+                  onStudio={async (rootId, tree) => {
+                    const { nodes, edges } = treeToMindmap(rootId, tree, w.entriesApi.entries);
+                    const title = `Hierarquia · ${w.entriesApi.entries[rootId]?.title || 'Mundo'}`;
+                    const it = await w.api.create({ template: 'mindmap', parentId: project.id, title });
+                    if (!it) return;
+                    w.api.update(it.id, { data: { ...(it.data || {}), mindMapNodes: nodes, mindMapEdges: edges } });
+                    w.open(it.id);
+                  }}
+                />
+              </section>
+              <h3 className="nb-world-h3">Grafo e genealogia</h3>
+              <div className="nb-world-rows mb-10">
+                <button type="button" className="nb-world-row" onClick={() => w.openSummary(project.id)}>
+                  <span className="nb-world-row-title">Grafo de conexões e genealogia</span>
+                  <span className="nb-world-row-meta">{w.entriesApi.links.filter((l) => entries.some((e) => e.id === l.from_id)).length} relações</span>
+                </button>
+              </div>
+              <h3 className="nb-world-h3">Diagramas no Estúdio 2D</h3>
+            </>
           }
         />
       )}

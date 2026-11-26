@@ -10,6 +10,8 @@ import { Infobox } from './Infobox';
 import { EntryAppearances } from '../entries/MentionContext';
 import { useNotebookMenu } from '../menu/ContextMenu';
 import { itemIcon } from '../FileExplorer';
+import { focusOnMap } from '../map/MapStudio';
+import { eventEntries, formatWorldDate, normalizeChronos, type ChronoEvent, type ChronosData } from '@/lib/notebook/worldtime';
 
 const WORLD_TEMPLATES = new Set(['map', 'timeline', 'calendar', 'mindmap']);
 
@@ -84,6 +86,31 @@ export function CodexArticle({
   );
   const inWorld = usedIn.filter((i) => WORLD_TEMPLATES.has(i.template));
   const inText = usedIn.filter((i) => !WORLD_TEMPLATES.has(i.template));
+
+  // Na história: acontecimentos das linhas do tempo que envolvem o verbete
+  const timelineKey = inWorld
+    .filter((i) => i.template === 'timeline')
+    .map((i) => `${i.id}:${i.updated_at}`)
+    .join(',');
+  const [history, setHistory] = useState<{ item: NotebookItem; data: ChronosData; ev: ChronoEvent }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const out: { item: NotebookItem; data: ChronosData; ev: ChronoEvent }[] = [];
+      for (const t of inWorld.filter((i) => i.template === 'timeline')) {
+        const full = t._full ? w.api.items[t.id] || t : await w.api.loadFull(t.id);
+        if (!full) continue;
+        const data = normalizeChronos((full.data as Record<string, unknown>)?.chronos);
+        data.events.filter((ev) => eventEntries(ev).includes(entry.id)).forEach((ev) => out.push({ item: full, data, ev }));
+      }
+      out.sort((a, b) => a.ev.year - b.ev.year);
+      if (alive) setHistory(out);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineKey, entry.id]);
 
   const moreMenu = (e: React.MouseEvent) =>
     menu.open(
@@ -199,6 +226,23 @@ export function CodexArticle({
         <div className="min-w-0">
           <div className="nb-art-body">{body}</div>
 
+          {history.length > 0 && (
+            <section className="nb-art-section">
+              <h3 className="nb-world-h3">Na história</h3>
+              <ol className="nb-art-history">
+                {history.map(({ item: t, data, ev }) => (
+                  <li key={`${t.id}-${ev.id}`}>
+                    <span className="nb-art-history-date">{formatWorldDate(data, ev)}</span>
+                    <button type="button" data-item-id={t.id} onClick={() => w.open(t.id)} className="nb-art-history-title">
+                      {ev.title}
+                    </button>
+                    {ev.summary && <span className="block text-[13px] text-[var(--nb-ink-3)] line-clamp-2">{ev.summary}</span>}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
           <section className="nb-art-section">
             <h3 className="nb-world-h3">Aparições</h3>
             {inText.length === 0 && <p className="mb-3 text-[13px] text-[var(--nb-ink-3)]">Ainda não citado em nenhum texto. Digite + num capítulo ou nota para mencionar “{entry.title}”.</p>}
@@ -232,7 +276,14 @@ export function CodexArticle({
               <ul>
                 {inWorld.map((i) => (
                   <li key={i.id}>
-                    <button type="button" data-item-id={i.id} onClick={() => w.open(i.id)}>
+                    <button
+                      type="button"
+                      data-item-id={i.id}
+                      onClick={() => {
+                        if (i.template === 'map') focusOnMap(i.id, entry.id);
+                        w.open(i.id);
+                      }}
+                    >
                       <span className="text-[12px] text-[var(--nb-ink-3)]">{itemIcon(i)}</span>
                       <span className="truncate">{i.title}</span>
                     </button>

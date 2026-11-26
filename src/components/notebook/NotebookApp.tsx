@@ -52,7 +52,10 @@ import { PostComposer } from '@/components/feed/PostComposer';
 import { TopicWorkspaceView } from '@/components/feed/TopicWorkspaceView';
 import { useNotebook, type NotebookApi } from '@/lib/notebook/useNotebook';
 import { getTemplate, WORKSPACE_TEMPLATES, type NotebookTemplateDef } from '@/lib/notebook/templates';
-import { itemToPostBlocks } from '@/lib/notebook/toPostBlocks';
+import { htmlToPostBlocks, itemToPostBlocks } from '@/lib/notebook/toPostBlocks';
+import { articleData } from '@/lib/notebook/article';
+import { buildArticle, referenceHtml } from '@/lib/notebook/articleRender';
+import type { Source } from '@/lib/notebook/sources';
 import type { NotebookItem, NotebookTemplate } from '@/lib/notebook/types';
 import type { PostBlock, TopicTemplateType, TopicWorkspaceData } from '@/types/database';
 import { FileExplorer, itemIcon } from './FileExplorer';
@@ -568,6 +571,36 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       if (!full) return;
       const book = full.parent_id && api.items[full.parent_id]?.template === 'book' ? api.items[full.parent_id] : null;
       let blocks = itemToPostBlocks(full, book, entriesApi.entries);
+      // artigo: citações recalculadas, resumo, notas e referências pela norma
+      if (full.template === 'article') {
+        const art = articleData(full.data);
+        const ids = Array.from(new Set([...(full.source_refs || []), ...art.sources]));
+        const { data: rows } = ids.length ? await createClient().from('notebook_sources').select('*').in('id', ids) : { data: [] };
+        const srcMap: Record<string, Source> = {};
+        ((rows || []) as Source[]).forEach((r) => (srcMap[r.id] = { ...r, authors: Array.isArray(r.authors) ? r.authors : [], extra: r.extra || {} }));
+        const out = buildArticle(full.title, full.content, srcMap, art, full.source_refs || []);
+        const uid = () => Math.random().toString(36).slice(2);
+        const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        blocks = [
+          { id: uid(), type: 'h1', html: escH(full.title), fontStyle: 'serif' } as PostBlock,
+          ...(art.showPre && art.pre.subtitle.trim() ? [{ id: uid(), type: 'paragraph', html: `<em>${escH(art.pre.subtitle.trim())}</em>` } as PostBlock] : []),
+          ...(art.showPre && art.pre.abstract.trim() ? [{ id: uid(), type: 'quote', html: `<strong>Resumo:</strong> ${escH(art.pre.abstract.trim())}`, fontStyle: 'sans' } as PostBlock] : []),
+          ...htmlToPostBlocks(out.body, { entries: entriesApi.entries }),
+          ...(out.notes.length
+            ? [
+                { id: uid(), type: 'divider' } as PostBlock,
+                { id: uid(), type: 'h2', html: 'Notas' } as PostBlock,
+                ...out.notes.map((n, i) => ({ id: uid(), type: 'paragraph', html: `<sup>${i + 1}</sup> ${n}` }) as PostBlock),
+              ]
+            : []),
+          ...(out.references.length
+            ? [
+                { id: uid(), type: 'h2', html: escH(out.refTitle) } as PostBlock,
+                ...out.references.map((src) => ({ id: uid(), type: 'paragraph', html: referenceHtml(src, art.norm) }) as PostBlock),
+              ]
+            : []),
+        ];
+      }
       // verbete do Codex: Infobox vira tabela; segredos ficam de fora
       const cx = full.template === 'codex' ? codexData(full.data) : null;
       if (cx) {

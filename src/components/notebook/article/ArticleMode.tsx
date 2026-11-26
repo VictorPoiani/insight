@@ -18,6 +18,9 @@ import { RefText } from './RefText';
 import { CitationContext, insertCitation, type CitationTools } from '../editor/academic';
 import type { Editor } from '@tiptap/core';
 import 'katex/dist/katex.min.css';
+import { ArticleSheet } from './ArticleSheet';
+import { exportArticleDocx, exportArticleMarkdown } from './exportArticle';
+import { Download, FileText, PenLine } from 'lucide-react';
 
 type Heading = { el: HTMLElement; level: number; text: string; num: string };
 type Caption = { kind: 'figura' | 'tabela' | 'quadro' | 'grafico'; text: string; el: HTMLElement };
@@ -58,6 +61,8 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
     }
   }, [panels]);
   const [tab, setTab] = useState<PanelTab>('fontes');
+  const [view, setView] = useState<'escrita' | 'folha'>('escrita');
+  const [exporting, setExporting] = useState(false);
   const [dialog, setDialog] = useState<{ source: Source | null; title?: string } | null>(null);
   const [title, setTitle] = useState(live.title);
   useEffect(() => setTitle(live.title), [live.title]);
@@ -236,6 +241,53 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
           </label>
         )}
         <span className="flex-1" />
+        <div className="nb-art2-views" role="radiogroup" aria-label="Visualização">
+          <button type="button" role="radio" aria-checked={view === 'escrita'} onClick={() => setView('escrita')}>
+            <PenLine className="w-3.5 h-3.5" /> Escrita
+          </button>
+          <button type="button" role="radio" aria-checked={view === 'folha'} onClick={() => setView('folha')}>
+            <FileText className="w-3.5 h-3.5" /> Folha
+          </button>
+        </div>
+        <button
+          type="button"
+          disabled={exporting}
+          onClick={(e) =>
+            menu.open(
+              e,
+              [
+                { label: 'PDF diagramado (pela Folha)', icon: <FileText className="w-3.5 h-3.5" />, run: () => setView('folha') },
+                {
+                  label: 'Word (.docx) com notas de rodapé',
+                  icon: <Download className="w-3.5 h-3.5" />,
+                  run: async () => {
+                    setExporting(true);
+                    try {
+                      await api.flushAll();
+                      const cur = api.items[item.id] || live;
+                      await exportArticleDocx(cur.title, cur.content, sourcesApi.sources, articleData(cur.data), cur.source_refs || []);
+                    } catch (err) {
+                      alert(err instanceof Error ? `Não foi possível gerar o Word: ${err.message}` : 'Não foi possível gerar o Word.');
+                    }
+                    setExporting(false);
+                  },
+                },
+                {
+                  label: 'Markdown (.md)',
+                  icon: <Download className="w-3.5 h-3.5" />,
+                  run: () => {
+                    const cur = api.items[item.id] || live;
+                    exportArticleMarkdown(cur.title, cur.content, sourcesApi.sources, articleData(cur.data), cur.source_refs || []);
+                  },
+                },
+              ],
+              'Exportar artigo'
+            )
+          }
+          className="nb-world-btn"
+        >
+          <Download className="w-3.5 h-3.5" /> {exporting ? 'Gerando…' : 'Exportar'}
+        </button>
         <button type="button" aria-pressed={panels.outline} title="Estrutura" aria-label="Estrutura" onClick={() => setPanels((p) => ({ ...p, outline: !p.outline }))} className="nb-art2-toggle">
           <ListTree />
         </button>
@@ -297,7 +349,12 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
         )}
 
         {/* folha */}
-        <div className="nb-art2-paper" ref={paperRef}>
+        {view === 'folha' && (
+          <div className="nb-art2-folha">
+            <ArticleSheet title={live.title} md={live.content} sources={sourcesApi.sources} a={a} cited={cited} />
+          </div>
+        )}
+        <div className="nb-art2-paper" ref={paperRef} style={view === 'folha' ? { display: 'none' } : undefined}>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value.slice(0, 200))}

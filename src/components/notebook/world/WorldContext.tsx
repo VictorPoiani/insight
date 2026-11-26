@@ -22,6 +22,8 @@ export interface WorldTools {
   newVerbete: (projectId: string, categoryId: string | null, title?: string) => Promise<NotebookItem | null>;
   /** transforma uma menção solta em verbete do Codex */
   promoteEntry: (entry: NotebookEntry, categoryId: string | null) => Promise<NotebookItem | null>;
+  /** renomeia uma nota (atualiza os [[links]] das outras) */
+  rename: (id: string, title: string) => void;
   /** apaga o verbete (nota para a lixeira, menção removida) */
   removeVerbete: (entry: NotebookEntry) => Promise<void>;
 }

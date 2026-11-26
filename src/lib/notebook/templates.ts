@@ -3,6 +3,7 @@ import { buildInitialWorkspaceData } from '@/components/feed/TopicTabsManager';
 import type { NotebookItemData, NotebookTemplate } from './types';
 import { characterToMarkdown, emptyCharacter } from './character';
 import type { GlyphName } from './glyphs';
+import { newArticleData } from './article';
 
 export type TemplateSection = 'escrita' | 'livro' | 'textos' | 'workspaces';
 
@@ -342,31 +343,13 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     id: 'article',
     section: 'textos',
     name: 'Artigo',
-    description: 'Estrutura de artigo: resumo, desenvolvimento, conclusão e referências.',
+    description: 'Artigo profissional: ABNT, APA ou editorial, com resumo, seções numeradas, fontes e referências automáticas.',
     icon: 'pen',
     color: '#2563eb',
     kind: 'note',
     title: () => 'Novo artigo',
-    content: () =>
-      [
-        '---',
-        'status: rascunho',
-        'público: ',
-        'tags: artigo',
-        '---',
-        '',
-        '> [!dica] A tese em uma frase',
-        '> O que este artigo defende ou explica?',
-        '',
-        '## Introdução',
-        '',
-        '## Desenvolvimento',
-        '',
-        '## Conclusão',
-        '',
-        '## Referências',
-        '- ',
-      ].join('\n'),
+    content: () => ['## Introdução', '', '', '## Desenvolvimento', '', '', '## Conclusão', ''].join('\n'),
+    data: () => newArticleData() as unknown as NotebookItemData,
   },
 
   // ------------------------------------------------------------ workspaces dos tópicos

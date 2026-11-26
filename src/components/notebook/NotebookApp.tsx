@@ -67,6 +67,7 @@ import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
 import { CanvasStudio } from './canvas/CanvasStudio';
+import { ArticleMode } from './article/ArticleMode';
 import { ContextMenuProvider } from './menu/ContextMenu';
 import { GlobalContextMenus, type GlobalMenuActions } from './menu/GlobalMenus';
 import { WorldCalendar } from './worldtime/WorldCalendar';
@@ -737,6 +738,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       await entriesApi.update(entry.id, { target_id: it.id, codex_category_id: cat?.id ?? null, ...(cat ? { category: cat.kind } : {}) });
       return { ...it, data };
     },
+    rename: (id, t) => void rename(id, t),
     removeVerbete: async (entry) => {
       const t = entry.target_id ? api.items[entry.target_id] : null;
       if (t?.template === 'codex') {
@@ -1325,7 +1327,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     level={viewer.contributor_level}
                   />
                 ) : (
-                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' || active.template === 'codex' || isWorld(active) ? 'max-w-6xl' : 'max-w-3xl'}`}>
+                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' || active.template === 'codex' || isWorld(active) ? 'max-w-6xl' : active.template === 'article' ? 'max-w-[1480px]' : 'max-w-3xl'}`}>
                     {/* trilha + ações */}
                     <div className="flex items-center gap-2 mb-4 min-h-[28px]">
                       <nav className="flex items-center gap-1 text-[12px] text-[var(--nb-ink-3)] min-w-0 flex-1" aria-label="Caminho">
@@ -1380,7 +1382,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     </div>
 
                     {/* título */}
-                    {active.template !== 'codex' && <TitleInput key={`t-${active.id}-${reloadKey}`} item={active} onRename={(t) => void rename(active.id, t)} />}
+                    {active.template !== 'codex' && active.template !== 'article' && <TitleInput key={`t-${active.id}-${reloadKey}`} item={active} onRename={(t) => void rename(active.id, t)} />}
                     {active.published_post_id && (
                       <a href={`/post/${active.published_post_id}`} target="_blank" className="inline-flex items-center gap-1 mb-4 text-[11px] font-semibold text-purple-400 hover:underline">
                         <Sparkles className="w-3 h-3" /> publicado no Insight
@@ -1729,6 +1731,8 @@ function NoteBody({
       jumpTo={jump}
     />
   );
+  // artigo profissional: estrutura, folha, fontes e referências
+  if (item.template === 'article') return <ArticleMode item={item} api={api} body={editor} />;
   // verbete do Codex: o texto entra na página do verbete, dentro do Mundo
   if (item.template === 'codex') {
     const pid = projectOf(api.items, item);

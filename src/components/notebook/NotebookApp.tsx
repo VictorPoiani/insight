@@ -53,6 +53,7 @@ import { MarkdownEditor } from './MarkdownEditor';
 import { WriterMode } from './WriterMode';
 import { BookDashboard } from './BookDashboard';
 import { CharacterSheet } from './character/CharacterSheet';
+import { NoteEditor } from './editor/NoteEditor';
 import { convertCharacterItem } from './character/convert';
 import { NOTEBOOK_FEATURES } from '@/lib/notebook/copy';
 import { GraphView } from './GraphView';
@@ -989,8 +990,9 @@ function NoteBody({
     return <CharacterSheet item={item} api={api} role={viewer.role} level={viewer.contributor_level} />;
   }
 
+  const EditorCmp = NOTEBOOK_FEATURES.richEditor ? NoteEditor : MarkdownEditor;
   return (
-    <MarkdownEditor
+    <EditorCmp
       item={item}
       titles={titles}
       titleExists={titleExists}

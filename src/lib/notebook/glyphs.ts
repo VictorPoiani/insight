@@ -43,6 +43,7 @@ export const GLYPHS = {
   quote: '<path d="M10 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5H7.2M18.5 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5h-2.8"/>',
   todo: '<rect x="4.5" y="4.5" width="15" height="15" rx="3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8h.01"/>',
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

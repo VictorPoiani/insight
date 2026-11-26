@@ -11,6 +11,8 @@ export type ProjectType = 'livro' | 'poesia' | 'mundo' | 'artigos' | 'estudos' |
 export interface ProjectData {
   type: ProjectType;
   description?: string;
+  /** área Mundo (Codex, mapas, cronologia) ligada num projeto de outro tipo */
+  world?: boolean;
 }
 
 export interface ProjectSuggestion {
@@ -149,7 +151,14 @@ export function isProject(item: Pick<NotebookItem, 'kind' | 'parent_id' | 'templ
   return item.kind === 'folder' && item.template === 'folder' && !item.parent_id;
 }
 
+/** Projeto com a área Mundo (Worldbuilding). */
+export function isWorld(item: NotebookItem | null | undefined): boolean {
+  if (!item || !isProject(item)) return false;
+  const d = projectData(item);
+  return d.type === 'mundo' || !!d.world;
+}
+
 export function projectData(item: NotebookItem): ProjectData {
   const p = (item.data as Record<string, unknown> | null)?.project as ProjectData | undefined;
-  return { type: p?.type && PROJECT_TYPES.some((t) => t.id === p.type) ? p.type : 'livre', description: p?.description || '' };
+  return { type: p?.type && PROJECT_TYPES.some((t) => t.id === p.type) ? p.type : 'livre', description: p?.description || '', ...(p?.world ? { world: true } : {}) };
 }

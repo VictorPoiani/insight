@@ -44,7 +44,7 @@ export function ProjectHome({
     el.style.height = `${el.scrollHeight}px`;
   }, [desc]);
 
-  const setProject = (patch: Partial<{ type: ProjectType; description: string }>, debounce = 600) => {
+  const setProject = (patch: Partial<{ type: ProjectType; description: string; world: boolean }>, debounce = 600) => {
     const next = { ...projectData(item), ...patch };
     const extra: Partial<NotebookItem> = patch.type ? { icon: projectType(patch.type).glyph } : {};
     api.update(item.id, { ...extra, data: { ...(item.data || {}), project: next } }, { debounce });
@@ -117,6 +117,13 @@ export function ProjectHome({
             </button>
           ))}
         </div>
+        <p className="text-[12px] text-[var(--nb-ink-3)]">
+          Este projeto tem um mundo próprio?{' '}
+          <button type="button" onClick={() => setProject({ world: true }, 0)} className="font-semibold text-[var(--nb-ink-2)] underline underline-offset-2 hover:text-[var(--nb-ink)]">
+            Ativar a área Mundo
+          </button>{' '}
+          (Codex com Infobox, mapas, cronologia e relações).
+        </p>
       </section>
 
       {/* sugestões */}

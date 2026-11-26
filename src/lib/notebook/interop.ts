@@ -110,7 +110,7 @@ async function itemMarkdown(item: NotebookItem, api: NotebookApi): Promise<strin
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const WORKSPACES = new Set(['goals', 'habits', 'tasks', 'roadmap', 'mindmap', 'diet', 'agenda', 'map']);
+const WORKSPACES = new Set(['goals', 'habits', 'tasks', 'roadmap', 'mindmap', 'diet', 'agenda', 'map', 'calendar', 'timeline']);
 export const isWorkspace = (t: string) => WORKSPACES.has(t);
 
 // ============================================================ tabelas (CSV / Excel)
@@ -138,6 +138,26 @@ function itemTables(item: NotebookItem): Table[] {
     out.push({
       name: 'Roadmap',
       rows: [['Fase', 'Título', 'Descrição', 'Status', 'Quando'], ...d.roadmapSteps.map((s) => [s.phase, s.title, s.description, s.status, s.dateLabel || ''])],
+    });
+  }
+  const raw = (item.data || {}) as Record<string, unknown>;
+  const chronos = raw.chronos as { era?: string; events?: { year: number; title: string; summary?: string; major?: boolean }[]; eras?: { name: string; start: number; end: number }[] } | undefined;
+  if (chronos?.events?.length) {
+    out.push({
+      name: 'Cronos',
+      rows: [
+        ['Ano', 'Acontecimento', 'Resumo', 'Era', 'Marco'],
+        ...[...chronos.events]
+          .sort((a, b) => a.year - b.year)
+          .map((e) => [e.year, e.title, e.summary || '', chronos.eras?.find((r) => e.year >= r.start && e.year <= r.end)?.name || '', e.major ? 'sim' : '']),
+      ],
+    });
+  }
+  const worldcal = raw.worldcal as { era?: string; months?: { name: string }[]; events?: { year: number; month: number; day: number; title: string }[] } | undefined;
+  if (worldcal?.events?.length) {
+    out.push({
+      name: 'Calendário',
+      rows: [['Ano', 'Mês', 'Dia', 'Evento'], ...worldcal.events.map((e) => [e.year, worldcal.months?.[e.month]?.name || String(e.month + 1), e.day, e.title])],
     });
   }
   // tabelas dentro do markdown

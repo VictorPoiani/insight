@@ -59,6 +59,8 @@ import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
+import { WorldCalendar } from './worldtime/WorldCalendar';
+import { Chronos } from './worldtime/Chronos';
 import { ExportDialog, ImportResultDialog } from './interop/InteropDialogs';
 import { IMPORT_ACCEPT, exportAll, importFiles, type ImportResult } from '@/lib/notebook/interop';
 import { EntryDialog } from './entries/EntryDialog';
@@ -884,7 +886,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                     level={viewer.contributor_level}
                   />
                 ) : (
-                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) ? 'max-w-6xl' : 'max-w-3xl'}`}>
+                  <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-10 ${WORKSPACE_TEMPLATES.has(active.template) || active.template === 'calendar' || active.template === 'timeline' ? 'max-w-6xl' : 'max-w-3xl'}`}>
                     {/* trilha + ações */}
                     <div className="flex items-center gap-2 mb-4 min-h-[28px]">
                       <nav className="flex items-center gap-1 text-[12px] text-[var(--nb-ink-3)] min-w-0 flex-1" aria-label="Caminho">
@@ -1210,6 +1212,9 @@ function NoteBody({
       />
     );
   }
+
+  if (item.template === 'calendar') return <WorldCalendar item={item} api={api} />;
+  if (item.template === 'timeline') return <Chronos item={item} api={api} />;
 
   if (item.template === 'character' && NOTEBOOK_FEATURES.characterSheet) {
     return <CharacterSheet item={item} api={api} role={viewer.role} level={viewer.contributor_level} />;

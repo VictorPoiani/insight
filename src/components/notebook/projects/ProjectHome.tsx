@@ -252,6 +252,8 @@ function glyphFor(t: string) {
     character: 'character',
     world: 'world',
     map: 'map',
+    calendar: 'moon',
+    timeline: 'timeline',
     mindmap: 'mindmap',
     roadmap: 'roadmap',
     idea: 'idea',

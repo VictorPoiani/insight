@@ -57,7 +57,7 @@ export const entryKind = (k: string | null | undefined) => ENTRY_KINDS.find((x) 
 export const isEntryKind = (k: unknown): k is EntryKind => k === 'elemento' || k === 'nota_autor' || k === 'aviso';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const REF_RE = new RegExp(`(?:\\]\\(ref:|data-ref=\\\\?")(${UUID})`, 'gi');
+const REF_RE = new RegExp(`(?:\\]\\(ref:|data-ref=\\\\?"|"entryId":")(${UUID})`, 'gi');
 
 /** Ids de entradas citadas num texto (markdown, HTML ou JSON). */
 export function extractEntryRefs(...texts: (string | null | undefined)[]): string[] {

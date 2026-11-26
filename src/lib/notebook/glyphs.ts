@@ -43,6 +43,7 @@ export const GLYPHS = {
   quote: '<path d="M10 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5H7.2M18.5 7c-3 .8-4.5 3-4.5 6v4h4.5v-4.5h-2.8"/>',
   todo: '<rect x="4.5" y="4.5" width="15" height="15" rx="3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  timeline: '<path d="M3 12h18"/><circle cx="6" cy="12" r="2"/><circle cx="12.5" cy="12" r="2"/><circle cx="18.5" cy="12" r="2"/><path d="M6 10V6M12.5 14v4M18.5 10V6"/>',
   map: '<path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5L3.5 20z"/><path d="M9 4v13.5M15 6.5V20"/>',
   crown: '<path d="M4 17.5 3 7.5l5 4 4-6 4 6 5-4-1 10z"/><path d="M4.5 20.5h15"/>',
   gem: '<path d="M6.5 4h11l3.5 5-9 11L3 9z"/><path d="M3 9h18M9 4l-1.8 5L12 20l4.8-11L15 4"/>',

@@ -575,7 +575,7 @@ function MarkerEditor({ marker, onChange }: { marker: MapMarker; onChange: (p: P
 }
 
 /** Liga o marcador/região a uma menção (mostra a prévia ao passar o mouse). */
-function MentionPicker({ value, label, onChange }: { value: string | null; label: string; onChange: (id: string | null) => void }) {
+export function MentionPicker({ value, label, onChange }: { value: string | null; label: string; onChange: (id: string | null) => void }) {
   const links = useNotebookLinks();
   const all = Object.values(links.entries)
     .filter((e) => e.kind === 'elemento')
@@ -615,7 +615,7 @@ function MentionPicker({ value, label, onChange }: { value: string | null; label
           <Plus className="w-3 h-3" /> Criar menção “{label.slice(0, 24)}”
         </button>
       )}
-      {current && <p className="text-[11px] text-[var(--nb-ink-3)]">Passe o mouse no marcador para ver a prévia de {current.title}.</p>}
+      {current && <p className="text-[11px] text-[var(--nb-ink-3)]">Passe o mouse para ver a prévia de {current.title}.</p>}
     </div>
   );
 }

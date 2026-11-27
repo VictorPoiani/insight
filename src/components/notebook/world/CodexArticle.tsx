@@ -265,6 +265,7 @@ export function CodexArticle({
             }}
             onFields={() => cat && onEditCat(cat.parent_id && !cat.fields.length ? cat.parent_id : cat.id)}
             onSecretEntry={(v) => void w.entriesApi.update(entry.id, { is_secret: v })}
+            onPublicEntry={(v) => void w.entriesApi.update(entry.id, { is_public: v })}
             onOpenEntry={(id) => {
               const e = w.entriesApi.entries[id];
               if (e) w.readMore(e);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Files,
+  Eye,
   Images,
   Inbox,
   ListTodo,
@@ -76,6 +77,7 @@ import { CANVAS_CMD_EVENT, CANVAS_FRAMES_EVENT, CanvasStudio } from './canvas/Ca
 import { TrashDialog } from './trash/TrashDialog';
 import { AssetLibrary } from './assets/AssetLibrary';
 import { BackupDialog } from './backup/BackupDialog';
+import { ProofReader } from './publication/ProofReader';
 import { TodoPanel } from './todos/TodoPanel';
 import { QUICK_CAPTURE_EVENT, QUICK_CAPTURED_EVENT } from './QuickCapture';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
@@ -260,7 +262,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [left, setLeft] = useState<LeftMode>('files');
   const [right, setRight] = useState(false);
   const [picker, setPicker] = useState<{ parentId: string | null } | null>(null);
-  const [publishing, setPublishing] = useState<{ item: NotebookItem; blocks: PostBlock[] } | null>(null);
+  const [publishing, setPublishing] = useState<{ item: NotebookItem; blocks: PostBlock[]; publicationId?: string } | null>(null);
+  const [proof, setProof] = useState<string | null>(null);
   const [immersive, setImmersive] = useState(false);
   const [sideHidden, setSideHidden] = useState(false);
   const [projectDialog, setProjectDialog] = useState(false);
@@ -576,6 +579,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       } else if (k === 'o' || (k === 'k' && !(e.target as HTMLElement)?.closest?.('textarea'))) {
         e.preventDefault();
         setPalette({ mode: '', aside: false });
+      } else if (k === 'r' && e.altKey && activeId && view === 'note') {
+        e.preventDefault();
+        setProof(activeId);
       } else if (k === 'n' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         void newInContext();
@@ -608,59 +614,37 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       const full = item._full ? item : await api.loadFull(item.id);
       if (!full) return;
       const book = full.parent_id && api.items[full.parent_id]?.template === 'book' ? api.items[full.parent_id] : null;
-      let blocks = itemToPostBlocks(full, book, entriesApi.entries);
-      // artigo: citações recalculadas, resumo, notas e referências pela norma
-      if (full.template === 'article') {
-        const art = articleData(full.data);
-        const ids = Array.from(new Set([...(full.source_refs || []), ...art.sources]));
-        const { data: rows } = ids.length ? await createClient().from('notebook_sources').select('*').in('id', ids) : { data: [] };
-        const srcMap: Record<string, Source> = {};
-        ((rows || []) as Source[]).forEach((r) => (srcMap[r.id] = { ...r, authors: Array.isArray(r.authors) ? r.authors : [], extra: r.extra || {} }));
-        const out = buildArticle(full.title, full.content, srcMap, art, full.source_refs || []);
-        const uid = () => Math.random().toString(36).slice(2);
-        const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-        blocks = [
-          { id: uid(), type: 'h1', html: escH(full.title), fontStyle: 'serif' } as PostBlock,
-          ...(art.showPre && art.pre.subtitle.trim() ? [{ id: uid(), type: 'paragraph', html: `<em>${escH(art.pre.subtitle.trim())}</em>` } as PostBlock] : []),
-          ...(art.showPre && art.pre.abstract.trim() ? [{ id: uid(), type: 'quote', html: `<strong>Resumo:</strong> ${escH(art.pre.abstract.trim())}`, fontStyle: 'sans' } as PostBlock] : []),
-          ...htmlToPostBlocks(out.body, { entries: entriesApi.entries }),
-          ...(out.notes.length
-            ? [
-                { id: uid(), type: 'divider' } as PostBlock,
-                { id: uid(), type: 'h2', html: 'Notas' } as PostBlock,
-                ...out.notes.map((n, i) => ({ id: uid(), type: 'paragraph', html: `<sup>${i + 1}</sup> ${n}` }) as PostBlock),
-              ]
-            : []),
-          ...(out.references.length
-            ? [
-                { id: uid(), type: 'h2', html: escH(out.refTitle) } as PostBlock,
-                ...out.references.map((src) => ({ id: uid(), type: 'paragraph', html: referenceHtml(src, art.norm) }) as PostBlock),
-              ]
-            : []),
-        ];
+      if (full.template === 'blocks') {
+        setPublishing({ item: full, blocks: itemToPostBlocks(full, book, entriesApi.entries) });
+        return;
       }
-      // verbete do Codex: Infobox vira tabela; segredos ficam de fora
-      const cx = full.template === 'codex' ? codexData(full.data) : null;
-      if (cx) {
-        const entry = entriesApi.entries[cx.entry];
-        if (entry?.is_secret) {
-          alert('Este verbete está marcado como segredo do autor e não pode ser publicado.');
-          return;
-        }
-        const cat = entry?.codex_category_id ? codex.cats[entry.codex_category_id] : null;
-        const parent = cat?.parent_id ? codex.cats[cat.parent_id] : null;
-        const fields = cat?.fields?.length ? cat.fields : parent?.fields || [];
-        const titleOf = (id: string) => (entriesApi.entries[id] && !entriesApi.entries[id].is_secret ? entriesApi.entries[id].title : null);
-        const rows = fields
-          .filter((f) => !isEmptyValue(cx.infobox[f.key]) && !cx.infobox[f.key]?.secret)
-          .map((f) => [f.label, valueText(cx.infobox[f.key], titleOf)])
-          .filter(([, v]) => v);
-        const lead: PostBlock[] = [];
-        if (entry?.summary) lead.push({ id: Math.random().toString(36).slice(2), type: 'paragraph', html: entry.summary.replace(/&/g, '&amp;').replace(/</g, '&lt;') });
-        if (rows.length) lead.push({ id: Math.random().toString(36).slice(2), type: 'table', tableData: rows });
-        blocks = [blocks[0], ...lead, ...blocks.slice(1)];
+      // montado no SERVIDOR: segredos do autor, verbetes não públicos e pendências saem lá
+      let pub: { publicationId: string; title: string; html: string; entries: Record<string, NotebookEntry> } | null = null;
+      try {
+        const r = await fetch('/api/notebook/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: full.id, mode: 'prepare' }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) return void alert(d?.error || 'Não foi possível preparar a publicação.');
+        pub = d;
+      } catch {
+        return void alert('Sem conexão: a publicação é preparada no servidor.');
       }
-      setPublishing({ item: full, blocks });
+      if (!pub) return;
+      const uid = () => Math.random().toString(36).slice(2);
+      const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      const chapter = full.template === 'chapter';
+      const head: PostBlock[] = [];
+      if (chapter && book) head.push({ id: uid(), type: 'callout', html: escH(book.title), calloutIcon: '📖', fontStyle: 'serif' } as PostBlock);
+      head.push({ id: uid(), type: 'h1', html: escH(full.title), fontStyle: chapter ? 'serif' : 'sans', ...(chapter ? { align: 'center' } : {}) } as PostBlock);
+      const note = chapter ? String(full.data?.authorNote || '').trim() : '';
+      const blocks: PostBlock[] = [
+        ...head,
+        ...htmlToPostBlocks(pub.html, { font: chapter ? 'serif' : 'sans', entries: pub.entries }),
+        ...(note ? [{ id: uid(), type: 'divider' } as PostBlock, { id: uid(), type: 'quote', html: `<strong>Nota do autor:</strong> ${escH(note)}`, fontStyle: 'sans' } as PostBlock] : []),
+        ...(Object.keys(pub.entries).length
+          ? [{ id: uid(), type: 'paragraph', html: `<a href="/n/${pub.publicationId}">Ler com o Sumário interativo</a>`, fontStyle: 'sans' } as PostBlock]
+          : []),
+      ];
+      setPublishing({ item: full, blocks, publicationId: pub.publicationId });
     },
     [api, entriesApi.entries, codex.cats]
   );
@@ -938,6 +922,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
     { id: 'canvas', group: 'Criar', label: 'Novo canvas', icon: <Glyph name="canvas" />, keywords: 'quadro obsidian cartoes', run: () => void newInContext('canvas') },
     { id: 'capture', group: 'Criar', label: 'Capturar ideia na Caixa de entrada', icon: ic(Inbox), shortcut: 'Ctrl+Alt+N', keywords: 'inbox rapida quick', run: () => window.dispatchEvent(new Event(QUICK_CAPTURE_EVENT)) },
+    ...(noteOpen && active!.kind === 'note' ? [{ id: 'proof', group: 'Nota atual', label: 'Prova final (como o leitor vai ver)', icon: ic(Eye), shortcut: 'Ctrl+Alt+R', keywords: 'leitura preview previa diagramacao', run: () => setProof(active!.id) }] : []),
     { id: 'library', group: 'Notebook', label: 'Biblioteca de mídias', icon: ic(Images), keywords: 'imagens arquivos r2 midia orfas assets', run: () => setLibOpen(true) },
     { id: 'trash-open', group: 'Notebook', label: 'Abrir a lixeira', icon: ic(Trash2), keywords: 'apagados restaurar excluidos', run: () => setTrashOpen(true) },
     { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
@@ -1471,6 +1456,16 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                           <Send className="w-3 h-3" /> Publicar
                         </button>
                       )}
+                      {active.kind === 'note' && !['blocks', 'canvas', 'map', 'mindmap', 'calendar', 'timeline'].includes(active.template) && !getTemplate(active.template).workspace && (
+                        <button
+                          type="button"
+                          onClick={() => setProof(active.id)}
+                          title="Prova final: como o leitor vai ver (Ctrl+Alt+R)"
+                          className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[var(--nb-line)] text-[var(--nb-ink-2)] text-[11px] font-bold hover:text-[var(--nb-ink)]"
+                        >
+                          <Eye className="w-3 h-3" /> Prova final
+                        </button>
+                      )}
                       <div className="relative">
                         <button
                           type="button"
@@ -1626,6 +1621,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           setImportResult(res);
         }}
       />
+      {proof && <ProofReader itemId={proof} onClose={() => setProof(null)} />}
       {backupOpen && <BackupDialog api={api} entries={entriesApi.entries} projectId={currentProjectId ?? null} onClose={() => setBackupOpen(false)} />}
       {libOpen && viewer.id && <AssetLibrary api={api} profileId={viewer.id} entries={entriesApi.entries} projectId={currentProjectId ?? null} onOpen={open} onClose={() => setLibOpen(false)} />}
       {trashOpen && viewer.id && (
@@ -1707,6 +1703,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
               draftScopeOverride={`notebook:publish:${publishing.item.id}`}
               onPublished={(postId) => {
                 const it = publishing.item;
+                // a cópia montada no servidor fica pública e ligada ao post
+                if (publishing.publicationId)
+                  void fetch('/api/notebook/publish/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publicationId: publishing.publicationId, postId }) });
                 api.update(it.id, {
                   published_post_id: postId,
                   ...(it.template === 'chapter' ? { data: { ...(api.items[it.id]?.data || it.data), status: 'publicado' } } : {}),

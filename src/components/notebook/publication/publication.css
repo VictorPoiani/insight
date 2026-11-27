@@ -1,0 +1,89 @@
+/* Leitor final do Notebook (Prova Final e página pública): editorial, sóbrio. */
+.pub {
+  --p-ink: #e7e5e4;
+  --p-ink-2: #b8b5b2;
+  --p-ink-3: #8a8784;
+  --p-line: rgba(255, 255, 255, 0.08);
+  --p-bg: #0e0e10;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 72px 24px 120px;
+  color: var(--p-ink);
+}
+.pub-head h1 { font-family: var(--font-literata, Georgia), Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 600; line-height: 1.12; letter-spacing: -0.01em; }
+.pub-byline { margin-top: 14px; padding-bottom: 22px; border-bottom: 1px solid var(--p-line); font-size: 13px; color: var(--p-ink-3); }
+.pub-body { margin-top: 32px; font-family: var(--font-literata, Georgia), Georgia, 'Times New Roman', serif; font-size: 1.125rem; line-height: 1.78; color: var(--p-ink); }
+.pub-body > * + * { margin-top: 1.1em; }
+.pub-body h1, .pub-body h2, .pub-body h3, .pub-body h4 { font-family: inherit; font-weight: 600; line-height: 1.25; margin-top: 2em; color: var(--p-ink); }
+.pub-body h1 { font-size: 1.7rem; }
+.pub-body h2 { font-size: 1.45rem; }
+.pub-body h3 { font-size: 1.2rem; }
+.pub-body a { color: var(--p-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, 0.35); }
+.pub-body blockquote { padding-left: 18px; border-left: 2px solid var(--p-line); color: var(--p-ink-2); font-style: italic; }
+.pub-body ul, .pub-body ol { padding-left: 1.4em; }
+.pub-body ul { list-style: disc; }
+.pub-body ol { list-style: decimal; }
+.pub-body li + li { margin-top: 0.3em; }
+.pub-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.pub-body figure { margin: 1.6em 0; }
+.pub-body figcaption { margin-top: 8px; font-family: system-ui, sans-serif; font-size: 13px; color: var(--p-ink-3); text-align: center; }
+.pub-body hr { border: 0; border-top: 1px solid var(--p-line); margin: 2.4em auto; width: 40%; }
+.pub-body code { padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); font-size: 0.85em; }
+.pub-body pre { padding: 14px 16px; border-radius: 6px; border: 1px solid var(--p-line); overflow-x: auto; font-size: 0.82em; }
+.pub-body table { width: 100%; border-collapse: collapse; font-family: system-ui, sans-serif; font-size: 0.85em; }
+.pub-body th, .pub-body td { padding: 8px 10px; border-bottom: 1px solid var(--p-line); text-align: left; vertical-align: top; }
+.pub-body th { color: var(--p-ink-3); font-weight: 600; }
+.pub-body mark { background: rgba(250, 204, 21, 0.18); color: inherit; padding: 0 2px; }
+/* termos do Sumário */
+.pub-body [data-ref] { border-bottom: 1px dotted rgba(255, 255, 255, 0.45); cursor: help; outline: none; }
+.pub-body [data-ref]:hover, .pub-body [data-ref]:focus-visible { border-bottom-style: solid; background: rgba(255, 255, 255, 0.04); }
+.pub-body [data-kind='nota_autor'] { border-bottom-color: rgba(167, 139, 250, 0.7); }
+.pub-body [data-kind='aviso'] { border-bottom-color: rgba(240, 160, 122, 0.8); }
+/* destaques (callouts) */
+.pub-body .nb-callout { padding: 14px 16px; border: 1px solid var(--p-line); border-radius: 6px; font-family: system-ui, sans-serif; font-size: 0.92rem; line-height: 1.6; }
+.pub-body .nb-callout__title { font-weight: 600; margin-bottom: 4px; }
+.pub-body .nb-callout__body > * + * { margin-top: 0.6em; }
+.pub-body .nb-longquote { margin-left: 4em; font-size: 0.92em; font-style: normal; border: 0; padding: 0; }
+/* artigo */
+.pub-body .ar-subtitle { font-style: italic; color: var(--p-ink-2); }
+.pub-body .ar-authors { font-family: system-ui, sans-serif; font-size: 13px; color: var(--p-ink-3); }
+.pub-body .ar-abstract, .pub-body .ar-keywords { font-size: 0.95em; color: var(--p-ink-2); }
+.pub-body .nb-fn-ref { font-size: 0.7em; vertical-align: super; color: var(--p-ink-3); }
+.pub-body .pub-notes, .pub-body .pub-refs { margin-top: 3em; padding-top: 1.4em; border-top: 1px solid var(--p-line); font-size: 0.9em; color: var(--p-ink-2); }
+.pub-body .pub-notes h2, .pub-body .pub-refs h2 { font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; font-family: system-ui, sans-serif; color: var(--p-ink-3); margin-top: 0; }
+.pub-body .pub-ref { padding-left: 1.4em; text-indent: -1.4em; }
+.pub-body .pub-lead { font-size: 1.2rem; color: var(--p-ink-2); }
+.pub-body .pub-infobox { max-width: 26rem; }
+/* balão do Sumário */
+.pub-pop {
+  position: fixed;
+  z-index: 300;
+  width: 320px;
+  transform: translateY(-100%);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #161618;
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  color: #e7e5e4;
+}
+.pub-pop[data-below] { transform: none; }
+.pub-pop > img { width: 100%; height: 132px; object-fit: cover; }
+.pub-pop-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+.pub-pop-kind { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
+.pub-pop-body strong { font-family: var(--font-literata, Georgia), Georgia, serif; font-size: 1.05rem; font-weight: 600; }
+.pub-pop-body p { font-size: 13px; line-height: 1.5; color: #b8b5b2; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.pub-pop-more { align-self: flex-start; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #e7e5e4; text-decoration: underline; text-underline-offset: 3px; }
+/* página do verbete */
+.pub-entry h1 { margin-top: 10px; font-family: var(--font-literata, Georgia), Georgia, serif; font-size: clamp(1.8rem, 4.5vw, 2.5rem); font-weight: 600; }
+.pub-back { display: inline-block; margin-bottom: 28px; font-size: 13px; color: var(--p-ink-3); }
+.pub-back:hover { color: var(--p-ink); }
+.pub-entry-alias { margin-top: 6px; font-size: 13px; color: var(--p-ink-3); }
+.pub-entry-img { width: 100%; max-height: 420px; object-fit: cover; margin-top: 22px; border-radius: 6px; }
+.pub-entry-summary { margin-top: 22px; font-family: var(--font-literata, Georgia), Georgia, serif; font-size: 1.15rem; line-height: 1.75; color: var(--p-ink); white-space: pre-wrap; }
+@media (max-width: 640px) {
+  .pub { padding: 40px 18px 96px; }
+  .pub-body { font-size: 1.05rem; }
+  .pub-pop { left: 12px !important; right: 12px; width: auto; }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookMarked, ImagePlus, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { BookMarked, ImagePlus, GripVertical, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { ENTRY_CATEGORIES, ENTRY_KINDS, entryLook, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
 import { EntryAvatar, EntrySidePanel, FamilyTree, MentionGraph, RelationsEditor } from './MentionViews';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -288,8 +288,22 @@ function EntryCard({
     <div
       id={`entry-${entry.id}`}
       ref={ref}
-      className={`rounded-2xl border bg-[var(--nb-pane)] p-4 transition-colors ${focus ? 'border-[var(--nb-hl)]' : 'border-[var(--nb-line)]'}`}
+      className={`relative rounded-2xl border bg-[var(--nb-pane)] p-4 transition-colors ${focus ? 'border-[var(--nb-hl)]' : 'border-[var(--nb-line)]'}`}
     >
+      {/* arraste para um canvas aberto ao lado */}
+      <span
+        className="nb-entry-grip"
+        draggable
+        title="Arraste para um canvas"
+        aria-label="Arrastar para um canvas"
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/x-insight-entry', entry.id);
+          e.dataTransfer.setData('text/plain', entry.title);
+          e.dataTransfer.effectAllowed = 'copy';
+        }}
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </span>
       <div className="flex items-start gap-3">
         <button
           type="button"

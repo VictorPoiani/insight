@@ -10,9 +10,11 @@
  * - imagens enviadas sem perda para o R2 (aparecem na hora, sobem por trás).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BringToFront, ChevronRight, ClipboardPaste, Copy, ExternalLink, FileText, Focus, Group, ImagePlus, LayoutGrid, Lock, LockOpen, Maximize, Scissors, SendToBack, StickyNote, Trash2, Ungroup } from 'lucide-react';
+import { BookMarked, BringToFront, ChevronRight, ClipboardPaste, Copy, ExternalLink, FileText, Focus, Globe, Group, ImagePlus, LayoutGrid, LayoutTemplate, Lock, LockOpen, Maximize, Paperclip, Scissors, SendToBack, StickyNote, Trash2, Ungroup } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
+import type { EntriesApi } from '@/lib/notebook/useEntries';
+import type { NotebookEntry } from '@/lib/notebook/entries';
 import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import { CANVAS_COLORS, autoSides, cuid, edgePath, sidePoint, toJsonCanvas, canvasColor, type CanvasData, type CanvasEdge, type CanvasNode, type CanvasSide } from '@/lib/notebook/canvas';
 import {
@@ -35,11 +37,14 @@ import {
   type Guide,
 } from '@/lib/notebook/canvasGeom';
 import { useCanvasDoc } from '@/lib/notebook/useCanvasDoc';
-import { formatSize, imageSize, uploadCanvasImage } from '@/lib/notebook/canvasMedia';
+import { CANVAS_FILE, CANVAS_TEXT, formatSize, imageSize, uploadCanvasFile, uploadCanvasImage } from '@/lib/notebook/canvasMedia';
+import { clipPage, fetchExternalImage, type PluginResult } from '@/lib/notebook/canvasPlugins';
+import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
+import { PluginPanel, PLUGIN_DRAG } from './CanvasPlugins';
 import { Glyph } from '../icons/Glyph';
 import { useNotebookMenu, type MenuEntry } from '../menu/ContextMenu';
 import { CanvasNodeView, type NodeCtx } from './CanvasNodeView';
-import { HelpPanel, NotePicker, RightRail, SelectionBar, type CanvasPrefs } from './CanvasChrome';
+import { EntryPicker, HelpPanel, NotePicker, RightRail, SelectionBar, TemplateMenu, type CanvasPrefs } from './CanvasChrome';
 
 type View = { x: number; y: number; k: number };
 type Gesture =
@@ -57,6 +62,9 @@ const GRID = 20;
 const CLIP_MARK = 'insight-canvas/v1:';
 const PREFS_KEY = 'nb-canvas-prefs';
 const IMG_W = 400;
+const ENTRY_DRAG = 'application/x-insight-entry';
+/** Pedido vindo de fora (paleta de comandos): { id do canvas, comando }. */
+export const CANVAS_CMD_EVENT = 'nb-canvas-cmd';
 
 const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
 const isField = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable="true"]');
@@ -69,6 +77,8 @@ export function CanvasStudio({
   onRename,
   role,
   level,
+  entriesApi,
+  onOpenEntry,
 }: {
   item: NotebookItem;
   api: NotebookApi;
@@ -77,9 +87,12 @@ export function CanvasStudio({
   onRename: (t: string) => void;
   role?: string | null;
   level?: number | null;
+  entriesApi?: EntriesApi;
+  onOpenEntry?: (e: NotebookEntry) => void;
 }) {
   const menu = useNotebookMenu();
-  const doc = useCanvasDoc(item, api);
+  const entries = entriesApi?.entries || {};
+  const doc = useCanvasDoc(item, api, (id) => entriesApi?.entries[id]?.title || null);
   const { data, dataRef, commit, live, silent } = doc;
 
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
@@ -101,6 +114,9 @@ export function CanvasStudio({
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
   const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
+  const [entryPicker, setEntryPicker] = useState<{ x: number; y: number } | null>(null);
+  const [templates, setTemplates] = useState(false);
+  const [plugins, setPlugins] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const [uploads, setUploads] = useState(0);
   const [title, setTitle] = useState(item.title);
@@ -276,7 +292,7 @@ export function CanvasStudio({
     const t = text.trim();
     if (!t) return;
     if (t.startsWith(CLIP_MARK)) return pasteClip(t, at);
-    if (/^https?:\/\/\S+$/.test(t)) addNodes([{ id: cuid(), type: 'link', x: Math.round(at[0] - 160), y: Math.round(at[1] - 45), width: 320, height: 90, url: t.slice(0, 2000) }]);
+    if (/^https?:\/\/\S+$/.test(t)) addLink(t, at);
     else addNodes([{ id: cuid(), type: 'text', x: Math.round(at[0] - 150), y: Math.round(at[1] - 60), width: 300, height: Math.min(400, 80 + Math.ceil(t.length / 40) * 22), text: t.slice(0, 20000) }]);
   };
   const copySel = async (cut = false) => {
@@ -309,7 +325,120 @@ export function CanvasStudio({
   };
 
   // ------------------------------------------------------------ mídia (R2, sem perda)
-  async function addImages(files: File[], x: number, y: number) {
+  /** Qualquer arquivo: imagem, PDF/áudio/vídeo ou texto (vira cartão). */
+  async function addFiles(files: File[], x: number, y: number) {
+    const imgs = files.filter((f) => f.type.startsWith('image/'));
+    const media = files.filter((f) => CANVAS_FILE.test(f.type));
+    const texts = files.filter((f) => !f.type.startsWith('image/') && !CANVAS_FILE.test(f.type) && (CANVAS_TEXT.test(f.type) || CANVAS_TEXT.test(f.name)));
+    const other = files.filter((f) => !imgs.includes(f) && !media.includes(f) && !texts.includes(f));
+    if (other.length) alert(`Este tipo de arquivo ainda não entra no canvas: ${other.map((f) => f.name).join(', ')}.`);
+    let dy = 0;
+    if (texts.length) {
+      const made: CanvasNode[] = [];
+      for (const [i, f] of texts.slice(0, 20).entries()) {
+        if (f.size > 2_000_000) {
+          alert(`${f.name}: texto grande demais para um cartão.`);
+          continue;
+        }
+        const body = (await f.text()).replace(/\r\n/g, '\n').slice(0, 20000);
+        const title = f.name.replace(/\.(md|markdown|txt)$/i, '');
+        made.push({ id: cuid(), type: 'text', x: Math.round(x - 170 + i * 30), y: Math.round(y - 120 + i * 30), width: 340, height: 260, text: /^#\s/.test(body) ? body : `# ${title}\n\n${body}` });
+      }
+      if (made.length) addNodes(made);
+      dy += 300;
+    }
+    if (media.length) void addMedia(media, x, y + dy), (dy += 380);
+    if (imgs.length) void addImages(imgs, x, y + dy);
+  }
+
+  async function addMedia(files: File[], x: number, y: number) {
+    const budget = getUserUploadLimitBytes(level ?? 0, role ?? undefined);
+    const made = files.slice(0, 12).map((f, i) => {
+      const kind = f.type === 'application/pdf' ? 'pdf' : f.type.startsWith('audio/') ? 'audio' : 'video';
+      const [w, h] = kind === 'pdf' ? [420, 560] : kind === 'audio' ? [360, 110] : [480, 310];
+      const node: CanvasNode = { id: cuid(), type: 'file', x: Math.round(x - w / 2 + i * 40), y: Math.round(y - h / 2 + i * 40), width: w, height: h, url: URL.createObjectURL(f), label: f.name, mime: f.type, bytes: f.size, pending: true };
+      return { node, file: f };
+    });
+    addNodes(made.map((m) => m.node));
+    setUploads((u) => u + made.length);
+    await Promise.all(
+      made.map(async ({ node, file }) => {
+        try {
+          const up = await uploadCanvasFile(file, { itemId: item.id, profileId: item.profile_id, budgetBytes: budget });
+          silent((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === node.id ? { ...n, url: up.url, assetId: up.assetId, bytes: up.bytes, pending: undefined } : n)) }));
+          setTimeout(() => URL.revokeObjectURL(node.url!), 4000);
+        } catch (err) {
+          silent((d) => ({ nodes: d.nodes.filter((n) => n.id !== node.id), edges: d.edges.filter((e) => e.fromNode !== node.id && e.toNode !== node.id) }));
+          URL.revokeObjectURL(node.url!);
+          alert(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
+        } finally {
+          setUploads((u) => u - 1);
+        }
+      })
+    );
+  }
+
+  /** Cartão de link: aparece na hora e ganha a prévia (título, imagem) do servidor. */
+  const addLink = (url: string, at: [number, number], meta?: CanvasNode['meta']) => {
+    const id = cuid();
+    const rich = !!(meta && (meta.title || meta.image));
+    addNodes([{ id, type: 'link', x: Math.round(at[0] - 180), y: Math.round(at[1] - (rich ? 150 : 45)), width: 360, height: rich ? (meta?.image ? 300 : 150) : 90, url: url.slice(0, 2000), meta: meta || undefined }]);
+    if (meta) return;
+    clipPage(url)
+      .then((m) => {
+        if (m.isImage) return;
+        if (!m.title && !m.image) return;
+        silent((d) => ({
+          ...d,
+          nodes: d.nodes.map((n) => (n.id === id ? { ...n, meta: { title: m.title, description: m.description, image: m.image, site: m.site }, height: Math.max(n.height, m.image ? 300 : 150) } : n)),
+        }));
+      })
+      .catch(() => {
+        /* fica o link simples */
+      });
+  };
+
+  const addEntry = (e: NotebookEntry, at: [number, number]) =>
+    addNodes([{ id: cuid(), type: 'entry', x: Math.round(at[0] - 170), y: Math.round(at[1] - 110), width: 340, height: e.image_url ? 300 : 200, entryId: e.id, label: e.title }]);
+
+  const addTemplate = (id: string) => {
+    const t = CANVAS_TEMPLATES.find((x) => x.id === id);
+    if (!t) return;
+    const [cx, cy] = center();
+    let built = t.build(cx, cy);
+    // não cobre o que já existe: vai para o espaço livre à direita
+    const bb = bboxOf(built.nodes);
+    const taken = bboxOf(dataRef.current.nodes);
+    if (bb && taken && intersects({ x: bb.x - 80, y: bb.y - 80, width: bb.width + 160, height: bb.height + 160 }, taken)) {
+      const dx = taken.x + taken.width + 200 - bb.x;
+      const dy = taken.y - bb.y;
+      built = { ...built, nodes: built.nodes.map((n) => ({ ...n, x: n.x + dx, y: n.y + dy })) };
+    }
+    const groupsFirst = [...built.nodes.filter((n) => n.type === 'group'), ...built.nodes.filter((n) => n.type !== 'group')];
+    commit({ nodes: [...dataRef.current.nodes, ...groupsFirst], edges: [...dataRef.current.edges, ...built.edges] }, undefined, 200);
+    setSel(new Set(built.nodes.map((n) => n.id)));
+    setTimeout(() => zoomTo(bboxOf(built.nodes), 1), 30);
+  };
+
+  /** Resultado de um plugin entra no canvas. */
+  const insertResult = async (r: PluginResult, at: [number, number] = center()) => {
+    if (r.kind === 'text') {
+      addNodes([{ id: cuid(), type: 'text', x: Math.round(at[0] - 180), y: Math.round(at[1] - 140), width: 360, height: 280, text: `## ${r.title}\n\n${r.text}\n\n[Wikipedia](${r.url})` }]);
+      return;
+    }
+    if (r.kind === 'link') return addLink(r.url, at, { title: r.title, description: r.description, image: r.image, site: r.site });
+    try {
+      setUploads((u) => u + 1);
+      const f = await fetchExternalImage(r.full, r.title);
+      await addImages([f], at[0], at[1], r.credit);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível trazer a imagem.');
+    } finally {
+      setUploads((u) => u - 1);
+    }
+  };
+
+  async function addImages(files: File[], x: number, y: number, credit?: string) {
     const list = files.filter((f) => f.type.startsWith('image/')).slice(0, 30);
     if (!list.length) return;
     const budget = getUserUploadLimitBytes(level ?? 0, role ?? undefined);
@@ -336,6 +465,7 @@ export function CanvasStudio({
           bytes: f.size,
           natW: s?.width,
           natH: s?.height,
+          credit,
           pending: true,
         },
       });
@@ -595,7 +725,8 @@ export function CanvasStudio({
       e.stopPropagation();
       if (n.type === 'text' || n.type === 'group') setEditing(n.id);
       else if (n.type === 'note' && n.itemId) onOpen(n.itemId);
-      else if ((n.type === 'link' || n.type === 'image') && n.url && !n.pending) window.open(n.url, '_blank', 'noopener,noreferrer');
+      else if ((n.type === 'link' || n.type === 'image' || n.type === 'file') && n.url && !n.pending) window.open(n.url, '_blank', 'noopener,noreferrer');
+      else if (n.type === 'entry' && n.entryId && entries[n.entryId]) onOpenEntry?.(entries[n.entryId]);
     },
     menu: (e, n) => nodeMenu(e, n),
     resize: (e, n, dir) => {
@@ -618,6 +749,7 @@ export function CanvasStudio({
       if (cur && (cur.label || '') !== label) mapNodes(new Set([n.id]), (x) => ({ ...x, label }));
     },
     openNote: (id) => onOpen(id),
+    openEntry: (id) => entries[id] && onOpenEntry?.(entries[id]),
     linkClick: (e) => {
       const a = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
       if (!a) return;
@@ -638,6 +770,7 @@ export function CanvasStudio({
       finishText: (n, t) => ctxRef.current.finishText(n, t),
       finishLabel: (n, t) => ctxRef.current.finishLabel(n, t),
       openNote: (id) => ctxRef.current.openNote(id),
+      openEntry: (id) => ctxRef.current.openEntry(id),
       linkClick: (e) => ctxRef.current.linkClick(e),
       titleExists: (t) => ctxRef.current.titleExists(t),
     }),
@@ -737,7 +870,13 @@ export function CanvasStudio({
     const onPaste = (e: ClipboardEvent) => {
       if (isField(e.target) || !alive()) return;
       const at = dropPoint();
-      const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
+      const all = Array.from(e.clipboardData?.files || []);
+      const files = all.filter((f) => f.type.startsWith('image/'));
+      if (all.length > files.length) {
+        e.preventDefault();
+        void addFiles(all, at[0], at[1]);
+        return;
+      }
       if (files.length) {
         e.preventDefault();
         void addImages(
@@ -767,6 +906,36 @@ export function CanvasStudio({
       window.removeEventListener('paste', onPaste);
     };
   });
+
+  // ------------------------------------------------------------ comandos da paleta (Ctrl+P)
+  const cmdRef = useRef<(cmd: string) => void>(() => {});
+  cmdRef.current = (cmd: string) => {
+    const [x, y] = center();
+    if (cmd === 'text') addNodes([{ id: cuid(), type: 'text', x: Math.round(x - 130), y: Math.round(y - 60), width: 260, height: 120, text: '' }], true);
+    else if (cmd === 'note') setPicker({ x, y });
+    else if (cmd === 'file') ((filePoint.current = [x, y]), fileRef.current?.click());
+    else if (cmd === 'entry') setEntryPicker({ x, y });
+    else if (cmd === 'templates') setTemplates(true);
+    else if (cmd.startsWith('template:')) addTemplate(cmd.slice(9));
+    else if (cmd.startsWith('plugin:')) setPlugins(cmd.slice(7));
+    else if (cmd === 'fit') fit();
+    else if (cmd === 'zoomSel') zoomSel();
+    else if (cmd === 'selectAll') setSel(new Set(dataRef.current.nodes.map((n) => n.id)));
+    else if (cmd === 'snap') setPrefs({ ...prefsRef.current, snap: !prefsRef.current.snap });
+    else if (cmd === 'grid') setPrefs({ ...prefsRef.current, grid: !prefsRef.current.grid });
+    else if (cmd === 'help') setHelp(true);
+    else if (cmd === 'download') download();
+    else if (cmd === 'group') addGroup(x, y, selRef.current);
+    else if (cmd === 'arrange' && selRef.current.size > 1) doGrid();
+  };
+  useEffect(() => {
+    const h = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; cmd: string }>).detail;
+      if (d?.id === item.id && boxRef.current?.isConnected) cmdRef.current(d.cmd);
+    };
+    window.addEventListener(CANVAS_CMD_EVENT, h);
+    return () => window.removeEventListener(CANVAS_CMD_EVENT, h);
+  }, [item.id]);
 
   // ------------------------------------------------------------ menus por alvo
   function nodeMenu(e: React.MouseEvent, n: CanvasNode) {
@@ -869,6 +1038,15 @@ export function CanvasStudio({
             ]
           : [])
       );
+    if (n.type === 'file' && n.url && !n.pending)
+      specific.push(
+        { label: 'Abrir o original', icon: <ExternalLink className="w-3.5 h-3.5" />, run: () => window.open(n.url, '_blank', 'noopener,noreferrer') },
+        { label: 'Copiar o endereço', run: () => void navigator.clipboard?.writeText(n.url!) }
+      );
+    if (n.type === 'entry' && n.entryId && entries[n.entryId]) specific.push({ label: 'Abrir o verbete', icon: <BookMarked className="w-3.5 h-3.5" />, run: () => onOpenEntry?.(entries[n.entryId!]) });
+    if (n.type === 'link' && n.url) specific.push({ label: n.meta ? 'Atualizar a prévia' : 'Buscar a prévia', run: () => {
+      clipPage(n.url!).then((m) => mapNodes(new Set([n.id]), (x) => ({ ...x, meta: { title: m.title, description: m.description, image: m.image, site: m.site }, height: Math.max(x.height, m.image ? 300 : 150) }))).catch((err) => alert(err instanceof Error ? err.message : 'Falhou.'));
+    } });
     const info = n.type === 'image' ? [n.mime?.replace('image/', '').toUpperCase(), formatSize(n.bytes), n.natW && `${n.natW} × ${n.natH}`].filter(Boolean).join(' · ') : '';
     menu.open(
       e,
@@ -894,7 +1072,10 @@ export function CanvasStudio({
       [
         { label: 'Cartão de texto aqui', icon: <StickyNote className="w-3.5 h-3.5" />, run: () => addNodes([{ id: cuid(), type: 'text', x: Math.round(x - 130), y: Math.round(y - 60), width: 260, height: 120, text: '' }], true) },
         { label: 'Nota do Notebook…', icon: <FileText className="w-3.5 h-3.5" />, run: () => setPicker({ x, y }) },
-        { label: 'Imagem…', icon: <ImagePlus className="w-3.5 h-3.5" />, run: () => ((filePoint.current = [x, y]), fileRef.current?.click()) },
+        { label: 'Imagem, PDF, áudio ou vídeo…', icon: <Paperclip className="w-3.5 h-3.5" />, run: () => ((filePoint.current = [x, y]), fileRef.current?.click()) },
+        ...(entriesApi && Object.keys(entries).length ? [{ label: 'Verbete do Codex…', icon: <BookMarked className="w-3.5 h-3.5" />, run: () => setEntryPicker({ x, y }) }] : []),
+        { label: 'Modelo…', icon: <LayoutTemplate className="w-3.5 h-3.5" />, run: () => setTemplates(true) },
+        { label: 'Fontes externas…', icon: <Globe className="w-3.5 h-3.5" />, run: () => setPlugins('wikimedia') },
         { label: 'Grupo aqui', icon: <Group className="w-3.5 h-3.5" />, run: () => addGroup(x, y, new Set()) },
         'sep',
         { label: 'Colar aqui', shortcut: 'Ctrl+V', icon: <ClipboardPaste className="w-3.5 h-3.5" />, run: () => void pasteFromMenu([x, y]) },
@@ -966,14 +1147,14 @@ export function CanvasStudio({
     else bar = { x, y: 60, below: true };
   }
 
-  const download = () => {
+  function download() {
     const blob = new Blob([JSON.stringify(toJsonCanvas(dataRef.current, (id) => api.items[id]?.title || null), null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${item.title || 'canvas'}.canvas`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  };
+  }
 
   const status = doc.status === 'error' ? 'Não salvou — tentando de novo' : uploads ? `Enviando ${uploads} ${uploads === 1 ? 'arquivo' : 'arquivos'}…` : doc.status === 'saving' ? 'Salvando…' : doc.status === 'loading' ? 'Abrindo…' : 'Salvo';
 
@@ -1040,13 +1221,37 @@ export function CanvasStudio({
           addNodes([{ id: cuid(), type: 'text', x: Math.round(x - 130), y: Math.round(y - 50), width: 260, height: 120, text: '' }], true);
         }}
         onContextMenu={emptyMenu}
-        onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
+        onDragOver={(e) => {
+          const t = e.dataTransfer.types;
+          if (t.includes('Files') || t.includes(ENTRY_DRAG) || t.includes(PLUGIN_DRAG) || t.includes('text/plain') || t.includes('text/uri-list')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
         onDrop={(e) => {
-          const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'));
-          if (!files.length) return;
+          const at = toWorld(e.clientX, e.clientY);
+          const dt = e.dataTransfer;
+          const files = Array.from(dt.files);
           e.preventDefault();
-          const [x, y] = toWorld(e.clientX, e.clientY);
-          void addImages(files, x, y);
+          if (files.length) return void addFiles(files, at[0], at[1]);
+          const ent = dt.getData(ENTRY_DRAG);
+          if (ent && entries[ent]) return addEntry(entries[ent], at);
+          const plug = dt.getData(PLUGIN_DRAG);
+          if (plug) {
+            try {
+              return void insertResult(JSON.parse(plug) as PluginResult, at);
+            } catch {
+              return;
+            }
+          }
+          const text = (dt.getData('text/uri-list') || dt.getData('text/plain') || '').trim();
+          // nota arrastada do explorador
+          const it = api.items[text];
+          if (it) {
+            if (it.id === item.id || it.kind !== 'note') return;
+            return addNodes([{ id: cuid(), type: 'note', x: Math.round(at[0] - 200), y: Math.round(at[1] - 150), width: 400, height: 300, itemId: it.id }]);
+          }
+          if (text) pasteText(text.split('\n')[0].startsWith('http') ? text.split('\n')[0] : text, at);
         }}
       >
         <div className="nb-cv-world" style={{ transform: `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.k})`, ['--k' as string]: v.k }}>
@@ -1134,6 +1339,7 @@ export function CanvasStudio({
               handles={single?.id === n.id && !busy}
               editing={editing === n.id}
               note={n.type === 'note' && n.itemId ? api.items[n.itemId] || null : null}
+              entry={n.type === 'entry' && n.entryId ? entries[n.entryId] || null : null}
               ctx={ctx}
             />
           ))}
@@ -1197,7 +1403,9 @@ export function CanvasStudio({
             onOpen={
               single?.type === 'note' && single.itemId
                 ? () => onOpen(single.itemId!)
-                : (single?.type === 'image' || single?.type === 'link') && single.url && !single.pending
+                : single?.type === 'entry' && single.entryId && entries[single.entryId]
+                  ? () => onOpenEntry?.(entries[single.entryId!])
+                  : (single?.type === 'image' || single?.type === 'link' || single?.type === 'file') && single.url && !single.pending
                   ? () => window.open(single.url, '_blank', 'noopener,noreferrer')
                   : undefined
             }
@@ -1234,13 +1442,28 @@ export function CanvasStudio({
         <button type="button" title="Nota do Notebook" aria-label="Nota do Notebook" onClick={() => setPicker({ x: center()[0], y: center()[1] })}>
           <FileText />
         </button>
-        <button type="button" title="Imagem (sem perda de qualidade)" aria-label="Imagem" onClick={() => ((filePoint.current = center()), fileRef.current?.click())}>
+        <button type="button" title="Imagem, PDF, áudio ou vídeo (sem perda de qualidade)" aria-label="Arquivo" onClick={() => ((filePoint.current = center()), fileRef.current?.click())}>
           <ImagePlus />
         </button>
+        {entriesApi && (
+          <button type="button" title="Verbete do Codex" aria-label="Verbete do Codex" onClick={() => setEntryPicker({ x: center()[0], y: center()[1] })}>
+            <BookMarked />
+          </button>
+        )}
         <button type="button" title={sel.size ? 'Agrupar a seleção' : 'Grupo'} aria-label="Grupo" onClick={() => addGroup(...center())}>
           <Group />
         </button>
+        <span className="nb-cv-dock-sep" />
+        <button type="button" title="Modelos" aria-label="Modelos" data-on={templates || undefined} onClick={() => setTemplates((t) => !t)}>
+          <LayoutTemplate />
+        </button>
+        <button type="button" title="Fontes externas (imagens livres, Wikipedia, páginas)" aria-label="Fontes externas" data-on={!!plugins || undefined} onClick={() => setPlugins((p) => (p ? null : 'wikimedia'))}>
+          <Globe />
+        </button>
+        {templates && <TemplateMenu onPick={(id) => (setTemplates(false), addTemplate(id))} onClose={() => setTemplates(false)} />}
       </div>
+
+      {plugins && <PluginPanel tab={plugins} setTab={setPlugins} onInsert={(r) => void insertResult(r)} onClose={() => setPlugins(null)} />}
 
       <RightRail
         zoom={v.k}
@@ -1261,14 +1484,14 @@ export function CanvasStudio({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf,audio/*,video/mp4,video/webm,video/quicktime,.md,.markdown,.txt,text/plain,text/markdown"
         multiple
         hidden
         onChange={(e) => {
           const files = Array.from(e.target.files || []);
           e.target.value = '';
           const [x, y] = filePoint.current || center();
-          if (files.length) void addImages(files, x, y);
+          if (files.length) void addFiles(files, x, y);
         }}
       />
 
@@ -1284,6 +1507,17 @@ export function CanvasStudio({
         />
       )}
       {help && <HelpPanel onClose={() => setHelp(false)} />}
+      {entryPicker && (
+        <EntryPicker
+          entries={Object.values(entries)}
+          onClose={() => setEntryPicker(null)}
+          onPick={(e) => {
+            const p = entryPicker;
+            setEntryPicker(null);
+            addEntry(e, [p.x, p.y]);
+          }}
+        />
+      )}
     </div>
   );
 }

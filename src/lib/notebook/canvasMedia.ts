@@ -63,6 +63,38 @@ export async function imageSize(file: Blob): Promise<{ width: number; height: nu
   }
 }
 
+/** Arquivos que o canvas mostra (além de imagens): PDF, áudio e vídeo. */
+export const CANVAS_FILE = /^(application\/pdf|audio\/(mpeg|mp4|ogg|wav|webm|x-wav|aac|flac)|video\/(mp4|webm|quicktime))$/i;
+/** Textos que viram cartão (o conteúdo, não o arquivo). */
+export const CANVAS_TEXT = /^(text\/(plain|markdown|x-markdown))$|\.(md|markdown|txt)$/i;
+
+export const fileKind = (mime?: string) => (!mime ? 'file' : mime === 'application/pdf' ? 'pdf' : mime.startsWith('audio/') ? 'audio' : mime.startsWith('video/') ? 'video' : 'file');
+
+/** Envia PDF, áudio ou vídeo exatamente como veio (sem compressão). */
+export async function uploadCanvasFile(file: File, o: { itemId: string; profileId: string; budgetBytes: number }): Promise<CanvasUpload> {
+  const supabase = createClient();
+  const hash = await sha256Hex(file);
+  const name = (file.name || 'arquivo').slice(0, 300);
+  if (hash) {
+    const { data } = await supabase.from('notebook_assets').select('id, url, size_bytes, content_type').eq('profile_id', o.profileId).eq('sha256', hash).limit(1);
+    const hit = data?.[0] as { id: string; url: string; size_bytes: number; content_type: string | null } | undefined;
+    if (hit?.url) return { url: hit.url, assetId: hit.id, bytes: Number(hit.size_bytes) || file.size, mime: hit.content_type || file.type, width: null, height: null, converted: false, reused: true };
+  }
+  if (file.size > o.budgetBytes) throw new Error(`O arquivo tem ${formatSize(file.size)}; o limite por arquivo do seu nível é ${formatSize(o.budgetBytes)}.`);
+  const res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asFile: true, scope: 'notebook' });
+  let assetId: string | null = null;
+  if (res.r2Key) {
+    const { data, error } = await supabase
+      .from('notebook_assets')
+      .insert({ profile_id: o.profileId, item_id: o.itemId, r2_key: res.r2Key, url: res.publicUrl, sha256: hash, original_name: name })
+      .select('id')
+      .single();
+    if (error) console.warn('[canvas] anexo sem registro', error.message);
+    assetId = (data as { id: string } | null)?.id ?? null;
+  }
+  return { url: res.publicUrl, assetId, bytes: file.size, mime: file.type, width: null, height: null, converted: false, reused: false };
+}
+
 export async function uploadCanvasImage(
   file: File,
   o: { itemId: string; profileId: string; budgetBytes: number; size?: { width: number; height: number } | null }

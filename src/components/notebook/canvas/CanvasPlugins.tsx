@@ -1,0 +1,126 @@
+'use client';
+
+/**
+ * Painel "Fontes externas" do Canvas: abas com os plugins registrados, busca e
+ * resultados. Clique insere no centro; arrastar solta no ponto escolhido.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { KeyRound, Loader2, Search, X } from 'lucide-react';
+import { CANVAS_PLUGINS, type PluginResult } from '@/lib/notebook/canvasPlugins';
+
+export const PLUGIN_DRAG = 'application/x-insight-plugin';
+
+export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; setTab: (t: string) => void; onInsert: (r: PluginResult) => void; onClose: () => void }) {
+  const plugin = CANVAS_PLUGINS.find((p) => p.id === tab) || CANVAS_PLUGINS[0];
+  const [q, setQ] = useState('');
+  const [state, setState] = useState<{ loading: boolean; error: string | null; results: PluginResult[]; for: string }>({ loading: false, error: null, results: [], for: '' });
+  const ctrl = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setState({ loading: false, error: null, results: [], for: '' });
+    inputRef.current?.focus();
+  }, [plugin.id]);
+
+  const run = async (term = q) => {
+    const t = term.trim();
+    if (!t || plugin.needsKey) return;
+    ctrl.current?.abort();
+    const c = new AbortController();
+    ctrl.current = c;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const results = await plugin.search(t, c.signal);
+      if (!c.signal.aborted) setState({ loading: false, error: null, results, for: t });
+    } catch (err) {
+      if (c.signal.aborted) return;
+      setState({ loading: false, error: err instanceof Error ? err.message : 'A busca falhou.', results: [], for: t });
+    }
+  };
+
+  // busca enquanto digita (menos no recortador, que espera o Enter)
+  useEffect(() => {
+    if (plugin.id === 'clipper' || q.trim().length < 3) return;
+    const t = setTimeout(() => void run(), 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, plugin.id]);
+
+  const drag = (e: React.DragEvent, r: PluginResult) => {
+    e.dataTransfer.setData(PLUGIN_DRAG, JSON.stringify(r));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const images = state.results.filter((r) => r.kind === 'image');
+  const others = state.results.filter((r) => r.kind !== 'image');
+
+  return (
+    <aside className="nb-cv-plugins" data-cv-ui aria-label="Fontes externas" onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <header>
+        <h2>Fontes externas</h2>
+        <button type="button" onClick={onClose} aria-label="Fechar">
+          <X />
+        </button>
+      </header>
+      <nav className="nb-cv-plugins-tabs" role="tablist">
+        {CANVAS_PLUGINS.map((p) => (
+          <button key={p.id} type="button" role="tab" aria-selected={p.id === plugin.id} data-off={p.needsKey ? true : undefined} onClick={() => setTab(p.id)}>
+            {p.name}
+          </button>
+        ))}
+      </nav>
+      <p className="nb-cv-plugins-desc">{plugin.description}</p>
+
+      {plugin.needsKey ? (
+        <div className="nb-cv-plugins-key">
+          <KeyRound />
+          <p>
+            Este plugin precisa de uma chave ({plugin.needsKey}). Quando ela for configurada no servidor, a aba passa a funcionar.
+          </p>
+        </div>
+      ) : (
+        <>
+          <form
+            className="nb-cv-plugins-search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run();
+            }}
+          >
+            <Search />
+            <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value.slice(0, 300))} placeholder={plugin.hint} aria-label={plugin.hint} />
+            {state.loading && <Loader2 className="animate-spin" />}
+          </form>
+          <div className="nb-cv-plugins-list nb-scroll">
+            {state.error && <p className="nb-cv-plugins-msg nb-cv-plugins-msg--err">{state.error}</p>}
+            {!state.error && !state.loading && state.for && !state.results.length && <p className="nb-cv-plugins-msg">Nada encontrado para “{state.for}”.</p>}
+            {!state.for && !state.loading && <p className="nb-cv-plugins-msg">{plugin.id === 'clipper' ? 'Cole o endereço e aperte Enter.' : 'Digite ao menos três letras.'}</p>}
+            {images.length > 0 && (
+              <div className="nb-cv-plugins-grid">
+                {images.map((r) => (
+                  <button key={r.id} type="button" draggable onDragStart={(e) => drag(e, r)} onClick={() => onInsert(r)} title={`${r.title}\n${r.kind === 'image' ? r.credit : ''}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={r.kind === 'image' ? r.thumb : ''} alt={r.title} loading="lazy" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {others.map((r) => (
+              <button key={r.id} type="button" className="nb-cv-plugins-row" draggable onDragStart={(e) => drag(e, r)} onClick={() => onInsert(r)}>
+                {(r.kind === 'text' ? r.thumb : r.kind === 'link' ? r.image : null) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={(r.kind === 'text' ? r.thumb : r.kind === 'link' ? r.image : '') || ''} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                )}
+                <span>
+                  <strong>{r.title}</strong>
+                  <small>{r.kind === 'text' ? r.text : r.kind === 'link' ? r.description || r.url : ''}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {images.length > 0 && <p className="nb-cv-plugins-foot">Clique para pôr no centro ou arraste para o quadro. A imagem original sobe para o seu Notebook com o crédito do autor.</p>}
+        </>
+      )}
+    </aside>
+  );
+}

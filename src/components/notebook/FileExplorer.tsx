@@ -38,6 +38,8 @@ interface Props {
   onRename: (id: string, title: string) => void;
   onImport?: (parentId: string | null) => void;
   onClose?: () => void;
+  /** abre a Lixeira completa (com verbetes, fontes e categorias) */
+  onOpenTrash?: () => void;
 }
 
 const OPEN_KEY = 'insight-notebook-open-folders';
@@ -51,7 +53,7 @@ export function itemIcon(item: Pick<NotebookItem, 'icon' | 'template' | 'kind'>)
   return <Glyph name={itemGlyph(item)} />;
 }
 
-export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onRename, onImport, onClose }: Props) {
+export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onRename, onImport, onClose, onOpenTrash }: Props) {
   const [sort, setSort] = useState<SortMode>('manual');
   const [filter, setFilter] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -378,7 +380,7 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
       <div className="border-t border-[var(--nb-line)]">
         <button
           type="button"
-          onClick={() => setShowTrash((v) => !v)}
+          onClick={() => (onOpenTrash ? onOpenTrash() : setShowTrash((v) => !v))}
           className="w-full flex items-center gap-2 px-3 h-9 text-[12px] text-[var(--nb-ink-3)] hover:text-[var(--nb-ink)]"
         >
           <Trash2 className="w-3.5 h-3.5" />

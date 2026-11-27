@@ -71,7 +71,7 @@ export const CANVAS_TEXT = /^(text\/(plain|markdown|x-markdown))$|\.(md|markdown
 export const fileKind = (mime?: string) => (!mime ? 'file' : mime === 'application/pdf' ? 'pdf' : mime.startsWith('audio/') ? 'audio' : mime.startsWith('video/') ? 'video' : 'file');
 
 /** Envia PDF, áudio ou vídeo exatamente como veio (sem compressão). */
-export async function uploadCanvasFile(file: File, o: { itemId: string; profileId: string; budgetBytes: number }): Promise<CanvasUpload> {
+export async function uploadCanvasFile(file: File, o: { itemId: string; profileId: string; budgetBytes: number; projectId?: string | null }): Promise<CanvasUpload> {
   const supabase = createClient();
   const hash = await sha256Hex(file);
   const name = (file.name || 'arquivo').slice(0, 300);
@@ -81,12 +81,13 @@ export async function uploadCanvasFile(file: File, o: { itemId: string; profileI
     if (hit?.url) return { url: hit.url, assetId: hit.id, bytes: Number(hit.size_bytes) || file.size, mime: hit.content_type || file.type, width: null, height: null, converted: false, reused: true };
   }
   if (file.size > o.budgetBytes) throw new Error(`O arquivo tem ${formatSize(file.size)}; o limite por arquivo do seu nível é ${formatSize(o.budgetBytes)}.`);
-  const res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asFile: true, scope: 'notebook' });
+  const id = crypto.randomUUID();
+  const res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asFile: true, scope: 'notebook', asset: { project: o.projectId ?? null, id, variant: 'original' } });
   let assetId: string | null = null;
   if (res.r2Key) {
     const { data, error } = await supabase
       .from('notebook_assets')
-      .insert({ profile_id: o.profileId, item_id: o.itemId, r2_key: res.r2Key, url: res.publicUrl, sha256: hash, original_name: name })
+      .insert({ id, profile_id: o.profileId, item_id: o.itemId, project_id: o.projectId ?? null, r2_key: res.r2Key, url: res.publicUrl, sha256: hash, original_name: name })
       .select('id')
       .single();
     if (error) console.warn('[canvas] anexo sem registro', error.message);
@@ -97,7 +98,7 @@ export async function uploadCanvasFile(file: File, o: { itemId: string; profileI
 
 export async function uploadCanvasImage(
   file: File,
-  o: { itemId: string; profileId: string; budgetBytes: number; size?: { width: number; height: number } | null }
+  o: { itemId: string; profileId: string; budgetBytes: number; size?: { width: number; height: number } | null; projectId?: string | null }
 ): Promise<CanvasUpload> {
   const supabase = createClient();
   const size = o.size !== undefined ? o.size : await imageSize(file);
@@ -116,12 +117,14 @@ export async function uploadCanvasImage(
   const lossless = LOSSLESS_IMAGE.test(file.type);
   let converted = !lossless;
   let res;
+  const id = crypto.randomUUID();
+  const asset = { project: o.projectId ?? null, id, variant: 'original' as const };
   try {
-    res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asFile: lossless, asImage: !lossless, scope: 'notebook' });
+    res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asFile: lossless, asImage: !lossless, scope: 'notebook', asset });
   } catch (err) {
     // acima do limite por arquivo: tenta uma versão comprimida
     if (!(err instanceof MediaQuotaError) || !lossless) throw err;
-    res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asImage: true, scope: 'notebook' });
+    res = await uploadMediaToInsight(file, { budgetBytes: o.budgetBytes, asImage: true, scope: 'notebook', asset });
     converted = true;
   }
 
@@ -130,8 +133,10 @@ export async function uploadCanvasImage(
     const { data, error } = await supabase
       .from('notebook_assets')
       .insert({
+        id,
         profile_id: o.profileId,
         item_id: o.itemId,
+        project_id: o.projectId ?? null,
         r2_key: res.r2Key,
         url: res.publicUrl,
         width: size?.width ?? null,
@@ -144,6 +149,8 @@ export async function uploadCanvasImage(
       .single();
     if (error) console.warn('[canvas] anexo sem registro', error.message);
     assetId = (data as { id: string } | null)?.id ?? null;
+    // miniatura leve para a Biblioteca e o minimapa (o original não muda)
+    if (assetId && size && Math.max(size.width, size.height) > 640) void makePreview(file, assetId, o.projectId ?? null, o.budgetBytes);
   }
   return {
     url: res.publicUrl,
@@ -158,3 +165,25 @@ export async function uploadCanvasImage(
 }
 
 export const formatSize = (b?: number) => (!b ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);
+
+/** Gera e envia uma miniatura WebP (lado maior 480 px) e liga ao anexo. */
+export async function makePreview(file: Blob, assetId: string, projectId: string | null, budgetBytes: number) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = 480 / Math.max(bmp.width, bmp.height);
+    const w = Math.max(1, Math.round(bmp.width * k));
+    const h = Math.max(1, Math.round(bmp.height * k));
+    const c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = c.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+    if (!ctx) return;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const blob: Blob | null =
+      'convertToBlob' in c ? await (c as OffscreenCanvas).convertToBlob({ type: 'image/webp', quality: 0.8 }) : await new Promise((r) => (c as HTMLCanvasElement).toBlob(r, 'image/webp', 0.8));
+    if (!blob) return;
+    const res = await uploadMediaToInsight(new File([blob], 'preview.webp', { type: 'image/webp' }), { budgetBytes, asFile: true, scope: 'notebook', asset: { project: projectId, id: assetId, variant: 'preview' } });
+    if (res.r2Key) await createClient().from('notebook_assets').update({ preview_key: res.r2Key }).eq('id', assetId);
+  } catch {
+    /* a miniatura é opcional */
+  }
+}

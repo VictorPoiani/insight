@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { writeOrQueue } from './localStore';
 import type { EntryCategory, EntryKind, EntryLink, EntryRel, NotebookEntry } from './entries';
 
 const COLS = 'id, profile_id, project_id, kind, title, summary, target_id, aliases, category, image_url, codex_category_id, is_secret, created_at, updated_at';
@@ -13,26 +14,30 @@ export function useEntries(profileId: string | null) {
   const [entries, setEntries] = useState<Record<string, NotebookEntry>>({});
   const [loaded, setLoaded] = useState(false);
   const [links, setLinks] = useState<EntryLink[]>([]);
+  /** recarrega (ex.: depois de restaurar da lixeira) */
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     if (!profileId) return;
     let alive = true;
     void (async () => {
       const [{ data }, { data: rel }] = await Promise.all([
-        supabase.from('notebook_entries').select(COLS).eq('profile_id', profileId).order('title').limit(5000),
+        supabase.from('notebook_entries').select(COLS).eq('profile_id', profileId).is('deleted_at', null).order('title').limit(5000),
         supabase.from('notebook_entry_links').select(LINK_COLS).eq('profile_id', profileId).limit(10000),
       ]);
       if (!alive) return;
-      setLinks((rel || []) as EntryLink[]);
       const map: Record<string, NotebookEntry> = {};
       for (const e of (data || []) as NotebookEntry[]) map[e.id] = e;
+      // relações com verbetes na lixeira ficam escondidas (voltam ao restaurar)
+      setLinks(((rel || []) as EntryLink[]).filter((l) => map[l.from_id] && map[l.to_id]));
       setEntries(map);
       setLoaded(true);
     })();
     return () => {
       alive = false;
     };
-  }, [profileId, supabase]);
+  }, [profileId, supabase, nonce]);
 
   const create = useCallback(
     async (e: {
@@ -66,10 +71,10 @@ export function useEntries(profileId: string | null) {
   const update = useCallback(
     async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url' | 'codex_category_id' | 'is_secret'>>) => {
       setEntries((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
-      const { error } = await supabase.from('notebook_entries').update(patch).eq('id', id);
+      const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_entries', op: 'update', id, row: patch });
       if (error) alert('Não foi possível salvar a entrada do Sumário.');
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   const remove = useCallback(
@@ -80,9 +85,10 @@ export function useEntries(profileId: string | null) {
         return next;
       });
       setLinks((prev) => prev.filter((l) => l.from_id !== id && l.to_id !== id));
-      await supabase.from('notebook_entries').delete().eq('id', id);
+      // vai para a lixeira (30 dias), não some
+      await writeOrQueue(supabase, profileId, { table: 'notebook_entries', op: 'update', id, row: { deleted_at: new Date().toISOString() } });
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   const addLink = useCallback(
@@ -112,8 +118,8 @@ export function useEntries(profileId: string | null) {
   );
 
   return useMemo(
-    () => ({ entries, loaded, create, update, remove, links, addLink, removeLink }),
-    [entries, loaded, create, update, remove, links, addLink, removeLink]
+    () => ({ entries, loaded, create, update, remove, links, addLink, removeLink, reload }),
+    [entries, loaded, create, update, remove, links, addLink, removeLink, reload]
   );
 }
 

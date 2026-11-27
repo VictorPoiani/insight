@@ -181,7 +181,13 @@ export async function POST(req: NextRequest) {
           : 'files';
     const yearMonth = new Date().toISOString().slice(0, 7);
     const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
-    const r2Key = `users/${user.id}/${scope === 'notebook' ? 'notebook/' : ''}${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
+    // Notebook: users/{uid}/notebook/p/{projeto}/{anexo}/{original|preview}/{nome}
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const asset = body.asset as { project?: string | null; id?: string; variant?: string } | undefined;
+    const r2Key =
+      scope === 'notebook' && asset && typeof asset.id === 'string' && UUID_RE.test(asset.id)
+        ? `users/${user.id}/notebook/${asset.project && UUID_RE.test(asset.project) ? `p/${asset.project.toLowerCase()}` : 'inbox'}/${asset.id.toLowerCase()}/${asset.variant === 'preview' ? 'preview' : 'original'}/${cleanName}`
+        : `users/${user.id}/${scope === 'notebook' ? 'notebook/' : ''}${folder}/${yearMonth}/${crypto.randomUUID()}-${cleanName}`;
 
     // registra ANTES de assinar: o banco valida o limite de novo e guarda o tamanho exato
     const { error: regError } = await supabase.rpc('register_media_upload', {

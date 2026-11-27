@@ -56,6 +56,7 @@ export const GLYPHS = {
   skull: '<path d="M12 3.5a7 7 0 0 0-7 7c0 2.4 1.2 4.3 3 5.5V19h8v-3c1.8-1.2 3-3.1 3-5.5a7 7 0 0 0-7-7z"/><circle cx="9.3" cy="11" r="1.4"/><circle cx="14.7" cy="11" r="1.4"/><path d="M10.5 19v2M13.5 19v2"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8h.01"/>',
   canvas: '<rect x="3.5" y="4.5" width="7" height="6" rx="1"/><rect x="13.5" y="13.5" width="7" height="6" rx="1"/><rect x="13.5" y="4.5" width="7" height="4" rx="1"/><path d="M10.5 7.5h3M17 8.5v5M7 10.5v6.5h6.5"/>',
+  inbox: '<path d="M3.5 13.5l2.6-7.2A1.5 1.5 0 0 1 7.5 5.3h9a1.5 1.5 0 0 1 1.4 1l2.6 7.2v4.7a1.5 1.5 0 0 1-1.5 1.5h-14a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M3.5 13.5h5l1.2 2.2h4.6l1.2-2.2h5"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   codex: '<path d="M6 3.5h10.5a1.5 1.5 0 0 1 1.5 1.5v15.5H7.5A1.5 1.5 0 0 1 6 19V3.5z"/><path d="M6 17.5h12M9.5 7.5h5M9.5 10.5h5"/>',
 } as const;

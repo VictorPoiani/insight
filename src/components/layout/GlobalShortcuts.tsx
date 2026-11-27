@@ -14,6 +14,7 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['@'], label: 'Marcar alguém da comunidade' },
   { keys: ['Ctrl', 'B'], label: 'Negrito (com texto selecionado)' },
   { keys: ['Ctrl', 'I'], label: 'Itálico (com texto selecionado)' },
+  { keys: ['Ctrl', 'Alt', 'N'], label: 'Capturar uma ideia na Caixa de entrada do Notebook' },
   { keys: ['?'], label: 'Mostrar esta lista de atalhos' },
 ];
 
@@ -66,7 +67,8 @@ export function GlobalShortcuts() {
     function onKey(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      if (mod && e.shiftKey && key === 'f') {
+      // no Notebook, Ctrl+Shift+F é a busca global dele
+      if (mod && e.shiftKey && key === 'f' && !window.location.pathname.startsWith('/notebook')) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('insight-toggle-focus-mode', { detail: {} }));
         setToast('Modo foco alternado');

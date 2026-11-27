@@ -49,7 +49,7 @@ import { getUserUploadLimitBytes } from '@/lib/contributorLevels';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { Glyph } from '../icons/Glyph';
 import type { GlyphName } from '@/lib/notebook/glyphs';
-import { CALLOUT_TYPES, Callout, EntryRef, TagHighlight, WikiLink, joinFrontmatter, splitFrontmatter } from './extensions';
+import { CALLOUT_TYPES, Callout, EntryRef, PendingMark, TODO_KINDS, TagHighlight, WikiLink, joinFrontmatter, splitFrontmatter } from './extensions';
 import { Illustration, PoemKeys } from './bookExtensions';
 import { ImageBar } from './ImageBar';
 import { useEditorTick } from './useEditorTick';
@@ -137,7 +137,21 @@ function slashItems(upload: () => void): MenuItem[] {
         .insertContent({ type: 'callout', attrs: { kind: c.id, title: c.label }, content: [{ type: 'paragraph' }] })
         .run(),
   }));
-  return [...base, ...callouts];
+  // pendência: com texto selecionado, marca; sem, insere um trecho para descrever
+  const todos: MenuItem[] = TODO_KINDS.map((k) => ({
+    id: `pendencia-${k.id}`,
+    label: `Pendência: ${k.label}`,
+    hint: 'Ctrl+Alt+P na seleção',
+    icon: <Glyph name="note" className="text-[16px]" />,
+    run: (e, r) => {
+      e.chain().focus().deleteRange(r).run();
+      const { from } = e.state.selection;
+      const text = k.id === 'checar' ? 'confirmar este dado' : k.id === 'lore' ? 'ajustar com o mundo' : k.id === 'revisar' ? 'revisar este trecho' : 'descrever a pendência';
+      e.chain().insertContent({ type: 'text', text, marks: [{ type: 'pending', attrs: { kind: k.id } }] }).setTextSelection({ from, to: from + text.length }).run();
+
+    },
+  }));
+  return [...base, ...callouts, ...todos];
 }
 
 const norm = (s: string) =>
@@ -424,6 +438,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
       TableKit.configure({ table: { resizable: false } }),
       Illustration.configure({ inline: false }),
       EntryRef,
+      PendingMark,
       ...(variant === 'poem' ? [PoemKeys] : []),
       ...(variant === 'article' ? [...ACADEMIC_EXTENSIONS, makeSuggest('citeMenu', '^', (q) => citeItems(q, citeRef.current), 'cite', setMenu, menuRef)] : []),
       Placeholder.configure({

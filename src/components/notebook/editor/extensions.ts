@@ -326,3 +326,67 @@ export const EntryRef = Mark.create({
     return `[${h.renderChildren(node)}](ref:${a.id}${a.kind && a.kind !== 'elemento' ? ` "${a.kind}"` : ''})`;
   },
 });
+
+// ------------------------------------------------------------------ pendência
+/** Tipos de pendência (Central de Pendências). */
+export const TODO_KINDS = [
+  { id: 'revisar', label: 'Revisar' },
+  { id: 'checar', label: 'Checar fato' },
+  { id: 'lore', label: 'Ajustar lore' },
+  { id: 'geral', label: 'Pendência' },
+] as const;
+export type TodoKind = (typeof TODO_KINDS)[number]['id'];
+const TODO_RE = /^(revisar|checar|lore|geral)$/;
+
+/**
+ * Trecho inacabado: [texto](todo:revisar). No capítulo (HTML), um
+ * <span data-todo="revisar">. Atalho Ctrl+Alt+P marca ou desmarca a seleção.
+ */
+export const PendingMark = Mark.create({
+  name: 'pending',
+  // como o negrito: o que se digita no fim do trecho continua marcado
+  inclusive: true,
+  addAttributes() {
+    return { kind: { default: 'geral' } };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-todo]',
+        getAttrs: (el) => {
+          const k = (el as HTMLElement).getAttribute('data-todo') || 'geral';
+          return { kind: TODO_RE.test(k) ? k : 'geral' };
+        },
+      },
+    ];
+  },
+  renderHTML({ mark, HTMLAttributes }) {
+    return ['span', mergeAttributes(HTMLAttributes, { 'data-todo': mark.attrs.kind, class: `nb-todo nb-todo--${mark.attrs.kind}` }), 0];
+  },
+  addKeyboardShortcuts() {
+    return {
+      // com seleção, marca ou desmarca o trecho; sem seleção, liga ou desliga para o que vier
+      'Mod-Alt-p': () => this.editor.chain().focus().toggleMark('pending', { kind: 'revisar' }).run(),
+    };
+  },
+  markdownTokenName: 'pending',
+  markdownTokenizer: {
+    name: 'pending',
+    level: 'inline',
+    start: (src: string) => {
+      const m = /\[[^\]\n]+\]\(todo:/.exec(src);
+      return m ? m.index : -1;
+    },
+    tokenize(src: string, _tokens, lexer) {
+      const m = /^\[([^\]\n]+)\]\(todo:(revisar|checar|lore|geral)\)/i.exec(src);
+      if (!m) return undefined;
+      return { type: 'pending', raw: m[0], text: m[1], kind: m[2].toLowerCase(), tokens: lexer.inlineTokens(m[1]) };
+    },
+  },
+  parseMarkdown(token, h) {
+    return h.applyMark('pending', h.parseInline(token.tokens || []), { kind: token.kind });
+  },
+  renderMarkdown(node: JSONContent, h) {
+    return `[${h.renderChildren(node)}](todo:${node.attrs?.kind || 'geral'})`;
+  },
+});

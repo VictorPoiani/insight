@@ -57,6 +57,7 @@ function nodeRow(n: CanvasNode, z: number): NodeRow {
   if (n.natH) extra.natH = n.natH;
   if (n.meta) extra.meta = n.meta;
   if (n.credit) extra.credit = n.credit.slice(0, 500);
+  if (n.creditUrl && /^https:\/\//.test(n.creditUrl)) extra.creditUrl = n.creditUrl.slice(0, 1000);
   return {
     id: n.id,
     type: n.type,
@@ -94,6 +95,7 @@ function fromNodeRow(r: NodeRow): CanvasNode {
     entryId: r.entry_id ?? undefined,
     meta: e.meta && typeof e.meta === 'object' ? (e.meta as CanvasNode['meta']) : undefined,
     credit: typeof e.credit === 'string' ? e.credit : undefined,
+    creditUrl: typeof e.creditUrl === 'string' ? e.creditUrl : undefined,
     locked: r.locked || undefined,
     mime: typeof e.mime === 'string' ? e.mime : undefined,
     bytes: typeof e.bytes === 'number' ? e.bytes : undefined,

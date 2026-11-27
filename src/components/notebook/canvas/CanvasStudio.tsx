@@ -38,7 +38,7 @@ import {
 } from '@/lib/notebook/canvasGeom';
 import { useCanvasDoc } from '@/lib/notebook/useCanvasDoc';
 import { CANVAS_FILE, CANVAS_TEXT, formatSize, imageSize, uploadCanvasFile, uploadCanvasImage } from '@/lib/notebook/canvasMedia';
-import { clipPage, fetchExternalImage, type PluginResult } from '@/lib/notebook/canvasPlugins';
+import { clipPage, fetchExternalImage, trackStockDownload, type PluginResult } from '@/lib/notebook/canvasPlugins';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
 import { PluginPanel, PLUGIN_DRAG } from './CanvasPlugins';
 import { Glyph } from '../icons/Glyph';
@@ -427,10 +427,18 @@ export function CanvasStudio({
       return;
     }
     if (r.kind === 'link') return addLink(r.url, at, { title: r.title, description: r.description, image: r.image, site: r.site });
+    if (r.hotlink) {
+      // Unsplash: exibe pelo endereço deles e avisa o download
+      const w = IMG_W;
+      const h = r.width && r.height ? Math.round((w * r.height) / r.width) : 280;
+      addNodes([{ id: cuid(), type: 'image', x: Math.round(at[0] - w / 2), y: Math.round(at[1] - h / 2), width: w, height: h, url: r.full, label: r.title, natW: r.width, natH: r.height, credit: r.credit, creditUrl: r.creditUrl }]);
+      trackStockDownload('unsplash', r.track);
+      return;
+    }
     try {
       setUploads((u) => u + 1);
       const f = await fetchExternalImage(r.full, r.title);
-      await addImages([f], at[0], at[1], r.credit);
+      await addImages([f], at[0], at[1], r.credit, r.creditUrl);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Não foi possível trazer a imagem.');
     } finally {
@@ -438,7 +446,7 @@ export function CanvasStudio({
     }
   };
 
-  async function addImages(files: File[], x: number, y: number, credit?: string) {
+  async function addImages(files: File[], x: number, y: number, credit?: string, creditUrl?: string) {
     const list = files.filter((f) => f.type.startsWith('image/')).slice(0, 30);
     if (!list.length) return;
     const budget = getUserUploadLimitBytes(level ?? 0, role ?? undefined);
@@ -466,6 +474,7 @@ export function CanvasStudio({
           natW: s?.width,
           natH: s?.height,
           credit,
+          creditUrl,
           pending: true,
         },
       });

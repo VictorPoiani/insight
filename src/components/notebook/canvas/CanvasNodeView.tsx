@@ -184,7 +184,14 @@ function Body({ n, editing, note, entry, selected, ctx }: { n: CanvasNode; editi
         <span className="nb-cv-caption">{n.label}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={n.url} alt={n.label || ''} draggable={false} decoding="async" loading="lazy" />
-        {n.credit && <span className="nb-cv-credit">{n.credit}</span>}
+        {n.credit &&
+          (n.creditUrl ? (
+            <a className="nb-cv-credit" href={n.creditUrl} target="_blank" rel="noopener noreferrer" onPointerDown={(e) => e.stopPropagation()}>
+              {n.credit}
+            </a>
+          ) : (
+            <span className="nb-cv-credit">{n.credit}</span>
+          ))}
         {n.pending && (
           <span className="nb-cv-uploading">
             <Loader2 className="animate-spin" /> Enviando o original…

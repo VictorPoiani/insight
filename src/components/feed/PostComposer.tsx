@@ -13,6 +13,7 @@ import { draftStatusLabel, useCloudDraft } from '@/lib/drafts/useCloudDraft';
 import { DEFAULT_TABS, renderTopicVectorIcon } from './TopicTabsManager';
 import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { CustomSpotifyPlayer } from './CustomSpotifyPlayer';
+import { firstPostImage } from '@/lib/postMedia';
 import { SpotifySearchModal } from './SpotifySearchModal';
 import {
   Post,
@@ -25,6 +26,7 @@ import {
   CustomTopic,
   RoadmapStepItem,
   MindMapNodeItem,
+  CarouselImage,
 } from '@/types/database';
 import {
   Bold,
@@ -77,6 +79,9 @@ import {
   Network,
   Link2,
   ImagePlus,
+  GalleryHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface PostComposerProps {
@@ -133,10 +138,29 @@ function sumPostMediaBytes(blocks: PostBlock[]): number {
   let total = 0;
   for (const b of blocks) {
     if (b.imageUrl || b.videoUrl || b.fileUrl) total += b.mediaBytes || 0;
+    if (b.type === 'carousel') for (const img of b.carouselImages || []) if (img.imageUrl) total += img.mediaBytes || 0;
     for (const n of b.mindMapNodes || []) if (n.mediaUrl) total += n.mediaBytes || 0;
     for (const st of b.roadmapSteps || []) if (st.mediaUrl) total += st.mediaBytes || 0;
   }
   return total;
+}
+
+/** Máximo de fotos num carrossel. */
+const CAROUSEL_MAX = 10;
+
+/** Lê largura/altura da foto (reserva o espaço certo no feed). */
+function measureImage(url: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const done = (v: { width: number; height: number } | null) => {
+      clearTimeout(t);
+      resolve(v);
+    };
+    const t = setTimeout(() => done(null), 8000);
+    img.onload = () => done(img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null);
+    img.onerror = () => done(null);
+    img.src = url;
+  });
 }
 
 function uploadErrorMessage(err: unknown, fallback: string): string {
@@ -271,6 +295,7 @@ const BLOCK_MENU_ITEMS: {
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
   { type: 'paragraph', label: 'Texto', desc: 'Parágrafo', icon: AlignLeft },
+  { type: 'carousel', label: 'Carrossel de fotos', desc: 'Fotos lado a lado', icon: GalleryHorizontal },
   { type: 'h1', label: 'Título H1', desc: 'Cabeçalho principal', icon: Heading1 },
   { type: 'h2', label: 'Subtítulo H2', desc: 'Secção média', icon: Heading2 },
   { type: 'quote', label: 'Citação', desc: 'Barra lateral', icon: Quote },
@@ -334,6 +359,7 @@ function createNewBlock(type: PostBlockType = 'paragraph'): PostBlock {
   return {
     id: `blk-${uid}`,
     type,
+    ...(type === 'carousel' ? { carouselImages: [] as CarouselImage[] } : {}),
     html: '',
     fontStyle: type === 'code' ? 'mono' : 'sans',
     align: 'left',
@@ -1321,6 +1347,78 @@ export function PostComposer({
     }
   }
 
+  /** Carrossel: aceita várias fotos de uma vez (entram na ordem escolhida) ou uma por uma. */
+  async function handleCarouselUpload(fileList: FileList | File[] | null, blockId: string) {
+    if (!isAdmin || !fileList) return;
+    const current = blocks.find((b) => b.id === blockId)?.carouselImages?.length || 0;
+    const room = CAROUSEL_MAX - current;
+    const all = Array.from(fileList);
+    const files = all.filter((f) => f.type.startsWith('image/'));
+    if (!files.length) {
+      alert('Selecione arquivos de imagem válidos.');
+      return;
+    }
+    if (room <= 0) {
+      alert(`O carrossel aceita até ${CAROUSEL_MAX} fotos.`);
+      return;
+    }
+    if (files.length > room) alert(`O carrossel aceita até ${CAROUSEL_MAX} fotos: vão entrar só as ${room} primeiras.`);
+    const queue = files.slice(0, room);
+
+    let budget = remainingBytes;
+    startUpload(blockId, queue.length > 1 ? `Foto 1 de ${queue.length}...` : 'Otimizando imagem...');
+    try {
+      for (let i = 0; i < queue.length; i++) {
+        const prefix = queue.length > 1 ? `Foto ${i + 1} de ${queue.length} · ` : '';
+        setUploadProgressText(`${prefix}Otimizando...`);
+        const result = await uploadMediaToInsight(queue[i], {
+          budgetBytes: budget,
+          scope: uploadScope,
+          asImage: true,
+          onStatus: (label, pct) => onUploadStatus(`${prefix}${label}`, pct),
+        });
+        budget = Math.max(0, budget - (result.compressedSize || 0));
+        const dims = await measureImage(result.publicUrl);
+        const item: CarouselImage = {
+          id: `cimg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          imageUrl: result.publicUrl,
+          r2Key: result.r2Key,
+          mediaBytes: result.compressedSize,
+          ...(dims || {}),
+        };
+        // cada foto aparece assim que termina de subir
+        setBlocks((prev) =>
+          prev.map((b) => (b.id === blockId ? { ...b, carouselImages: [...(b.carouselImages || []), item] } : b))
+        );
+      }
+    } catch (err) {
+      alert(uploadErrorMessage(err, 'Erro ao enviar foto do carrossel.'));
+    } finally {
+      endUpload();
+    }
+  }
+
+  function moveCarouselImage(blockId: string, from: number, to: number) {
+    setBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id !== blockId) return b;
+        const list = [...(b.carouselImages || [])];
+        if (to < 0 || to >= list.length) return b;
+        const [moved] = list.splice(from, 1);
+        list.splice(to, 0, moved);
+        return { ...b, carouselImages: list };
+      })
+    );
+  }
+
+  function removeCarouselImage(blockId: string, imageId: string) {
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId ? { ...b, carouselImages: (b.carouselImages || []).filter((img) => img.id !== imageId) } : b
+      )
+    );
+  }
+
   async function handleBlockVideoUpload(
     e: React.ChangeEvent<HTMLInputElement>,
     blockId: string,
@@ -1460,6 +1558,7 @@ export function PostComposer({
       .filter((b) => {
         if (b.type === 'divider') return true;
         if (b.type === 'image') return Boolean(b.imageUrl);
+        if (b.type === 'carousel') return (b.carouselImages || []).some((img) => Boolean(img.imageUrl));
         if (b.type === 'video' || b.type === 'gif') return Boolean(b.videoUrl);
         if (b.type === 'spotify') return Boolean(b.spotifyTrackId);
         if (b.type === 'file') return Boolean(b.fileUrl);
@@ -1494,6 +1593,23 @@ export function PostComposer({
           align: b.align || 'left',
           postVisibility: targetVisibility,
         };
+
+        if (b.type === 'carousel') {
+          // ocupa a linha toda: a fileira rola para o lado
+          normalized.gridSpan = 12;
+          normalized.gridStart = 0;
+          normalized.carouselImages = (b.carouselImages || [])
+            .filter((img) => Boolean(img.imageUrl))
+            .slice(0, CAROUSEL_MAX)
+            .map((img, i) => ({
+              id: img.id || `cimg-${blockId}-${i}`,
+              imageUrl: img.imageUrl,
+              r2Key: img.r2Key || null,
+              mediaBytes: img.mediaBytes || 0,
+              ...(img.width && img.height ? { width: img.width, height: img.height } : {}),
+              ...(img.caption?.trim() ? { caption: img.caption.trim() } : {}),
+            }));
+        }
 
         if (b.type === 'image') {
           normalized.imageWidth = b.imageWidth || '100%';
@@ -1604,7 +1720,7 @@ export function PostComposer({
       .filter(Boolean)
       .join('\n\n');
 
-    const firstImageBlock = validBlocks.find((b) => b.type === 'image' && b.imageUrl);
+    const firstImageUrl = firstPostImage(validBlocks);
     const firstSpotifyBlock = validBlocks.find(
       (b) => b.type === 'spotify' && b.spotifyTrackId
     );
@@ -1618,7 +1734,7 @@ export function PostComposer({
 
     const basePayload = {
       content: plainTextSummary || 'Publicação multimídia',
-      image_url: firstImageBlock?.imageUrl || null,
+      image_url: firstImageUrl,
       spotify_track_id: firstSpotifyBlock?.spotifyTrackId || null,
       blocks: validBlocks,
       tags: combinedTags,
@@ -2371,6 +2487,133 @@ export function PostComposer({
                     <hr className="border-border" />
                   </div>
                 )}
+
+                {/* BLOCO CARROSSEL: fotos lado a lado, rolagem lateral */}
+                {block.type === 'carousel' && (() => {
+                  const imgs = block.carouselImages || [];
+                  const busy = uploadingBlockId === block.id;
+                  const full = imgs.length >= CAROUSEL_MAX;
+                  const onDrop = (e: React.DragEvent) => {
+                    if (!e.dataTransfer.files?.length) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!busy) void handleCarouselUpload(e.dataTransfer.files, block.id);
+                  };
+                  return (
+                    <div
+                      className="p-2.5 rounded-xl bg-elevated border border-border space-y-2.5 overflow-hidden min-w-0"
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+                      }}
+                      onDrop={onDrop}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-secondary">
+                          <GalleryHorizontal className="w-3.5 h-3.5 text-accent" />
+                          Carrossel · {imgs.length}/{CAROUSEL_MAX} fotos
+                        </span>
+                        {busy && (
+                          <span className="text-[10px] font-semibold text-accent truncate">{uploadProgressText || 'Enviando...'}</span>
+                        )}
+                      </div>
+
+                      {imgs.length === 0 ? (
+                        <label className={`flex flex-col items-center justify-center py-6 px-3 border border-dashed border-border rounded-xl text-center transition-colors ${busy ? 'opacity-70' : 'cursor-pointer hover:border-accent'}`}>
+                          <GalleryHorizontal className="w-6 h-6 text-accent mb-1.5" />
+                          <span className="text-xs font-semibold text-primary">
+                            {busy ? uploadProgressText || 'Enviando...' : 'Escolher fotos'}
+                          </span>
+                          <span className="mt-0.5 text-[10px] text-muted">
+                            Selecione várias de uma vez ou adicione uma por uma · até {CAROUSEL_MAX}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            disabled={busy}
+                            onChange={(e) => {
+                              const files = e.target.files ? Array.from(e.target.files) : [];
+                              e.target.value = '';
+                              void handleCarouselUpload(files, block.id);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      ) : (
+                        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                          {imgs.map((img, i) => (
+                            <div
+                              key={img.id}
+                              className="group/cimg relative shrink-0 h-28 sm:h-32 rounded-lg overflow-hidden bg-surface border border-border"
+                              style={{ aspectRatio: String(img.width && img.height ? Math.min(1.91, Math.max(0.56, img.width / img.height)) : 0.8) }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img.imageUrl} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" draggable={false} />
+                              <span className="absolute top-1 left-1 px-1.5 rounded bg-black/65 text-white text-[10px] font-bold tabular-nums">
+                                {i + 1}
+                              </span>
+                              <button
+                                type="button"
+                                title="Remover foto"
+                                aria-label={`Remover foto ${i + 1}`}
+                                onClick={() => removeCarouselImage(block.id, img.id)}
+                                className="absolute top-1 right-1 p-1 rounded-full bg-black/65 text-white hover:bg-danger transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                              <div className="absolute bottom-1 inset-x-1 flex justify-between sm:opacity-0 sm:group-hover/cimg:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  title="Mover para a esquerda"
+                                  aria-label={`Mover foto ${i + 1} para a esquerda`}
+                                  disabled={i === 0}
+                                  onClick={() => moveCarouselImage(block.id, i, i - 1)}
+                                  className="p-1 rounded-full bg-black/65 text-white disabled:opacity-0"
+                                >
+                                  <ChevronLeft className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Mover para a direita"
+                                  aria-label={`Mover foto ${i + 1} para a direita`}
+                                  disabled={i === imgs.length - 1}
+                                  onClick={() => moveCarouselImage(block.id, i, i + 1)}
+                                  className="p-1 rounded-full bg-black/65 text-white disabled:opacity-0"
+                                >
+                                  <ChevronRight className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {!full && (
+                            <label
+                              title="Adicionar fotos"
+                              className={`shrink-0 h-28 sm:h-32 w-24 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-center transition-colors ${busy ? 'opacity-60' : 'cursor-pointer hover:border-accent'}`}
+                            >
+                              <Plus className="w-4 h-4 text-accent" />
+                              <span className="text-[10px] font-semibold text-secondary leading-tight px-1">
+                                {busy ? 'Enviando...' : 'Adicionar'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                disabled={busy}
+                                onChange={(e) => {
+                                  const files = e.target.files ? Array.from(e.target.files) : [];
+                                  e.target.value = '';
+                                  void handleCarouselUpload(files, block.id);
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* BLOCO DE IMAGEM */}
                 {block.type === 'image' && (
@@ -3900,6 +4143,16 @@ export function PostComposer({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
         >
           <ImageIcon className="w-3.5 h-3.5 text-accent" />
+        </button>
+
+        <button
+          type="button"
+          title="Adicionar carrossel de fotos"
+          aria-label="Adicionar carrossel de fotos"
+          onClick={() => insertBlockAfter(blocks[blocks.length - 1].id, 'carousel')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated border border-border text-xs font-semibold text-secondary hover:text-primary hover:border-accent transition-colors"
+        >
+          <GalleryHorizontal className="w-3.5 h-3.5 text-accent" />
         </button>
 
         <button

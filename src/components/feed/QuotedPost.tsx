@@ -1,5 +1,6 @@
 'use client';
 
+import { firstPostImage } from '@/lib/postMedia';
 import { NsfwGate } from '@/components/moderation/NsfwGate';
 import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { useEffect, useMemo, useState } from 'react';
@@ -31,8 +32,7 @@ function loadPost(id: string): Promise<Loaded> {
 
 function firstImage(post: Post): string | null {
   if (post.image_url) return post.image_url;
-  const b = (post.blocks || []).find((x) => x.type === 'image' && (x as { imageUrl?: string }).imageUrl);
-  return (b as { imageUrl?: string } | undefined)?.imageUrl || null;
+  return firstPostImage(post.blocks);
 }
 
 /** Cartão compacto do Insight citado (dentro de um repost com comentário). */

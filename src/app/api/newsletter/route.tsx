@@ -230,6 +230,16 @@ function renderBlocksForEmail(blocks?: PostBlock[], fallbackText?: string): stri
           safeHtml(b.html)
         }</p>`;
       }
+      if (b.type === 'carousel' && Array.isArray(b.carouselImages)) {
+        // e-mail não rola para o lado: as fotos vão uma embaixo da outra
+        return b.carouselImages
+          .filter((img: { imageUrl?: string }) => img?.imageUrl && /^https:\/\//.test(img.imageUrl))
+          .map(
+            (img: { imageUrl: string; caption?: string }) =>
+              `<div style="margin: 12px 0; text-align: center;"><img src="${esc(img.imageUrl)}" alt="${esc(img.caption || 'Foto do post')}" style="max-width: 100%; border-radius: 12px; border: 1px solid #27272a; display: block; margin: 0 auto;" /></div>`
+          )
+          .join('');
+      }
       if (b.type === 'image' && b.imageUrl && /^https:\/\//.test(b.imageUrl)) {
         return `
           <div style="margin: 18px 0; text-align: center;">

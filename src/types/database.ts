@@ -76,7 +76,8 @@ export type PostBlockType =
   | 'file'
   | 'table'
   | 'mindmap'
-  | 'roadmap';
+  | 'roadmap'
+  | 'carousel';
 
 export type FontStyleType = 'sans' | 'serif' | 'mono';
 /** Largura da imagem no card, em % (atalhos 25/50/75/100 ou valor livre). */
@@ -255,6 +256,18 @@ export interface PollOptionItem {
   votes: number;
 }
 
+/** Foto de um bloco carrossel (fotos lado a lado, rolagem lateral). */
+export interface CarouselImage {
+  id: string;
+  imageUrl: string;
+  r2Key?: string | null;
+  mediaBytes?: number;
+  /** tamanho original: reserva o espaço certo no feed antes da foto carregar */
+  width?: number;
+  height?: number;
+  caption?: string;
+}
+
 export interface PostBlock {
   id: string;
   type: PostBlockType;
@@ -263,6 +276,8 @@ export interface PostBlock {
   align?: 'left' | 'center' | 'right';
   calloutIcon?: string;
   postVisibility?: PostVisibility;
+  /** bloco 'carousel': fotos na ordem em que aparecem */
+  carouselImages?: CarouselImage[];
 
   gridSpan?: number;
   gridStart?: number;

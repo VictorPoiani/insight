@@ -4,6 +4,7 @@ import { NsfwGate } from '@/components/moderation/NsfwGate';
 import { ModerationBanner } from '@/components/moderation/ModerationBanner';
 import { moderateNow } from '@/components/moderation/ModerationHost';
 import { MediaCarousel } from '@/components/media/MediaCarousel';
+import { MediaStrip } from '@/components/media/MediaStrip';
 import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
@@ -521,11 +522,12 @@ export function PostCard({
     if (!confirm('Excluir este Insight? Esta ação não pode ser desfeita.')) return;
 
     for (const blk of blocksState) {
-      if (blk.r2Key) {
+      const keys = [blk.r2Key, ...(blk.carouselImages || []).map((img) => img.r2Key)].filter(Boolean);
+      for (const r2Key of keys) {
         fetch('/api/upload/r2', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ r2Key: blk.r2Key }),
+          body: JSON.stringify({ r2Key }),
         }).catch(() => {});
       }
       if (Array.isArray(blk.mindMapNodes)) {
@@ -550,7 +552,11 @@ export function PostCard({
   // Imagens do post em tela cheia (na ordem em que aparecem)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lightboxImages = useMemo(() => {
-    const list = blocksState.filter((x) => x.type === 'image' && x.imageUrl).map((x) => ({ src: x.imageUrl!, alt: x.imageCaption || '' }));
+    const list: { src: string; alt: string }[] = [];
+    for (const x of blocksState) {
+      if (x.type === 'image' && x.imageUrl) list.push({ src: x.imageUrl, alt: x.imageCaption || '' });
+      if (x.type === 'carousel') for (const img of x.carouselImages || []) if (img.imageUrl) list.push({ src: img.imageUrl, alt: img.caption || '' });
+    }
     if (!list.length && postImageUrl) list.push({ src: postImageUrl, alt: '' });
     return list;
   }, [blocksState, postImageUrl]);
@@ -655,6 +661,15 @@ export function PostCard({
                     className={`${fontCls} flex-1 min-w-0`}
                     dangerouslySetInnerHTML={{ __html: sanitizeBlockHtml(b.html) }}
                   />
+                </div>
+              );
+            }
+
+            if (b.type === 'carousel' && Array.isArray(b.carouselImages) && b.carouselImages.length > 0) {
+              const imgs = b.carouselImages.filter((img) => img.imageUrl);
+              return (
+                <div key={b.id || idx} style={{ ...cellStyle, gridColumn: '1 / -1' }} className="min-w-0 py-1">
+                  <MediaStrip images={imgs} onOpen={(i) => openLightbox(imgs[i].imageUrl)} />
                 </div>
               );
             }

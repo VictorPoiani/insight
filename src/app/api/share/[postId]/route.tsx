@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { firstPostImage } from '@/lib/postMedia';
 import { createClient } from '@supabase/supabase-js';
 import { getShareTheme, SHARE_SIZES, ShareFormat } from '@/lib/share/themes';
 import { siteUrl } from '@/lib/account/mailer';
@@ -60,7 +61,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
   const [fonts, avatar, image] = await Promise.all([
     loadFonts(),
     toDataUrl(author?.avatar_url),
-    format === 'og' ? Promise.resolve(null) : toDataUrl(blocks.find((b) => b.type === 'image' && b.imageUrl)?.imageUrl),
+    format === 'og' ? Promise.resolve(null) : toDataUrl(firstPostImage(blocks as Parameters<typeof firstPostImage>[0])),
   ]);
 
   const name = author?.display_name || author?.full_name || author?.username || 'Membro do Insight';

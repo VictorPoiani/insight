@@ -94,7 +94,8 @@ const openverse: CanvasPlugin = {
   description: 'Mais de 800 milhões de imagens com licença aberta.',
   hint: 'Buscar no Openverse…',
   search: async (q, signal) => {
-    const d = await getJson<{ results: OvImage[] }>(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=30&mature=false`, signal);
+    // sem login, o Openverse aceita no máximo 20 por página (acima disso responde 401)
+    const d = await getJson<{ results: OvImage[] }>(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=20`, signal);
     return (d.results || []).map((r) => ({
       kind: 'image' as const,
       id: `ov-${r.id}`,

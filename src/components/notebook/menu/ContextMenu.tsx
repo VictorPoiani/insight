@@ -84,7 +84,8 @@ function MenuPanel({ x, y, items, title, onClose, nested = false }: { x: number;
   useEffect(() => {
     if (nested) return;
     const close = (e: Event) => {
-      if (e.type === 'mousedown' && (e.target as HTMLElement)?.closest?.('.nb-ctx')) return;
+      // clique em qualquer lugar fora do menu fecha (pointerdown na captura: o canvas cancela o mousedown)
+      if (e.type === 'pointerdown' && (e.target as HTMLElement)?.closest?.('.nb-ctx')) return;
       onClose();
     };
     const key = (e: KeyboardEvent) => {
@@ -105,13 +106,13 @@ function MenuPanel({ x, y, items, title, onClose, nested = false }: { x: number;
         }
       }
     };
-    window.addEventListener('mousedown', close);
+    window.addEventListener('pointerdown', close, true);
     window.addEventListener('blur', close);
     window.addEventListener('resize', close);
     window.addEventListener('scroll', close, true);
     window.addEventListener('keydown', key, true);
     return () => {
-      window.removeEventListener('mousedown', close);
+      window.removeEventListener('pointerdown', close, true);
       window.removeEventListener('blur', close);
       window.removeEventListener('resize', close);
       window.removeEventListener('scroll', close, true);

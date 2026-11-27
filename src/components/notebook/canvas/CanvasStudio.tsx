@@ -1472,7 +1472,16 @@ export function CanvasStudio({
         {templates && <TemplateMenu onPick={(id) => (setTemplates(false), addTemplate(id))} onClose={() => setTemplates(false)} />}
       </div>
 
-      {plugins && <PluginPanel tab={plugins} setTab={setPlugins} onInsert={(r) => void insertResult(r)} onClose={() => setPlugins(null)} />}
+      {plugins && (
+        <PluginPanel
+          tab={plugins}
+          setTab={setPlugins}
+          onInsert={(r) => void insertResult(r)}
+          onFiles={(files) => void addFiles(files, ...center())}
+          maxBytes={getUserUploadLimitBytes(level ?? 0, role ?? undefined)}
+          onClose={() => setPlugins(null)}
+        />
+      )}
 
       <RightRail
         zoom={v.k}

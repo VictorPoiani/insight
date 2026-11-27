@@ -240,5 +240,5 @@ export const CANVAS_PLUGINS: CanvasPlugin[] = [
   pixabay,
   unsplash,
   clipper,
-  needsKey('gdrive', 'Google Drive', 'Arquivos do seu Drive.', 'Credenciais OAuth do Google'),
+  needsKey('gdrive', 'Google Drive', 'Imagens, PDFs, áudios, vídeos e documentos do seu Drive. O Insight só enxerga o que você escolher.', 'NEXT_PUBLIC_GOOGLE_CLIENT_ID e NEXT_PUBLIC_GOOGLE_API_KEY'),
 ];

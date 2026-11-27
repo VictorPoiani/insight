@@ -74,6 +74,17 @@ export const NOTEBOOK_TEMPLATES: NotebookTemplateDef[] = [
     title: () => 'Página em blocos',
   },
   {
+    id: 'inbox',
+    section: 'escrita',
+    name: 'Caixa de entrada',
+    description: 'Ideias capturadas com Ctrl+Alt+N, de qualquer tela do Insight.',
+    icon: 'inbox',
+    color: '#a1a1aa',
+    kind: 'folder',
+    title: () => 'Caixa de entrada',
+    hidden: true,
+  },
+  {
     id: 'folder',
     section: 'escrita',
     name: 'Projeto',

@@ -982,6 +982,21 @@ export function CanvasStudio({
     else if (cmd === 'download') download();
     else if (cmd === 'group') addGroup(x, y, selRef.current);
     else if (cmd === 'arrange' && selRef.current.size > 1) doGrid();
+    else if (cmd.startsWith('focusText:')) {
+      // pendência de um cartão: acha o cartão pelo trecho e enquadra
+      const t = cmd.slice(10);
+      const n = dataRef.current.nodes.find((x) => (x.text || '').includes(`[${t}](todo:`)) || dataRef.current.nodes.find((x) => (x.text || '').includes(t));
+      if (n) {
+        setSel(new Set([n.id]));
+        zoomTo(n, 1.2);
+      }
+    } else if (cmd.startsWith('focus:')) {
+      const n = dataRef.current.nodes.find((x) => x.id === cmd.slice(6) || (x.type === 'group' && (x.label || '').toLowerCase() === cmd.slice(6).toLowerCase()));
+      if (n) {
+        setSel(new Set([n.id]));
+        zoomTo(n, n.type === 'group' ? 1 : 1.2);
+      }
+    }
   };
   useEffect(() => {
     const h = (e: Event) => {

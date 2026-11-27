@@ -97,6 +97,8 @@ function inline(raw: string, ctx: RenderCtx): string {
   });
   // fórmula: $x^2$ (fica como código no texto publicado)
   s = s.replace(/(^|[^\p{L}\p{N}$\\])\$(?=[^\s$])([^$\n]*?[^\s\\])\$(?![\p{N}])/gu, (_, pre, tex) => pre + keep(`<code class="nb-math-src">${esc(tex)}</code>`));
+  // pendência: [trecho](todo:revisar)
+  s = s.replace(/\[([^\]\n]+)\]\(todo:(revisar|checar|lore|geral)\)/gi, (_, text, kind) => keep(`<span class="nb-todo nb-todo--${kind.toLowerCase()}" data-todo="${kind.toLowerCase()}">${esc(text)}</span>`));
   // menção: [trecho](ref:<uuid> "tipo")
   s = s.replace(/\[([^\]\n]+)\]\(ref:([0-9a-f-]{36})(?:\s+"(elemento|nota_autor|aviso)")?\)/gi, (_, text, id, kind) =>
     keep(`<span class="nb-ref nb-ref--${kind || 'elemento'}" data-ref="${esc(id.toLowerCase())}" data-kind="${kind || 'elemento'}">${esc(text)}</span>`)

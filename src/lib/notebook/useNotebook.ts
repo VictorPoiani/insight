@@ -57,7 +57,23 @@ export function deriveFields(item: Pick<NotebookItem, 'template' | 'content' | '
   const base = deriveBase(item);
   const data = item.data ? JSON.stringify(item.data) : '';
   const html = item.template === 'chapter' ? String(item.data?.html || '') : '';
-  return { ...base, entry_refs: extractEntryRefs(item.content, data), source_refs: extractSourceRefs(item.content, html), media_refs: extractMediaRefs(`${item.content || ''}\n${data}`) };
+  return { ...base, entry_refs: extractEntryRefs(item.content, data), source_refs: extractSourceRefs(item.content, html), media_refs: extractMediaRefs(`${item.content || ''}\n${data}`), todos: extractTodos(item.content, html) };
+}
+
+export interface TodoRef {
+  /** tipo: revisar, checar, lore, geral */
+  k: string;
+  /** o trecho marcado */
+  t: string;
+  /** posição (n-ésima pendência da nota), para levar até ela */
+  i: number;
+}
+/** Pendências marcadas no texto: [trecho](todo:tipo) ou <span data-todo>. */
+export function extractTodos(md: string, html = ''): TodoRef[] {
+  const out: TodoRef[] = [];
+  for (const m of (md || '').matchAll(/\[([^\]\n]+)\]\(todo:(revisar|checar|lore|geral)\)/gi)) out.push({ k: m[2].toLowerCase(), t: m[1].slice(0, 200), i: out.length });
+  for (const m of (html || '').matchAll(/<span[^>]*data-todo="(revisar|checar|lore|geral)"[^>]*>([\s\S]*?)<\/span>/gi)) out.push({ k: m[1].toLowerCase(), t: m[2].replace(/<[^>]+>/g, '').slice(0, 200), i: out.length });
+  return out.slice(0, 300);
 }
 
 const MEDIA_BASE = (process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
@@ -335,8 +351,9 @@ export function useNotebook(profileId: string | null) {
 
   const flushAll = useCallback(async () => {
     await Promise.all(Array.from(pending.current.keys()).map((id) => flush(id)));
-    if (profileId) await drainQueue(profileId, supabase);
-  }, [flush, profileId, supabase]);
+    // fila de fora das notas (Quick Capture, verbetes, fontes): se algo subiu, recarrega a lista
+    if (profileId && (await drainQueue(profileId, supabase)) > 0) void reload();
+  }, [flush, profileId, supabase, reload]);
 
   // a conexão voltou: manda tudo o que ficou guardado
   useEffect(() => {
@@ -597,6 +614,13 @@ export function useNotebook(profileId: string | null) {
     async (q: string) => {
       const term = q.trim().replace(/[%_,()]/g, ' ').slice(0, 80);
       if (term.length < 2 || !profileId) return [] as { id: string; snippet: string }[];
+      // busca em português (radicais: "castelos" acha "castelo"), com trecho destacado
+      const { data: ranked, error: rpcErr } = await supabase.rpc('notebook_search', { p_q: term, p_limit: 60 });
+      if (!rpcErr && Array.isArray(ranked) && ranked.length) {
+        return (ranked as { kind: string; id: string; snippet: string }[])
+          .filter((r) => r.kind === 'item' && itemsRef.current[r.id])
+          .map((r) => ({ id: r.id, snippet: (r.snippet || '').replace(/\s+/g, ' ').slice(0, 220) }));
+      }
       const { data } = await supabase
         .from('notebook_items')
         .select('id, title, content, data')

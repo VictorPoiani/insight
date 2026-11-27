@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Files,
+  Inbox,
+  ListTodo,
   Search,
   Network,
   CalendarDays,
@@ -71,6 +73,8 @@ import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
 import { CANVAS_CMD_EVENT, CanvasStudio } from './canvas/CanvasStudio';
 import { TrashDialog } from './trash/TrashDialog';
+import { TodoPanel } from './todos/TodoPanel';
+import { QUICK_CAPTURE_EVENT, QUICK_CAPTURED_EVENT } from './QuickCapture';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
 import { ArticleMode } from './article/ArticleMode';
 import { ContextMenuProvider } from './menu/ContextMenu';
@@ -120,7 +124,7 @@ interface Viewer {
   contributor_level: number | null;
 }
 
-type LeftMode = 'files' | 'search' | null;
+type LeftMode = 'files' | 'search' | 'todos' | null;
 type MainView = 'home' | 'note' | 'graph' | 'summary';
 
 const TABS_KEY = 'insight-notebook-tabs';
@@ -278,6 +282,33 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const session = useWritingSession(api, viewer.id);
   const codex = useCodex(viewer.id);
   const [trashOpen, setTrashOpen] = useState(false);
+  // ideia capturada (Ctrl+Alt+N) com o Notebook aberto: aparece na hora na Caixa de entrada
+  useEffect(() => {
+    const h = () => void api.reload();
+    window.addEventListener(QUICK_CAPTURED_EVENT, h);
+    return () => window.removeEventListener(QUICK_CAPTURED_EVENT, h);
+  }, [api]);
+  /** leva até a n-ésima pendência da nota (rola o editor e pisca o trecho) */
+  const goTodo = (id: string, index: number, text: string) => {
+    open(id);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) setLeft(null);
+    if (api.items[id]?.template === 'canvas') {
+      setTimeout(() => window.dispatchEvent(new CustomEvent(CANVAS_CMD_EVENT, { detail: { id, cmd: `focusText:${text}` } })), 600);
+      return;
+    }
+    let tries = 0;
+    const t = setInterval(() => {
+      const els = document.querySelectorAll<HTMLElement>('main [data-todo]');
+      const el = els[index] || Array.from(els).find((e) => e.textContent?.trim() === text.trim());
+      if (el || ++tries > 25) {
+        clearInterval(t);
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.classList.add('nb-flash');
+        setTimeout(() => el.classList.remove('nb-flash'), 1400);
+      }
+    }, 120);
+  };
   const [secretsShown, setSecretsShown] = useSecrets();
   const restored = useRef(false);
 
@@ -541,7 +572,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       } else if (k === 'o' || (k === 'k' && !(e.target as HTMLElement)?.closest?.('textarea'))) {
         e.preventDefault();
         setPalette({ mode: '', aside: false });
-      } else if (k === 'n' && !e.shiftKey) {
+      } else if (k === 'n' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         void newInContext();
       } else if (k === 'f' && e.shiftKey) {
@@ -899,6 +930,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'project', group: 'Criar', label: 'Novo projeto', icon: ic(FolderPlus), run: () => setProjectDialog(true) },
     { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
     { id: 'canvas', group: 'Criar', label: 'Novo canvas', icon: <Glyph name="canvas" />, keywords: 'quadro obsidian cartoes', run: () => void newInContext('canvas') },
+    { id: 'capture', group: 'Criar', label: 'Capturar ideia na Caixa de entrada', icon: ic(Inbox), shortcut: 'Ctrl+Alt+N', keywords: 'inbox rapida quick', run: () => window.dispatchEvent(new Event(QUICK_CAPTURE_EVENT)) },
     { id: 'trash-open', group: 'Notebook', label: 'Abrir a lixeira', icon: ic(Trash2), keywords: 'apagados restaurar excluidos', run: () => setTrashOpen(true) },
     { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
     { id: 'daily', group: 'Criar', label: 'Nota de hoje', icon: ic(CalendarDays), keywords: 'diario diário', run: () => void openDaily() },
@@ -1123,6 +1155,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             <RibbonBtn label="Buscar (Ctrl+Shift+F)" active={left === 'search'} onClick={() => setLeft((l) => (l === 'search' ? null : 'search'))}>
               <Search />
             </RibbonBtn>
+ <RibbonBtn label="Pendências" active={left === 'todos'} onClick={() => setLeft((l) => (l === 'todos' ? null : 'todos'))}>
+              <ListTodo />
+            </RibbonBtn>
             <RibbonBtn label="Grafo (Ctrl+G)" active={shown === 'graph'} onClick={() => setView((v) => (v === 'graph' ? (activeId ? 'note' : 'home') : 'graph'))}>
               <Network />
             </RibbonBtn>
@@ -1184,8 +1219,10 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                   onOpenTrash={() => setTrashOpen(true)}
                   onClose={typeof window !== 'undefined' && window.innerWidth < 1024 ? () => setLeft(null) : undefined}
                 />
+              ) : left === 'todos' ? (
+                <TodoPanel api={api} projectId={currentProjectId ?? null} onGo={goTodo} />
               ) : (
-                <SearchPanel api={api} onOpen={open} initial={searchSeed} />
+                <SearchPanel api={api} onOpen={open} initial={searchSeed} entriesApi={entriesApi} projectId={currentProjectId ?? null} />
               )}
             </aside>
           </>

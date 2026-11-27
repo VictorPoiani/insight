@@ -38,7 +38,7 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Typography from '@tiptap/extension-typography';
 import { BubbleMenu } from '@tiptap/react/menus';
-import { EntryRef } from './editor/extensions';
+import { EntryRef, PendingMark } from './editor/extensions';
 import { Illustration, PageBreak } from './editor/bookExtensions';
 import { ImageBar } from './editor/ImageBar';
 import { EntryLinkButtons, SuggestMenu, makeSuggest, mentionItems, type MenuState } from './editor/RichNoteEditor';
@@ -57,7 +57,7 @@ const ALLOWED = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE'
 /** Atributos permitidos por tag, com o formato exato que cada um pode ter. */
 const ATTR_OK: Record<string, Record<string, RegExp>> = {
   IMG: { src: /^https?:\/\//i, alt: /^[^<>]{0,300}$/ },
-  SPAN: { 'data-ref': /^[0-9a-f-]{36}$/i, 'data-kind': /^(elemento|nota_autor|aviso)$/ },
+  SPAN: { 'data-ref': /^[0-9a-f-]{36}$/i, 'data-kind': /^(elemento|nota_autor|aviso)$/, 'data-todo': /^(revisar|checar|lore|geral)$/ },
   HR: { 'data-page-break': /^true$/ },
   FIGURE: { 'data-figure': /^$/, 'data-layout': /^(center|full|wide|left|right)$/, 'data-width': /^(30|40|50|60|70|80|90|100)$/ },
 };
@@ -305,6 +305,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
       Illustration.configure({ inline: false }),
       PageBreak,
       EntryRef,
+      PendingMark,
       mentionExt,
       Placeholder.configure({ placeholder: 'Era uma vez…' }),
       CurrentBlock,

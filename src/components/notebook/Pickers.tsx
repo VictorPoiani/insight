@@ -5,6 +5,8 @@ import { Search, CornerDownLeft, Plus, Loader2, Hash } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { NOTEBOOK_TEMPLATES, SECTION_LABELS, type NotebookTemplateDef, type TemplateSection } from '@/lib/notebook/templates';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
+import type { EntriesApi } from '@/lib/notebook/useEntries';
+import { ReplacePanel } from './search/ReplacePanel';
 import { itemIcon } from './FileExplorer';
 import { Glyph } from './icons/Glyph';
 
@@ -255,7 +257,8 @@ function Card({ icon, name, desc, color, onClick }: { icon: React.ReactNode; nam
 // Busca no conteúdo
 // ============================================================================
 
-export function SearchPanel({ api, onOpen, initial }: { api: NotebookApi; onOpen: (id: string) => void; initial?: string }) {
+export function SearchPanel({ api, onOpen, initial, entriesApi, projectId }: { api: NotebookApi; onOpen: (id: string) => void; initial?: string; entriesApi?: EntriesApi; projectId?: string | null }) {
+  const [mode, setMode] = useState<'buscar' | 'substituir'>('buscar');
   const [q, setQ] = useState(initial || '');
   const [hits, setHits] = useState<{ id: string; snippet: string }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -292,6 +295,10 @@ export function SearchPanel({ api, onOpen, initial }: { api: NotebookApi; onOpen
   }, [q, tagMode, searchContent]);
 
   const mark = (text: string) => {
+    // trecho vindo da busca do servidor: <<palavra>> marca o que bateu
+    if (text.includes('<<')) {
+      return text.split(/(<<[^>]*>>)/).map((part, k) => (part.startsWith('<<') ? <mark key={k} className="nb-mark">{part.slice(2, -2)}</mark> : <span key={k}>{part}</span>));
+    }
     const term = q.trim();
     if (!term) return text;
     const i = text.toLowerCase().indexOf(term.toLowerCase());
@@ -305,10 +312,28 @@ export function SearchPanel({ api, onOpen, initial }: { api: NotebookApi; onOpen
     );
   };
 
+  const tabs = (
+    <div className="nb-search-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={mode === 'buscar'} onClick={() => setMode('buscar')}>
+        Buscar
+      </button>
+      <button type="button" role="tab" aria-selected={mode === 'substituir'} onClick={() => setMode('substituir')}>
+        Substituir
+      </button>
+    </div>
+  );
+  if (mode === 'substituir')
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        <div className="px-3 pt-3">{tabs}</div>
+        <ReplacePanel api={api} entriesApi={entriesApi} projectId={projectId ?? null} onOpen={(id) => id && onOpen(id)} />
+      </div>
+    );
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 pt-3 pb-2 space-y-2">
-        <span className="nb-pane-title">Buscar</span>
+        {tabs}
         <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg bg-[var(--nb-bg)] border border-[var(--nb-line)] focus-within:border-[var(--nb-hl)]">
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--nb-ink-3)]" /> : <Search className="w-3.5 h-3.5 text-[var(--nb-ink-3)]" />}
           <input

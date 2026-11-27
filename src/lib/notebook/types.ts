@@ -32,7 +32,9 @@ export type NotebookTemplate =
   | 'diet'
   | 'agenda'
   // pasta comum
-  | 'folder';
+  | 'folder'
+  // Caixa de entrada (Quick Capture)
+  | 'inbox';
 
 export type ChapterStatus = 'ideia' | 'rascunho' | 'revisao' | 'pronto' | 'publicado';
 
@@ -92,6 +94,8 @@ export interface NotebookItem {
   source_refs?: string[];
   /** mídias do R2 citadas no conteúdo (endereços) */
   media_refs?: string[];
+  /** pendências marcadas no texto (Central de Pendências) */
+  todos?: { k: string; t: string; i: number }[];
   /** versão do conteúdo no servidor (conflitos entre dispositivos) */
   version?: number;
   word_count: number;
@@ -108,6 +112,6 @@ export interface NotebookItem {
 
 /** Colunas leves (árvore, busca de títulos, grafo). */
 export const NOTEBOOK_META_COLUMNS =
-  'id, profile_id, parent_id, kind, template, title, icon, color, tags, links, entry_refs, source_refs, media_refs, word_count, position, pinned, is_template, published_post_id, archived_at, created_at, updated_at, version';
+  'id, profile_id, parent_id, kind, template, title, icon, color, tags, links, entry_refs, source_refs, media_refs, todos, word_count, position, pinned, is_template, published_post_id, archived_at, created_at, updated_at, version';
 
 export const NOTEBOOK_FULL_COLUMNS = `${NOTEBOOK_META_COLUMNS}, content, blocks, data`;

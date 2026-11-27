@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Newspaper,
+  ArrowUp,
 } from 'lucide-react';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
@@ -406,6 +407,52 @@ function CommunityHomeFeed() {
   const progressiveFeed = useProgressiveList(mixedFeed, 8, 8, `${activeTab}|${selectedTag}|${query}`);
 
   const { isOnline } = usePresence();
+
+  // Quem está online agora (sem contar quem está vendo)
+  const onlineNow = useMemo(
+    () => profiles.filter((p) => p.id !== loggedProfile?.id && isOnline(p.id, p.last_seen_at)),
+    [profiles, loggedProfile?.id, isOnline]
+  );
+
+  // "Novos posts ↑": confere de tempos em tempos se chegou algo depois do mais recente carregado
+  const [freshPosts, setFreshPosts] = useState<{ id: string; author: string }[]>([]);
+  useEffect(() => {
+    setFreshPosts([]);
+    if (loading || (activeTab !== 'for_you' && activeTab !== 'following')) return;
+    const newest = posts.reduce((m, p) => (p.created_at > m ? p.created_at : m), '');
+    if (!newest) return;
+    let alive = true;
+    const check = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { data } = await supabase
+        .from('posts')
+        .select('id, profile_id, author_id, visibility, firstVisibility:blocks->0->>postVisibility')
+        .gt('created_at', newest)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!alive || !data) return;
+      const fresh = (data as { id: string; profile_id: string | null; author_id: string | null; visibility: string | null; firstVisibility: string | null }[])
+        .filter((p) => p.visibility !== 'private' && p.firstVisibility !== 'private')
+        .map((p) => ({ id: p.id, author: (p.profile_id || p.author_id) as string }))
+        .filter((p) => p.author && p.author !== loggedProfile?.id)
+        .filter((p) => activeTab !== 'following' || followingIds.has(p.author));
+      setFreshPosts(fresh);
+    };
+    const t = setInterval(() => void check(), 45_000);
+    const onVisible = () => void check();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [posts, loading, activeTab, followingIds, loggedProfile?.id, supabase]);
+
+  const showFreshPosts = async () => {
+    setFreshPosts([]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await loadExploreData();
+  };
   // quem está online aparece primeiro no carrossel
   const carouselMembers = useMemo(() => {
     const on = filteredProfiles.filter((p) => isOnline(p.id, p.last_seen_at));
@@ -576,6 +623,31 @@ function CommunityHomeFeed() {
           </div>
         )}
       </header>
+
+      {/* Novos posts chegaram: pílula flutuante logo abaixo do cabeçalho */}
+      {freshPosts.length > 0 && (activeTab === 'for_you' || activeTab === 'following') && (
+        <div className="sticky top-14 z-20 h-0 pointer-events-none">
+          <button
+            type="button"
+            onClick={() => void showFreshPosts()}
+            className="pointer-events-auto absolute left-1/2 -translate-x-1/2 top-2 insight-slide-down inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 rounded-full bg-accent text-white text-xs font-bold shadow-lg shadow-accent/30 hover:bg-accent-hover transition-colors"
+          >
+            <span className="flex -space-x-1.5">
+              {[...new Set(freshPosts.map((f) => f.author))].slice(0, 3).map((aid) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={aid}
+                  src={profilesMap[aid]?.avatar_url || '/assets/net/default-perfil'}
+                  alt=""
+                  className="w-5 h-5 rounded-full object-cover ring-2 ring-accent bg-elevated"
+                />
+              ))}
+            </span>
+            <ArrowUp className="w-3.5 h-3.5" />
+            {freshPosts.length === 1 ? '1 novo post' : `${freshPosts.length >= 20 ? '20+' : freshPosts.length} novos posts`}
+          </button>
+        </div>
+      )}
 
       {/* 2. COMPOSER EXPANSÍVEL */}
       {loggedProfile && showQuickComposer && (
@@ -748,6 +820,37 @@ function CommunityHomeFeed() {
         </div>
       ) : (
         <div>
+          {/* Online agora: quem está no Insight neste momento */}
+          {activeTab === 'for_you' && !selectedTag && onlineNow.length > 0 && (
+            <section className="px-4 sm:px-6 py-2.5 border-b border-border flex items-center gap-3 min-w-0" aria-label="Online agora">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-secondary shrink-0">
+                <span className="relative flex w-2 h-2">
+                  <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-500 opacity-60 animate-ping" />
+                  <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+                </span>
+                {onlineNow.length} online agora
+              </span>
+              <div className="flex items-center -space-x-2 min-w-0 overflow-hidden py-0.5">
+                {onlineNow.slice(0, 12).map((prof) => (
+                  <Link
+                    key={prof.id}
+                    href={`/u/${encodeURIComponent(prof.username)}`}
+                    title={prof.display_name || prof.full_name || prof.username}
+                    className="shrink-0 transition-transform hover:-translate-y-0.5 hover:z-10"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={prof.avatar_url || '/assets/net/default-perfil'}
+                      alt={prof.display_name || prof.full_name || prof.username}
+                      className="w-7 h-7 rounded-full object-cover ring-2 ring-background bg-elevated"
+                    />
+                  </Link>
+                ))}
+              </div>
+              {onlineNow.length > 12 && <span className="text-xs text-muted shrink-0">+{onlineNow.length - 12}</span>}
+            </section>
+          )}
+
           {activeTab === 'for_you' && !selectedTag && carouselMembers.length > 0 && (
             <section className="px-4 sm:px-6 py-3 border-b border-border bg-surface/20 relative">
               <div className="flex items-center justify-between mb-2.5 gap-2">

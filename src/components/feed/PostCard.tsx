@@ -29,6 +29,16 @@ import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle } from '@/lib/grid';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { PostTime } from './PostTime';
+import { LikedBy, ReplyPreview, ReactionChips, ReactionButton, HeartBurst } from './PostSocial';
+import { ProfileHoverCard } from './ProfileHoverCard';
+import {
+  getPostSocial,
+  patchPostSocial,
+  subscribePostSocial,
+  setMyReaction,
+  type PostSocial,
+  type ReactionId,
+} from '@/lib/postSocial';
 import { PostComposer } from './PostComposer';
 import { SharePostModal } from './SharePostModal';
 import {
@@ -49,6 +59,7 @@ import {
   Compass,
   Network,
   Flag,
+  AtSign,
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -257,6 +268,46 @@ export function PostCard({
   const [hasSaved, setHasSaved] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
 
+  // Contexto social (quem curtiu, resposta em destaque, reações) — em lote com os outros cartões
+  const [social, setSocial] = useState<PostSocial | null>(null);
+  const [likePulse, setLikePulse] = useState(0);
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    getPostSocial(post.id, viewer?.id ?? null).then((s) => alive && setSocial(s));
+    const off = subscribePostSocial(post.id, (s) => alive && setSocial(s));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [post.id, viewer?.id]);
+
+  async function handleReact(r: ReactionId) {
+    if (!viewer) {
+      window.location.href = loginHref();
+      return;
+    }
+    const prev = social;
+    const next: ReactionId | null = social?.myReaction === r ? null : r;
+    patchPostSocial(post.id, viewer.id, (s) => {
+      const counts = { ...s.reactions };
+      if (s.myReaction) counts[s.myReaction] = Math.max(0, (counts[s.myReaction] || 0) - 1);
+      if (next) counts[next] = (counts[next] || 0) + 1;
+      return { ...s, reactions: counts, myReaction: next };
+    });
+    const { error } = await setMyReaction(post.id, viewer.id, next);
+    if (error && prev) patchPostSocial(post.id, viewer.id, () => prev);
+  }
+
+  // Menciona quem está vendo (e não é o autor)
+  const mentionsViewer = useMemo(() => {
+    const handle = viewer?.username;
+    if (!handle || viewer?.id === author.id) return false;
+    const text = [postContent || '', ...blocksState.map((b) => b.html || '')].join(' ');
+    const esc = handle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\w])@${esc}(?![\\w])`, 'i').test(text);
+  }, [viewer?.username, viewer?.id, author.id, postContent, blocksState]);
+
   // Salvar para ler depois (lista privada em "Sua atividade" → Salvos)
   async function handleToggleSave() {
     if (!viewer) {
@@ -437,6 +488,17 @@ export function PostCard({
     const nextLikes = nextLiked ? likes + 1 : Math.max(0, likes - 1);
     setHasLiked(nextLiked);
     setLikes(nextLikes);
+    if (nextLiked) setLikePulse((n) => n + 1);
+    const me = loggedUserProfile;
+    patchPostSocial(post.id, me.id, (s) => ({
+      ...s,
+      likers: nextLiked
+        ? [
+            { id: me.id, username: me.username, name: me.display_name || me.full_name || me.username, avatar_url: me.avatar_url },
+            ...s.likers.filter((x) => x.id !== me.id),
+          ].slice(0, 3)
+        : s.likers.filter((x) => x.id !== me.id),
+    }));
 
     const { data, error } = await supabase.rpc('toggle_post_like', {
       target_post_id: post.id,
@@ -560,10 +622,35 @@ export function PostCard({
     if (!list.length && postImageUrl) list.push({ src: postImageUrl, alt: '' });
     return list;
   }, [blocksState, postImageUrl]);
+  const lastTouchRef = useRef(0);
+  const pointerTypeRef = useRef<string>('mouse');
+  const lightboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openLightbox = (src: string) => {
     const i = lightboxImages.findIndex((x) => x.src === src);
-    setLightboxIndex(i >= 0 ? i : 0);
+    const go = () => setLightboxIndex(i >= 0 ? i : 0);
+    if (pointerTypeRef.current !== 'touch') return go();
+    if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+    lightboxTimer.current = setTimeout(go, 300);
   };
+  // duplo toque no conteúdo (celular) = curtir, como no Instagram
+  const onContentPointerUp = (e: React.PointerEvent) => {
+    pointerTypeRef.current = e.pointerType;
+    if (e.pointerType !== 'touch') return;
+    // vídeo, botões e links têm toques próprios (ex.: duplo toque no vídeo avança 10 s)
+    if ((e.target as HTMLElement).closest('video, button, a, input, iframe, [role="slider"]')) return;
+    const now = Date.now();
+    if (now - lastTouchRef.current < 300) {
+      lastTouchRef.current = 0;
+      if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+      setBurst((n) => n + 1);
+      if (!hasLiked) void handleLike();
+    } else {
+      lastTouchRef.current = now;
+    }
+  };
+  useEffect(() => () => {
+    if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+  }, []);
 
   if (!isAdmin && postVisibility === 'private') {
     return null;
@@ -716,7 +803,8 @@ export function PostCard({
                     style={{ width: b.videoWidth || '100%' }}
                     className={`${getImageAlignClass(b.videoAlign)} space-y-1.5`}
                   >
-                    <div className="relative rounded-xl overflow-hidden border border-border bg-black/90">
+                    {/* o player ajusta a própria moldura à proporção do vídeo (sem tarjas pretas) */}
+                    <div className={`relative ${isRawGif ? 'rounded-xl overflow-hidden border border-border bg-black/90' : ''}`}>
                       {isRawGif ? (
                         <img
                           src={b.videoUrl}
@@ -725,7 +813,7 @@ export function PostCard({
                           loading="lazy"
                         />
                       ) : (
-                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} />
+                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} autoPlayInView={!isGifMode} className="rounded-xl overflow-hidden border border-border" />
                       )}
 
                       {isGifMode && isRawGif && (
@@ -1063,6 +1151,12 @@ export function PostCard({
       }`}
     >
       {/* Indicadores Superiores: Fixado / Privado */}
+      {mentionsViewer && (
+        <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-secondary">
+          <AtSign className="w-3.5 h-3.5 text-accent" />
+          <span>{author.display_name || author.full_name || author.username} mencionou você</span>
+        </div>
+      )}
       {(isPostPinned || postVisibility === 'private') && (
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {isPostPinned && (
@@ -1083,6 +1177,7 @@ export function PostCard({
 
       {/* Cabeçalho do Post */}
       <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <ProfileHoverCard profile={author}>
         <Link
           href={authorProfileHref}
           className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
@@ -1110,6 +1205,7 @@ export function PostCard({
             <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
           </div>
         </Link>
+        </ProfileHoverCard>
 
         {isAdmin && (
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
@@ -1191,6 +1287,8 @@ export function PostCard({
         </div>
       ) : (
         <NsfwGate active={isNsfw && !isPostOwner}>
+        <div className="relative" onPointerUp={onContentPointerUp}>
+        <HeartBurst show={burst} />
         {hasRichBlocks ? (
         <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
           {groupMediaRuns(blocksState).map((item) => {
@@ -1255,6 +1353,7 @@ export function PostCard({
           )}
         </>
       )}
+        </div>
         </NsfwGate>
       )}
 
@@ -1282,6 +1381,8 @@ export function PostCard({
           ))}
         </div>
       )}
+
+      {social && !isEditing && <ReactionChips social={social} onReact={(r) => void handleReact(r)} />}
 
       {/* Barra de Ações (Responsiva para Mobile e Desktop) */}
       <div className="mt-4 pt-3 flex items-center justify-between gap-2 text-xs text-secondary">
@@ -1328,7 +1429,7 @@ export function PostCard({
               }`}
             >
               <Repeat2 className="w-4 h-4" />
-              <span>{reposts}</span>
+              <span key={reposts} className="insight-count-roll tabular-nums">{reposts}</span>
             </button>
             {repostMenu && (
               <>
@@ -1372,9 +1473,11 @@ export function PostCard({
               hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
           >
-            <Heart className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''}`} />
-            <span>{likes}</span>
+            <Heart key={likePulse} className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''} ${likePulse ? 'insight-like-pop' : ''}`} />
+            <span key={likes} className="insight-count-roll tabular-nums">{likes}</span>
           </button>
+
+          <ReactionButton mine={social?.myReaction ?? null} onReact={(r) => void handleReact(r)} />
 
           <button
             type="button"
@@ -1413,6 +1516,13 @@ export function PostCard({
           </button>
         )}
       </div>
+
+      {social && !isEditing && (
+        <LikedBy likers={social.likers} total={likes} viewerLiked={hasLiked} />
+      )}
+      {social?.topReply && variant === 'feed' && !isEditing && (
+        <ReplyPreview reply={social.topReply} total={displayedRepliesCount} postId={post.id} />
+      )}
 
       {/* Modal Insight* Share Studio */}
       {lightboxIndex !== null && lightboxImages.length > 0 && (

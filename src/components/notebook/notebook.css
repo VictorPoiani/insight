@@ -2371,6 +2371,38 @@ a.nb-cv-credit:hover { color: var(--nb-ink-2); text-decoration: underline; text-
   .nb-cv-templates { width: min(320px, calc(100vw - 16px)); max-height: 50vh; }
 }
 
+/* ============================================================ Lixeira */
+.nb-trash { display: flex; flex-direction: column; max-height: min(80vh, 720px); }
+.nb-trash header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 12px; }
+.nb-trash h2 { font-size: 15px; font-weight: 600; }
+.nb-trash header p { margin-top: 3px; font-size: 12px; color: var(--nb-ink-3); }
+.nb-trash header button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--nb-ink-3); }
+.nb-trash header button:hover { color: var(--nb-ink); background: rgba(255, 255, 255, 0.06); }
+.nb-trash-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 0 20px; border-bottom: 1px solid var(--nb-line); }
+.nb-trash-bar nav { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.nb-trash-bar nav button { display: flex; align-items: center; gap: 6px; padding: 8px 0 9px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 12.5px; color: var(--nb-ink-3); }
+.nb-trash-bar nav button:hover { color: var(--nb-ink-2); }
+.nb-trash-bar nav button[aria-selected='true'] { color: var(--nb-ink); border-bottom-color: var(--nb-ink); }
+.nb-trash-bar nav span { font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--nb-ink-3); }
+.nb-trash-bar select { height: 28px; margin: 4px 0; padding: 0 8px; border-radius: 6px; border: 1px solid var(--nb-line); background: var(--nb-bg); font-size: 12px; color: var(--nb-ink-2); }
+.nb-trash-list { flex: 1; min-height: 120px; overflow-y: auto; padding: 4px 8px; }
+.nb-trash-list li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.nb-trash-list li:last-child { border-bottom: 0; }
+.nb-trash-icon { display: grid; place-items: center; width: 20px; color: var(--nb-ink-3); opacity: 0.8; }
+.nb-trash-main { flex: 1; min-width: 0; }
+.nb-trash-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--nb-ink-2); }
+.nb-trash-main small { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--nb-ink-3); }
+.nb-trash-left { flex-shrink: 0; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--nb-ink-3); }
+.nb-trash-left[data-soon] { color: #f0a07a; }
+.nb-trash-list li > button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--nb-ink-3); }
+.nb-trash-list li > button:hover { color: var(--nb-ink); background: rgba(255, 255, 255, 0.06); }
+.nb-trash-list li > .nb-trash-danger:hover { color: #f87171; }
+.nb-trash-empty { justify-content: center; padding: 32px 0 !important; font-size: 12.5px; color: var(--nb-ink-3); }
+.nb-trash footer { display: flex; justify-content: flex-end; padding: 10px 20px 14px; border-top: 1px solid var(--nb-line); }
+.nb-trash footer button { height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--nb-line); font-size: 12px; color: var(--nb-ink-3); }
+.nb-trash footer button:hover:not(:disabled) { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
+.nb-trash footer button:disabled { opacity: 0.4; }
+
 /* ============================================================ Modo Artigo */
 .nb-art2 { --a-line: rgba(255, 255, 255, 0.07); --a-serif: var(--nb-literata), Georgia, 'Times New Roman', serif; padding-bottom: 40px; }
 .nb-art2-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-bottom: 14px; margin-bottom: 22px; border-bottom: 1px solid var(--a-line); }

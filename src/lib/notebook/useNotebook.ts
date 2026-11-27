@@ -4,6 +4,7 @@ import { extractEntryRefs } from './entries';
 import { extractSourceRefs } from './sources';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { drainQueue, idbAll, idbDel, idbGet, idbPut, isNetworkError, onPendingChange, pendingCount } from './localStore';
 import type { PostBlock } from '@/types/database';
 import { countWords, extractLinks, extractTags, htmlToText } from './markdown';
 import { getTemplate } from './templates';
@@ -32,6 +33,12 @@ export interface NotebookRevision {
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'offline';
 
 const LOCAL_KEY = (profileId: string) => `insight-notebook-pending:${profileId}`;
+const OUT_KEY = (profileId: string, id: string) => `${profileId}:item:${id}`;
+const DOC_KEY = (profileId: string, id: string) => `${profileId}:doc:${id}`;
+const META_KEY = (profileId: string) => `${profileId}:meta`;
+/** campos que mudam o conteúdo (conferem a versão antes de gravar) */
+const CONTENT_FIELDS = ['content', 'blocks', 'data', 'title'] as const;
+const META_SYNC = ['title', 'icon', 'color', 'parent_id', 'position', 'pinned', 'archived_at', 'template', 'published_post_id', 'is_template'] as const;
 const REVISION_EVERY_MS = 10 * 60 * 1000;
 
 function blocksText(blocks: PostBlock[] | null | undefined): string {
@@ -50,7 +57,17 @@ export function deriveFields(item: Pick<NotebookItem, 'template' | 'content' | '
   const base = deriveBase(item);
   const data = item.data ? JSON.stringify(item.data) : '';
   const html = item.template === 'chapter' ? String(item.data?.html || '') : '';
-  return { ...base, entry_refs: extractEntryRefs(item.content, data), source_refs: extractSourceRefs(item.content, html) };
+  return { ...base, entry_refs: extractEntryRefs(item.content, data), source_refs: extractSourceRefs(item.content, html), media_refs: extractMediaRefs(`${item.content || ''}\n${data}`) };
+}
+
+const MEDIA_BASE = (process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
+/** Endereços de mídia do R2 citados no conteúdo (para a Biblioteca saber onde cada uma é usada). */
+export function extractMediaRefs(text: string): string[] {
+  if (!MEDIA_BASE || !text) return [];
+  const esc = MEDIA_BASE.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const out = new Set<string>();
+  for (const m of text.matchAll(new RegExp(`${esc}/[^\\s"'<>)\\]]+`, 'g'))) out.add(m[0].replace(/[\\.,;]+$/, ''));
+  return Array.from(out).slice(0, 500);
 }
 
 function deriveBase(item: Pick<NotebookItem, 'template' | 'content' | 'blocks' | 'data'>) {
@@ -75,6 +92,8 @@ export function useNotebook(profileId: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  /** alterações guardadas no aparelho esperando a rede */
+  const [pendingSync, setPendingSync] = useState(0);
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -92,13 +111,20 @@ export function useNotebook(profileId: string | null) {
       .eq('profile_id', profileId)
       .order('position', { ascending: true })
       .limit(5000);
+    let rows = (data || []) as unknown as NotebookItem[];
     if (err) {
-      setError(err.message);
-      setLoading(false);
-      return;
-    }
+      // sem rede: abre com a última lista guardada no aparelho
+      const cached = isNetworkError(err) ? await idbGet<NotebookItem[]>('docs', META_KEY(profileId)) : undefined;
+      if (!cached) {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
+      rows = cached;
+      setSaveState('offline');
+    } else void idbPut('docs', META_KEY(profileId), rows);
     const next: Record<string, NotebookItem> = {};
-    for (const row of (data || []) as unknown as NotebookItem[]) {
+    for (const row of rows) {
       next[row.id] = { ...row, content: '', blocks: null, data: {} as NotebookItemData, _full: false };
     }
     // mantém o que já estava aberto/carregado
@@ -117,29 +143,76 @@ export function useNotebook(profileId: string | null) {
   // reenvia alterações que ficaram só no aparelho (aba fechada / sem rede)
   useEffect(() => {
     if (!profileId) return;
-    try {
-      const raw = localStorage.getItem(LOCAL_KEY(profileId));
-      if (!raw) return;
-      const saved = JSON.parse(raw) as Record<string, Patch>;
-      for (const [id, patch] of Object.entries(saved)) {
-        pending.current.set(id, { ...(pending.current.get(id) || {}), ...patch });
-        scheduleFlush(id, 200);
+    void (async () => {
+      // formato antigo (localStorage) passa para o IndexedDB
+      try {
+        const raw = localStorage.getItem(LOCAL_KEY(profileId));
+        if (raw) {
+          for (const [id, patch] of Object.entries(JSON.parse(raw) as Record<string, Patch>)) await idbPut('outbox', OUT_KEY(profileId, id), { patch, base: null, ts: Date.now() });
+          localStorage.removeItem(LOCAL_KEY(profileId));
+        }
+      } catch {
+        /* ignora */
       }
-    } catch {
-      /* ignora */
-    }
+      const saved = await idbAll<{ patch: Patch; base: number | null }>('outbox', `${profileId}:item:`);
+      for (const [key, v] of saved) {
+        const id = key.slice(`${profileId}:item:`.length);
+        pending.current.set(id, { ...v.patch, ...(pending.current.get(id) || {}) });
+        if (v.base != null && !baseVersion.current.has(id)) baseVersion.current.set(id, v.base);
+        scheduleFlush(id, 300);
+      }
+      void refreshPending();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId]);
 
-  const persistLocal = useCallback(() => {
+  /** versão do servidor sobre a qual a edição pendente foi feita */
+  const baseVersion = useRef<Map<string, number>>(new Map());
+
+  const refreshPending = useCallback(async () => {
     if (!profileId) return;
-    try {
-      const obj = Object.fromEntries(pending.current.entries());
-      if (Object.keys(obj).length) localStorage.setItem(LOCAL_KEY(profileId), JSON.stringify(obj));
-      else localStorage.removeItem(LOCAL_KEY(profileId));
-    } catch {
-      /* cota do navegador */
-    }
+    setPendingSync(await pendingCount(profileId));
+  }, [profileId]);
+  useEffect(() => onPendingChange(() => void refreshPending()), [refreshPending]);
+
+  /** Guarda a edição pendente no aparelho (IndexedDB) antes de tentar a rede. */
+  const persistLocal = useCallback(
+    (id?: string) => {
+      if (!profileId) return;
+      const ids = id ? [id] : Array.from(pending.current.keys());
+      for (const k of ids) {
+        const patch = pending.current.get(k);
+        if (patch) void idbPut('outbox', OUT_KEY(profileId, k), { patch, base: baseVersion.current.get(k) ?? null, ts: Date.now() });
+        else void idbDel('outbox', OUT_KEY(profileId, k));
+      }
+    },
+    [profileId]
+  );
+
+  // cópia local da nota aberta (para abrir sem conexão)
+  const cacheDoc = useCallback(
+    (it: NotebookItem | undefined) => {
+      if (!profileId || !it?._full) return;
+      void idbPut('docs', DOC_KEY(profileId, it.id), it);
+    },
+    [profileId]
+  );
+
+  // várias abas: avisa as outras dos metadados (título, pasta, ordem); o conteúdo não, a versão cuida disso
+  const channel = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (!profileId || typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel(`insight-notebook:${profileId}`);
+    channel.current = ch;
+    ch.onmessage = (ev: MessageEvent<{ id: string; meta: Partial<NotebookItem> }>) => {
+      const { id, meta } = ev.data || ({} as { id: string; meta: Partial<NotebookItem> });
+      if (!id || pending.current.has(id)) return;
+      setItems((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...meta } } : prev));
+    };
+    return () => {
+      ch.close();
+      channel.current = null;
+    };
   }, [profileId]);
 
   // ------------------------------------------------------------ salvamento
@@ -155,26 +228,60 @@ export function useNotebook(profileId: string | null) {
         Object.assign(row, deriveFields({ ...cur, ...patch } as NotebookItem));
       }
       setSaveState('saving');
-      const { data, error: err } = await supabase
-        .from('notebook_items')
-        .update(row)
-        .eq('id', id)
-        .select('updated_at')
-        .maybeSingle();
+      const touchesContent = CONTENT_FIELDS.some((f) => f in patch);
+      const base = baseVersion.current.get(id) ?? cur?.version;
+      let q = supabase.from('notebook_items').update(row).eq('id', id);
+      if (touchesContent && base != null) q = q.eq('version', base);
+      let { data, error: err } = await q.select('updated_at, version').maybeSingle();
+      if (!err && !data && touchesContent && base != null) {
+        // outro aparelho ou aba gravou antes: a versão de lá vira um instantâneo
+        // no histórico (nada se perde) e a edição daqui segue como atual
+        const { data: other } = await supabase.from('notebook_items').select('title, content, blocks, data, word_count, version').eq('id', id).maybeSingle();
+        const same = other && (!('content' in row) || other.content === row.content) && (!('data' in row) || JSON.stringify(other.data) === JSON.stringify(row.data)) && (!('title' in row) || other.title === row.title);
+        if (other && profileId && !same) {
+          await supabase.from('notebook_revisions').insert({
+            item_id: id,
+            profile_id: profileId,
+            title: other.title,
+            content: other.content || '',
+            blocks: other.blocks ?? null,
+            data: other.data ?? null,
+            word_count: other.word_count || 0,
+            label: 'Conflito — versão de outro aparelho',
+          });
+        }
+        ({ data, error: err } = await supabase.from('notebook_items').update(row).eq('id', id).select('updated_at, version').maybeSingle());
+      }
       if (err) {
         // devolve para a fila e guarda no aparelho
         pending.current.set(id, { ...patch, ...(pending.current.get(id) || {}) });
-        persistLocal();
-        setSaveState(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'error');
-        setError(err.message);
-        timers.current.set(id, setTimeout(() => void flush(id), 8000));
+        persistLocal(id);
+        const offline = isNetworkError(err);
+        setSaveState(offline ? 'offline' : 'error');
+        if (!offline) setError(err.message);
+        const tries = (retries.current.get(id) || 0) + 1;
+        retries.current.set(id, tries);
+        timers.current.set(id, setTimeout(() => void flush(id), Math.min(60000, 4000 * 2 ** Math.min(tries, 4))));
+        void refreshPending();
         return;
       }
-      persistLocal();
-      if (data?.updated_at) {
-        setItems((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], updated_at: data.updated_at } } : prev));
+      retries.current.delete(id);
+      if (!pending.current.has(id)) {
+        baseVersion.current.delete(id);
+        persistLocal(id);
+      } else if (data?.version != null) baseVersion.current.set(id, data.version);
+      if (data) {
+        setItems((prev) => {
+          if (!prev[id]) return prev;
+          const next = { ...prev[id], updated_at: data!.updated_at, version: data!.version };
+          cacheDoc(next);
+          return { ...prev, [id]: next };
+        });
       }
+      const meta = Object.fromEntries(META_SYNC.filter((f) => f in patch).map((f) => [f, patch[f as keyof Patch]]));
+      if (Object.keys(meta).length) channel.current?.postMessage({ id, meta });
       setSaveState(pending.current.size ? 'saving' : 'saved');
+      void refreshPending();
 
       // revisão automática a cada 10 min de edição
       if (cur && profileId && ('content' in patch || 'blocks' in patch || 'data' in patch)) {
@@ -194,8 +301,9 @@ export function useNotebook(profileId: string | null) {
         }
       }
     },
-    [persistLocal, profileId, supabase]
+    [persistLocal, profileId, supabase, cacheDoc, refreshPending]
   );
+  const retries = useRef<Map<string, number>>(new Map());
 
   function scheduleFlush(id: string, delay: number) {
     const t = timers.current.get(id);
@@ -206,25 +314,48 @@ export function useNotebook(profileId: string | null) {
   /** Atualiza na tela na hora e salva com debounce (texto) ou logo (metadados). */
   const update = useCallback(
     (id: string, patch: Patch, opts: { debounce?: number } = {}) => {
+      const before = itemsRef.current[id];
+      if (!pending.current.has(id) && before?.version != null) baseVersion.current.set(id, before.version);
       setItems((prev) => {
         const cur = prev[id];
         if (!cur) return prev;
         const next = { ...cur, ...patch } as NotebookItem;
         if ('content' in patch || 'blocks' in patch || 'data' in patch) Object.assign(next, deriveFields(next));
+        cacheDoc(next);
         return { ...prev, [id]: next };
       });
       pending.current.set(id, { ...(pending.current.get(id) || {}), ...patch });
-      persistLocal();
+      persistLocal(id);
       setSaveState('saving');
       scheduleFlush(id, opts.debounce ?? 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [persistLocal]
+    [persistLocal, cacheDoc]
   );
 
   const flushAll = useCallback(async () => {
     await Promise.all(Array.from(pending.current.keys()).map((id) => flush(id)));
-  }, [flush]);
+    if (profileId) await drainQueue(profileId, supabase);
+  }, [flush, profileId, supabase]);
+
+  // a conexão voltou: manda tudo o que ficou guardado
+  useEffect(() => {
+    const on = () => {
+      setSaveState((s) => (s === 'offline' ? 'saving' : s));
+      void flushAll();
+    };
+    const off = () => setSaveState('offline');
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    const t = setInterval(() => {
+      if (navigator.onLine && (pending.current.size || pendingSync)) void flushAll();
+    }, 30000);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+      clearInterval(t);
+    };
+  }, [flushAll, pendingSync]);
 
   // salva antes de sair
   useEffect(() => {
@@ -253,15 +384,22 @@ export function useNotebook(profileId: string | null) {
       const cur = itemsRef.current[id];
       if (cur?._full) return cur;
       const { data, error: err } = await supabase.from('notebook_items').select(NOTEBOOK_FULL_COLUMNS).eq('id', id).maybeSingle();
-      if (err || !data) return null;
-      const full = { ...(data as unknown as NotebookItem), data: ((data as any).data || {}) as NotebookItemData, _full: true };
+      let fromServer = data as unknown as NotebookItem | null;
+      if (err || !data) {
+        // sem rede: abre a cópia guardada no aparelho
+        const cached = profileId && err && isNetworkError(err) ? await idbGet<NotebookItem>('docs', DOC_KEY(profileId, id)) : undefined;
+        if (!cached) return null;
+        fromServer = cached;
+      }
+      const full = { ...(fromServer as NotebookItem), data: ((fromServer as any).data || {}) as NotebookItemData, _full: true };
+      cacheDoc(full);
       // se há edição pendente local, ela vence
       const p = pending.current.get(id);
       const merged = p ? ({ ...full, ...p } as NotebookItem) : full;
       setItems((prev) => ({ ...prev, [id]: merged }));
       return merged;
     },
-    [supabase]
+    [supabase, profileId, cacheDoc]
   );
 
   // ------------------------------------------------------------ criar
@@ -373,7 +511,13 @@ export function useNotebook(profileId: string | null) {
   const destroy = useCallback(
     async (id: string) => {
       const ids = [id, ...descendants(id)];
-      ids.forEach((k) => pending.current.delete(k));
+      ids.forEach((k) => {
+        pending.current.delete(k);
+        if (profileId) {
+          void idbDel('outbox', OUT_KEY(profileId, k));
+          void idbDel('docs', DOC_KEY(profileId, k));
+        }
+      });
       const { error: err } = await supabase.from('notebook_items').delete().eq('id', id);
       if (err) {
         setError(err.message);
@@ -386,7 +530,7 @@ export function useNotebook(profileId: string | null) {
       });
       return true;
     },
-    [descendants, supabase]
+    [descendants, supabase, profileId]
   );
 
   const move = useCallback(
@@ -487,6 +631,7 @@ export function useNotebook(profileId: string | null) {
       error,
       setError,
       saveState,
+      pendingSync,
       reload,
       loadFull,
       update,
@@ -505,7 +650,7 @@ export function useNotebook(profileId: string | null) {
       registerAsset,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, loading, error, setError, saveState, reload, loadFull, update, flushAll, create, duplicate, trash, restore, destroy, move, listRevisions, saveRevisionNow, renameRevision, deleteRevision, searchContent, registerAsset]
+    [items, loading, error, setError, saveState, pendingSync, reload, loadFull, update, flushAll, create, duplicate, trash, restore, destroy, move, listRevisions, saveRevisionNow, renameRevision, deleteRevision, searchContent, registerAsset]
   );
 }
 

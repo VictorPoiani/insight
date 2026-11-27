@@ -70,6 +70,7 @@ import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
 import { CANVAS_CMD_EVENT, CanvasStudio } from './canvas/CanvasStudio';
+import { TrashDialog } from './trash/TrashDialog';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
 import { ArticleMode } from './article/ArticleMode';
 import { ContextMenuProvider } from './menu/ContextMenu';
@@ -276,6 +277,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [sessionDialog, setSessionDialog] = useState(false);
   const session = useWritingSession(api, viewer.id);
   const codex = useCodex(viewer.id);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [secretsShown, setSecretsShown] = useSecrets();
   const restored = useRef(false);
 
@@ -897,6 +899,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'project', group: 'Criar', label: 'Novo projeto', icon: ic(FolderPlus), run: () => setProjectDialog(true) },
     { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
     { id: 'canvas', group: 'Criar', label: 'Novo canvas', icon: <Glyph name="canvas" />, keywords: 'quadro obsidian cartoes', run: () => void newInContext('canvas') },
+    { id: 'trash-open', group: 'Notebook', label: 'Abrir a lixeira', icon: ic(Trash2), keywords: 'apagados restaurar excluidos', run: () => setTrashOpen(true) },
     { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
     { id: 'daily', group: 'Criar', label: 'Nota de hoje', icon: ic(CalendarDays), keywords: 'diario diário', run: () => void openDaily() },
     session.state
@@ -1178,6 +1181,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                   onPickTemplate={(parentId) => setPicker({ parentId })}
                   onRename={(id, t) => void rename(id, t)}
                   onImport={(pid) => startImport(pid)}
+                  onOpenTrash={() => setTrashOpen(true)}
                   onClose={typeof window !== 'undefined' && window.innerWidth < 1024 ? () => setLeft(null) : undefined}
                 />
               ) : (
@@ -1242,7 +1246,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 <FilePlus2 className="w-3.5 h-3.5" />
               </button>
               <div className="flex-1" />
-              <SaveBadge state={api.saveState} />
+              <SaveBadge state={api.saveState} pending={api.pendingSync} />
               <button
                 type="button"
                 title="Modo foco (Ctrl+.)"
@@ -1570,6 +1574,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           setImportResult(res);
         }}
       />
+      {trashOpen && viewer.id && (
+        <TrashDialog api={api} profileId={viewer.id} onRestoredEntries={entriesApi.reload} onRestoredCodex={codex.reload} onClose={() => setTrashOpen(false)} />
+      )}
       {exporting && <ExportDialog item={exporting} api={api} onClose={() => setExporting(null)} />}
       {importResult && <ImportResultDialog result={importResult} onOpen={open} onClose={() => setImportResult(null)} />}
 
@@ -2149,19 +2156,20 @@ function MenuRow({ icon, children, onClick, danger }: { icon: React.ReactElement
   );
 }
 
-function SaveBadge({ state }: { state: NotebookApi['saveState'] }) {
-  if (state === 'idle') return null;
-  const map = {
-    saving: { icon: <Loader2 className="w-3 h-3 animate-spin" />, label: 'salvando' },
-    saved: { icon: <Check className="w-3 h-3" />, label: 'salvo' },
-    offline: { icon: <CloudOff className="w-3 h-3" />, label: 'offline' },
-    error: { icon: <AlertTriangle className="w-3 h-3" />, label: 'erro' },
-  } as const;
-  const m = map[state];
+function SaveBadge({ state, pending }: { state: NotebookApi['saveState']; pending: number }) {
+  if (state === 'idle' && !pending) return null;
+  // indicador mínimo: Salvo, Salvando… ou Offline (com o que ficou guardado no aparelho)
+  const offline = state === 'offline';
+  const label = offline ? (pending ? `offline · ${pending} ${pending === 1 ? 'alteração guardada' : 'alterações guardadas'}` : 'offline') : state === 'saving' ? 'salvando' : state === 'error' ? 'erro ao salvar' : pending ? `${pending} na fila` : 'salvo';
+  const icon = offline ? <CloudOff className="w-3 h-3" /> : state === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : state === 'error' ? <AlertTriangle className="w-3 h-3" /> : <Check className="w-3 h-3" />;
   return (
-    <span className={`self-center flex items-center gap-1 px-2 text-[11px] ${state === 'error' || state === 'offline' ? 'text-amber-400' : 'text-[var(--nb-ink-3)]'}`} aria-live="polite">
-      {m.icon}
-      <span className="hidden sm:inline">{m.label}</span>
+    <span
+      className={`self-center flex items-center gap-1 px-2 text-[11px] ${state === 'error' || offline ? 'text-amber-400' : 'text-[var(--nb-ink-3)]'}`}
+      aria-live="polite"
+      title={offline ? 'Sem conexão. Tudo fica guardado neste aparelho e sobe sozinho quando a internet voltar.' : undefined}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
     </span>
   );
 }

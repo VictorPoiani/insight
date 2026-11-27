@@ -11,6 +11,10 @@
     {
       "path": "/api/moderation/sweep",
       "schedule": "29 5 * * *"
+    },
+    {
+      "path": "/api/notebook/purge",
+      "schedule": "11 6 * * *"
     }
   ],
   "headers": [

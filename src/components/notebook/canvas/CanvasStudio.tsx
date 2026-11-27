@@ -37,6 +37,8 @@ import {
   type Guide,
 } from '@/lib/notebook/canvasGeom';
 import { useCanvasDoc } from '@/lib/notebook/useCanvasDoc';
+import { idbAll, idbDel, idbPut, isNetworkError } from '@/lib/notebook/localStore';
+import { projectRootOf } from '@/lib/notebook/projects';
 import { CANVAS_FILE, CANVAS_TEXT, formatSize, imageSize, uploadCanvasFile, uploadCanvasImage } from '@/lib/notebook/canvasMedia';
 import { clipPage, fetchExternalImage, trackStockDownload, type PluginResult } from '@/lib/notebook/canvasPlugins';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
@@ -360,23 +362,81 @@ export function CanvasStudio({
       return { node, file: f };
     });
     addNodes(made.map((m) => m.node));
-    setUploads((u) => u + made.length);
-    await Promise.all(
-      made.map(async ({ node, file }) => {
-        try {
-          const up = await uploadCanvasFile(file, { itemId: item.id, profileId: item.profile_id, budgetBytes: budget });
-          silent((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === node.id ? { ...n, url: up.url, assetId: up.assetId, bytes: up.bytes, pending: undefined } : n)) }));
-          setTimeout(() => URL.revokeObjectURL(node.url!), 4000);
-        } catch (err) {
-          silent((d) => ({ nodes: d.nodes.filter((n) => n.id !== node.id), edges: d.edges.filter((e) => e.fromNode !== node.id && e.toNode !== node.id) }));
-          URL.revokeObjectURL(node.url!);
-          alert(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
-        } finally {
-          setUploads((u) => u - 1);
-        }
-      })
-    );
+    void budget;
+    await Promise.all(made.map(({ node, file }) => uploadNode(node.id, file, 'file')));
   }
+
+  // ------------------------------------------------------------ envio ao R2 (com retomada offline)
+  const blobKey = (nodeId: string) => `${item.profile_id}:blob:${item.id}:${nodeId}`;
+  const inFlight = useRef(new Set<string>());
+  /**
+   * Sobe o arquivo de um cartão. Sem rede, o arquivo fica guardado no aparelho
+   * (IndexedDB) e o cartão continua no quadro; o envio recomeça quando a
+   * conexão voltar ou na próxima vez que o canvas abrir.
+   */
+  async function uploadNode(nodeId: string, file: File, kind: 'image' | 'file', size?: { width: number; height: number } | null) {
+    if (inFlight.current.has(nodeId)) return;
+    inFlight.current.add(nodeId);
+    setUploads((u) => u + 1);
+    const budget = getUserUploadLimitBytes(level ?? 0, role ?? undefined);
+    const projectId = projectRootOf(api.items, item.id);
+    try {
+      const up =
+        kind === 'image'
+          ? await uploadCanvasImage(file, { itemId: item.id, profileId: item.profile_id, budgetBytes: budget, size, projectId })
+          : await uploadCanvasFile(file, { itemId: item.id, profileId: item.profile_id, budgetBytes: budget, projectId });
+      let old: string | undefined;
+      silent((d) => ({
+        ...d,
+        nodes: d.nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          old = n.url;
+          return { ...n, url: up.url, assetId: up.assetId, mime: up.mime || n.mime, bytes: up.bytes, pending: undefined };
+        }),
+      }));
+      void idbDel('blobs', blobKey(nodeId));
+      if (old?.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(old!), 4000);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        await idbPut('blobs', blobKey(nodeId), { file, kind, size: size || null, ts: Date.now() });
+      } else {
+        void idbDel('blobs', blobKey(nodeId));
+        silent((d) => ({ nodes: d.nodes.filter((n) => n.id !== nodeId), edges: d.edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId) }));
+        alert(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
+      }
+    } finally {
+      inFlight.current.delete(nodeId);
+      setUploads((u) => u - 1);
+    }
+  }
+
+  /** Retoma envios que ficaram guardados no aparelho. */
+  const resumeRef = useRef<() => void>(() => {});
+  resumeRef.current = () => {
+    void idbAll<{ file: File; kind: 'image' | 'file'; size: { width: number; height: number } | null }>('blobs', `${item.profile_id}:blob:${item.id}:`).then((list) => {
+      for (const [key, v] of list) {
+        const nodeId = key.split(':').pop()!;
+        const node = dataRef.current.nodes.find((n) => n.id === nodeId);
+        if (!node) {
+          void idbDel('blobs', key);
+          continue;
+        }
+        // depois de recarregar, o endereço local antigo não vale mais
+        if (node.url?.startsWith('blob:')) {
+          const url = URL.createObjectURL(v.file);
+          silent((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === nodeId ? { ...n, url, pending: true } : n)) }));
+        }
+        if (navigator.onLine) void uploadNode(nodeId, v.file, v.kind, v.size);
+      }
+    });
+  };
+  useEffect(() => {
+    if (!doc.loaded) return;
+    resumeRef.current();
+    const on = () => resumeRef.current();
+    window.addEventListener('online', on);
+    return () => window.removeEventListener('online', on);
+  }, [doc.loaded]);
 
   /** Cartão de link: aparece na hora e ganha a prévia (título, imagem) do servidor. */
   const addLink = (url: string, at: [number, number], meta?: CanvasNode['meta']) => {
@@ -482,22 +542,8 @@ export function CanvasStudio({
     }
     addNodes(made.map((m) => m.node));
     // 2) sobe o original por trás e troca o endereço quando terminar
-    setUploads((u) => u + made.length);
-    await Promise.all(
-      made.map(async ({ node, file, size }) => {
-        try {
-          const up = await uploadCanvasImage(file, { itemId: item.id, profileId: item.profile_id, budgetBytes: budget, size });
-          silent((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === node.id ? { ...n, url: up.url, assetId: up.assetId, mime: up.mime, bytes: up.bytes, pending: undefined } : n)) }));
-          setTimeout(() => URL.revokeObjectURL(node.url!), 4000);
-        } catch (err) {
-          silent((d) => ({ nodes: d.nodes.filter((n) => n.id !== node.id), edges: d.edges.filter((e) => e.fromNode !== node.id && e.toNode !== node.id) }));
-          URL.revokeObjectURL(node.url!);
-          alert(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
-        } finally {
-          setUploads((u) => u - 1);
-        }
-      })
-    );
+    void budget;
+    await Promise.all(made.map(({ node, file, size }) => uploadNode(node.id, file, 'image', size)));
   }
 
   // notas incorporadas: carrega o texto
@@ -1165,7 +1211,7 @@ export function CanvasStudio({
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  const status = doc.status === 'error' ? 'Não salvou — tentando de novo' : uploads ? `Enviando ${uploads} ${uploads === 1 ? 'arquivo' : 'arquivos'}…` : doc.status === 'saving' ? 'Salvando…' : doc.status === 'loading' ? 'Abrindo…' : 'Salvo';
+  const status = doc.status === 'offline' ? 'Offline — guardado neste aparelho' : doc.status === 'error' ? 'Não salvou — tentando de novo' : uploads ? `Enviando ${uploads} ${uploads === 1 ? 'arquivo' : 'arquivos'}…` : doc.status === 'saving' ? 'Salvando…' : doc.status === 'loading' ? 'Abrindo…' : 'Salvo';
 
   return (
     <div className="absolute inset-0 nb-cv">

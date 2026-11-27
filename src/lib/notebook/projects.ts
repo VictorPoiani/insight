@@ -162,3 +162,13 @@ export function projectData(item: NotebookItem): ProjectData {
   const p = (item.data as Record<string, unknown> | null)?.project as ProjectData | undefined;
   return { type: p?.type && PROJECT_TYPES.some((t) => t.id === p.type) ? p.type : 'livre', description: p?.description || '', ...(p?.world ? { world: true } : {}) };
 }
+
+/** Projeto (pasta de topo) ao qual uma nota pertence; null se estiver solta na raiz. */
+export function projectRootOf(items: Record<string, NotebookItem>, id: string | null | undefined): string | null {
+  let cur = id ? items[id] : undefined;
+  for (let guard = 0; cur && guard < 64; guard++) {
+    if (!cur.parent_id) return isProject(cur) ? cur.id : null;
+    cur = items[cur.parent_id];
+  }
+  return null;
+}

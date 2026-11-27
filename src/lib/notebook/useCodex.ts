@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { writeOrQueue } from './localStore';
 import { DEFAULT_CATEGORIES, type CodexCategory, type CodexField } from './codex';
 
 const COLS = 'id, profile_id, project_id, parent_id, name, glyph, kind, fields, position, created_at, updated_at';
@@ -10,6 +11,10 @@ const COLS = 'id, profile_id, project_id, parent_id, name, glyph, kind, fields, 
 export function useCodex(profileId: string | null) {
   const supabase = useMemo(() => createClient(), []);
   const [cats, setCats] = useState<Record<string, CodexCategory>>({});
+  const catsRef = useRef(cats);
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  catsRef.current = cats;
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -19,6 +24,7 @@ export function useCodex(profileId: string | null) {
       .from('notebook_codex_categories')
       .select(COLS)
       .eq('profile_id', profileId)
+      .is('deleted_at', null)
       .order('position')
       .limit(2000)
       .then(({ data }) => {
@@ -31,7 +37,7 @@ export function useCodex(profileId: string | null) {
     return () => {
       alive = false;
     };
-  }, [profileId, supabase]);
+  }, [profileId, supabase, nonce]);
 
   const ofProject = useCallback(
     (projectId: string) =>
@@ -93,26 +99,28 @@ export function useCodex(profileId: string | null) {
   const update = useCallback(
     async (id: string, patch: Partial<Pick<CodexCategory, 'name' | 'glyph' | 'kind' | 'fields' | 'position' | 'parent_id'>>) => {
       setCats((p) => (p[id] ? { ...p, [id]: { ...p[id], ...patch } } : p));
-      const { error } = await supabase.from('notebook_codex_categories').update(patch).eq('id', id);
+      const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_codex_categories', op: 'update', id, row: patch as Record<string, unknown> });
       if (error) alert('Não foi possível salvar a categoria.');
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   const remove = useCallback(
     async (id: string) => {
+      // a categoria e as subcategorias vão para a lixeira (30 dias)
+      const ids = [id, ...Object.values(catsRef.current).filter((c) => c.parent_id === id).map((c) => c.id)];
       setCats((p) => {
         const n = { ...p };
-        delete n[id];
-        Object.values(n).forEach((c) => c.parent_id === id && delete n[c.id]);
+        ids.forEach((k) => delete n[k]);
         return n;
       });
-      await supabase.from('notebook_codex_categories').delete().eq('id', id);
+      const at = new Date().toISOString();
+      for (const k of ids) await writeOrQueue(supabase, profileId, { table: 'notebook_codex_categories', op: 'update', id: k, row: { deleted_at: at } });
     },
-    [supabase]
+    [supabase, profileId]
   );
 
-  return useMemo(() => ({ cats, loaded, ofProject, create, seed, update, remove }), [cats, loaded, ofProject, create, seed, update, remove]);
+  return useMemo(() => ({ cats, loaded, ofProject, create, seed, update, remove, reload }), [cats, loaded, ofProject, create, seed, update, remove, reload]);
 }
 
 export type CodexApi = ReturnType<typeof useCodex>;

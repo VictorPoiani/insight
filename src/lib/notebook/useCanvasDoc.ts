@@ -13,6 +13,16 @@ import { createClient } from '@/lib/supabase/client';
 import type { NotebookItem } from './types';
 import type { NotebookApi } from './useNotebook';
 import { canvasToContent, normalizeCanvas, type CanvasData, type CanvasEdge, type CanvasNode } from './canvas';
+import { idbGet, idbPut, isNetworkError } from './localStore';
+
+/** Cópia local do canvas: o estado atual e o que o servidor já tem. */
+interface CanvasSnapshot {
+  data: CanvasData;
+  dirty: boolean;
+  savedN: [string, string][];
+  savedE: [string, string][];
+  ts: number;
+}
 
 const NODE_COLS = 'id, type, x, y, width, height, z, color, text, item_id, url, label, asset_id, entry_id, locked, extra';
 const EDGE_COLS = 'id, from_node, to_node, from_side, to_side, label, color, extra';
@@ -130,7 +140,7 @@ function fromEdgeRow(r: EdgeRow): CanvasEdge {
 /** Só o que pode ir para o banco: nada em envio (blob:) ou sem endereço. */
 const persistable = (n: CanvasNode) => !n.pending && !(n.url && n.url.startsWith('blob:'));
 
-export type CanvasStatus = 'loading' | 'saved' | 'saving' | 'error';
+export type CanvasStatus = 'loading' | 'saved' | 'saving' | 'error' | 'offline';
 
 export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (id: string) => string | null = () => null) {
   const supabase = useMemo(() => createClient(), []);
@@ -153,6 +163,24 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
   const loaded = useRef(false);
   const canvasId = item.id;
   const profileId = item.profile_id;
+
+  const snapKey = `${profileId}:canvas:${canvasId}`;
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Guarda a cópia local (logo após cada mudança; nada se perde se a aba fechar). */
+  const snapshot = (dirtyFlag: boolean, now = false) => {
+    if (!loaded.current) return;
+    const write = () =>
+      void idbPut('docs', snapKey, {
+        data: dataRef.current,
+        dirty: dirtyFlag,
+        savedN: Array.from(saved.current.nodes.entries()),
+        savedE: Array.from(saved.current.edges.entries()),
+        ts: Date.now(),
+      } satisfies CanvasSnapshot);
+    if (snapTimer.current) clearTimeout(snapTimer.current);
+    if (now) write();
+    else snapTimer.current = setTimeout(write, 250);
+  };
 
   const apply = (next: CanvasData) => {
     dataRef.current = next;
@@ -206,6 +234,7 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
         if (error) throw error;
       }
       saved.current = { nodes: nodeJson, edges: edgeJson };
+      snapshot(dataRef.current !== cur, true);
       // texto do canvas para busca, [[links]] e #tags; o JSON antigo sai do item
       const it = itemRef.current;
       const a = apiRef.current;
@@ -218,11 +247,13 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
       }
       setStatus('saved');
     } catch (err) {
-      console.error('[canvas] falha ao gravar', err);
-      setStatus('error');
-      // tenta de novo depois
+      const offline = isNetworkError(err);
+      if (!offline) console.error('[canvas] falha ao gravar', err);
+      setStatus(offline ? 'offline' : 'error');
+      snapshot(true, true);
+      // tenta de novo depois (e assim que a conexão voltar)
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void flush(), 5000);
+      timer.current = setTimeout(() => void flush(), offline ? 15000 : 5000);
     } finally {
       busy.current = false;
     }
@@ -234,9 +265,17 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
       if (timer.current) clearTimeout(timer.current);
       setStatus((s) => (s === 'loading' ? s : 'saving'));
       timer.current = setTimeout(() => void flush(), ms);
+      snapshot(true);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [flush]
   );
+
+  useEffect(() => {
+    const on = () => void flush();
+    window.addEventListener('online', on);
+    return () => window.removeEventListener('online', on);
+  }, [flush]);
 
   // ------------------------------------------------------------ carregar
   useEffect(() => {
@@ -244,9 +283,18 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
     void Promise.all([
       supabase.from('notebook_canvas_nodes').select(NODE_COLS).eq('canvas_id', canvasId).order('z').limit(20000),
       supabase.from('notebook_canvas_edges').select(EDGE_COLS).eq('canvas_id', canvasId).limit(40000),
-    ]).then(([nr, er]) => {
+      idbGet<CanvasSnapshot>('docs', snapKey),
+    ]).then(([nr, er, snap]) => {
       if (!alive) return;
       if (nr.error || er.error) {
+        // sem rede: abre a cópia do aparelho e segue editando
+        if (snap && isNetworkError(nr.error || er.error)) {
+          saved.current = { nodes: new Map(snap.savedN), edges: new Map(snap.savedE) };
+          loaded.current = true;
+          apply(normalizeCanvas(snap.data));
+          setStatus('offline');
+          return;
+        }
         setStatus('error');
         return;
       }
@@ -264,10 +312,24 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (
         apply(legacy);
         setStatus('saving');
         void flush();
+      } else if (snap?.dirty) {
+        // havia mudanças só no aparelho: elas valem; o que outro aparelho
+        // acrescentou nesse meio tempo (e que este nunca viu) entra junto
+        const known = new Set(snap.savedN.map(([id]) => id));
+        const knownE = new Set(snap.savedE.map(([id]) => id));
+        const local = normalizeCanvas(snap.data);
+        const localIds = new Set(local.nodes.map((n) => n.id));
+        const localE = new Set(local.edges.map((e) => e.id));
+        const extraN = rows.filter((r) => !localIds.has(r.id) && !known.has(r.id)).map(fromNodeRow);
+        const extraE = erows.filter((r) => !localE.has(r.id) && !knownE.has(r.id)).map(fromEdgeRow);
+        apply(normalizeCanvas({ nodes: [...local.nodes, ...extraN], edges: [...local.edges, ...extraE] }));
+        setStatus('saving');
+        void flush();
       } else {
         const sorted = [...rows].sort((a, b) => a.z - b.z);
         apply(normalizeCanvas({ nodes: sorted.map(fromNodeRow), edges: erows.map(fromEdgeRow) }));
         setStatus('saved');
+        snapshot(false, true);
       }
     });
     return () => {

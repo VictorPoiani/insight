@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { writeOrQueue } from './localStore';
 import type { Source, SourceQuote } from './sources';
 
 const COLS =
@@ -21,14 +22,14 @@ export function useSources(profileId: string | null) {
     if (!profileId) return;
     let alive = true;
     void Promise.all([
-      supabase.from('notebook_sources').select(COLS).eq('profile_id', profileId).order('updated_at', { ascending: false }).limit(5000),
-      supabase.from('notebook_source_quotes').select(QCOLS).eq('profile_id', profileId).order('created_at').limit(10000),
+      supabase.from('notebook_sources').select(COLS).eq('profile_id', profileId).is('deleted_at', null).order('updated_at', { ascending: false }).limit(5000),
+      supabase.from('notebook_source_quotes').select(QCOLS).eq('profile_id', profileId).is('deleted_at', null).order('created_at').limit(10000),
     ]).then(([{ data }, { data: q }]) => {
       if (!alive) return;
       const m: Record<string, Source> = {};
       for (const s of (data || []) as Source[]) m[s.id] = { ...s, authors: Array.isArray(s.authors) ? s.authors : [], extra: s.extra || {} };
       setSources(m);
-      setQuotes((q || []) as SourceQuote[]);
+      setQuotes(((q || []) as SourceQuote[]).filter((x) => m[x.source_id]));
       setLoaded(true);
     });
     return () => {
@@ -58,10 +59,10 @@ export function useSources(profileId: string | null) {
   const update = useCallback(
     async (id: string, patch: Partial<SourceInput>) => {
       setSources((p) => (p[id] ? { ...p, [id]: { ...p[id], ...patch } } : p));
-      const { error } = await supabase.from('notebook_sources').update(patch).eq('id', id);
+      const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_sources', op: 'update', id, row: patch as Record<string, unknown> });
       if (error) alert(error.message?.includes('url') ? 'O endereço precisa começar com http:// ou https://.' : 'Não foi possível salvar a fonte.');
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   const remove = useCallback(
@@ -72,9 +73,9 @@ export function useSources(profileId: string | null) {
         return n;
       });
       setQuotes((q) => q.filter((x) => x.source_id !== id));
-      await supabase.from('notebook_sources').delete().eq('id', id);
+      await writeOrQueue(supabase, profileId, { table: 'notebook_sources', op: 'update', id, row: { deleted_at: new Date().toISOString() } });
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   const addQuote = useCallback(
@@ -95,9 +96,9 @@ export function useSources(profileId: string | null) {
   const removeQuote = useCallback(
     async (id: string) => {
       setQuotes((q) => q.filter((x) => x.id !== id));
-      await supabase.from('notebook_source_quotes').delete().eq('id', id);
+      await writeOrQueue(supabase, profileId, { table: 'notebook_source_quotes', op: 'update', id, row: { deleted_at: new Date().toISOString() } });
     },
-    [supabase]
+    [supabase, profileId]
   );
 
   return useMemo(() => ({ sources, quotes, loaded, create, update, remove, addQuote, removeQuote }), [sources, quotes, loaded, create, update, remove, addQuote, removeQuote]);

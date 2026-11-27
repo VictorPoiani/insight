@@ -508,7 +508,7 @@ async function apiR2(body: Record<string, unknown>) {
 /** Envia um arquivo JÁ comprimido. O servidor registra o tamanho e assina Content-Length. */
 export async function uploadFileToR2(
   file: File,
-  meta: { isGif?: boolean; originalSize?: number; scope?: 'posts' | 'notebook' },
+  meta: { isGif?: boolean; originalSize?: number; scope?: 'posts' | 'notebook'; asset?: { project: string | null; id: string; variant: 'original' | 'preview' } },
   onStatus?: StatusFn
 ): Promise<{ publicUrl: string; r2Key: string | null }> {
   const contentType = file.type || 'application/octet-stream';
@@ -523,6 +523,7 @@ export async function uploadFileToR2(
     originalSize: meta.originalSize ?? file.size,
     isGif: Boolean(meta.isGif),
     scope: meta.scope ?? 'posts',
+    ...(meta.asset ? { asset: meta.asset } : {}),
   });
 
   // Todo arquivo vai para o Cloudflare R2; não existe mais plano B no Supabase Storage.
@@ -590,9 +591,9 @@ export async function uploadFileToR2(
  */
 export async function uploadMediaToInsight(
   rawFile: File,
-  opts: { budgetBytes: number; forceGifLoop?: boolean; asImage?: boolean; asFile?: boolean; onStatus?: StatusFn; scope?: 'posts' | 'notebook' }
+  opts: { budgetBytes: number; forceGifLoop?: boolean; asImage?: boolean; asFile?: boolean; onStatus?: StatusFn; scope?: 'posts' | 'notebook'; asset?: { project: string | null; id: string; variant: 'original' | 'preview' } }
 ): Promise<UploadR2Result> {
-  const { budgetBytes, forceGifLoop = false, asImage = false, asFile = false, onStatus, scope = 'posts' } = opts;
+  const { budgetBytes, forceGifLoop = false, asImage = false, asFile = false, onStatus, scope = 'posts', asset } = opts;
   const t = rawFile.type.toLowerCase();
 
   let compressed: CompressedMediaResult;
@@ -613,7 +614,7 @@ export async function uploadMediaToInsight(
   }
 
   onStatus?.('Conectando à Cloudflare R2...', 95);
-  const up = await uploadFileToR2(compressed.file, { isGif: compressed.isGif, originalSize: compressed.originalSize, scope }, onStatus);
+  const up = await uploadFileToR2(compressed.file, { isGif: compressed.isGif, originalSize: compressed.originalSize, scope, asset }, onStatus);
 
   // moderação: 3 quadros do vídeo (publicações; o caderno é privado)
   let frames: string[] | undefined;

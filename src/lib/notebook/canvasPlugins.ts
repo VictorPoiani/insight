@@ -11,7 +11,7 @@
  */
 
 export type PluginResult =
-  | { kind: 'image'; id: string; title: string; thumb: string; full: string; width?: number; height?: number; credit: string; source: string }
+  | { kind: 'image'; id: string; title: string; thumb: string; full: string; width?: number; height?: number; credit: string; source: string; creditUrl?: string; hotlink?: boolean; track?: string }
   | { kind: 'text'; id: string; title: string; text: string; url: string; thumb?: string }
   | { kind: 'link'; id: string; title: string; url: string; description?: string; image?: string; site?: string };
 
@@ -23,6 +23,8 @@ export interface CanvasPlugin {
   hint: string;
   /** precisa de chave: fica visível, mas desligado */
   needsKey?: string;
+  /** fonte com chave no servidor (liga quando /api/notebook/stock?status=1 confirmar) */
+  provider?: 'pixabay' | 'unsplash';
   /** busca (ou captura, para o recortador) */
   search: (q: string, signal: AbortSignal) => Promise<PluginResult[]>;
 }
@@ -181,6 +183,46 @@ const clipper: CanvasPlugin = {
   },
 };
 
+// ------------------------------------------------------------ bancos com chave (no servidor)
+async function stockSearch(provider: 'pixabay' | 'unsplash', q: string, signal: AbortSignal): Promise<PluginResult[]> {
+  const r = await fetch(`/api/notebook/stock?provider=${provider}&q=${encodeURIComponent(q)}`, { signal });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error || 'A busca falhou.');
+  return (d.results || []) as PluginResult[];
+}
+let statusPromise: Promise<Record<string, boolean>> | null = null;
+/** Quais bancos com chave estão ligados (consulta uma vez por sessão). */
+export function stockStatus(): Promise<Record<string, boolean>> {
+  statusPromise ||= fetch('/api/notebook/stock?status=1')
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({}));
+  return statusPromise;
+}
+/** Regra do Unsplash: avisar cada foto usada. */
+export function trackStockDownload(provider: string, track?: string) {
+  if (provider !== 'unsplash' || !track) return;
+  void fetch('/api/notebook/stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, track }) }).catch(() => {});
+}
+
+const pixabay: CanvasPlugin = {
+  id: 'pixabay',
+  name: 'Pixabay',
+  description: 'Fotos gratuitas para qualquer uso. A original sobe para o seu Notebook.',
+  hint: 'Buscar no Pixabay…',
+  provider: 'pixabay',
+  needsKey: 'PIXABAY_API_KEY',
+  search: (q, signal) => stockSearch('pixabay', q, signal),
+};
+const unsplash: CanvasPlugin = {
+  id: 'unsplash',
+  name: 'Unsplash',
+  description: 'Fotos de alta resolução. Pelas regras do Unsplash, a foto é exibida direto de lá, com crédito ao fotógrafo.',
+  hint: 'Buscar no Unsplash…',
+  provider: 'unsplash',
+  needsKey: 'UNSPLASH_ACCESS_KEY',
+  search: (q, signal) => stockSearch('unsplash', q, signal),
+};
+
 const needsKey = (id: string, name: string, description: string, key: string): CanvasPlugin => ({
   id,
   name,
@@ -195,8 +237,8 @@ export const CANVAS_PLUGINS: CanvasPlugin[] = [
   wikimedia,
   openverse,
   wikipedia,
+  pixabay,
+  unsplash,
   clipper,
-  needsKey('unsplash', 'Unsplash', 'Fotos de alta resolução.', 'Chave de acesso do Unsplash'),
-  needsKey('pexels', 'Pexels', 'Fotos e vídeos gratuitos.', 'Chave da API do Pexels'),
   needsKey('gdrive', 'Google Drive', 'Arquivos do seu Drive.', 'Credenciais OAuth do Google'),
 ];

@@ -39,6 +39,8 @@ export interface CanvasNode {
   meta?: { title?: string; description?: string; image?: string; site?: string } | null;
   /** autoria e licença (imagens de bancos livres) */
   credit?: string;
+  /** link do crédito (página do autor) */
+  creditUrl?: string;
   /** só no navegador: envio em andamento (não é gravado) */
   pending?: boolean;
 }

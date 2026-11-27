@@ -6,12 +6,18 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { KeyRound, Loader2, Search, X } from 'lucide-react';
-import { CANVAS_PLUGINS, type PluginResult } from '@/lib/notebook/canvasPlugins';
+import { CANVAS_PLUGINS, stockStatus, type PluginResult } from '@/lib/notebook/canvasPlugins';
 
 export const PLUGIN_DRAG = 'application/x-insight-plugin';
 
 export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; setTab: (t: string) => void; onInsert: (r: PluginResult) => void; onClose: () => void }) {
+  const [status, setStatus] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    void stockStatus().then(setStatus);
+  }, []);
   const plugin = CANVAS_PLUGINS.find((p) => p.id === tab) || CANVAS_PLUGINS[0];
+  const off = (p: (typeof CANVAS_PLUGINS)[number]) => !!p.needsKey && !(p.provider && status[p.provider]);
+  const locked = off(plugin);
   const [q, setQ] = useState('');
   const [state, setState] = useState<{ loading: boolean; error: string | null; results: PluginResult[]; for: string }>({ loading: false, error: null, results: [], for: '' });
   const ctrl = useRef<AbortController | null>(null);
@@ -24,7 +30,7 @@ export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; s
 
   const run = async (term = q) => {
     const t = term.trim();
-    if (!t || plugin.needsKey) return;
+    if (!t || locked) return;
     ctrl.current?.abort();
     const c = new AbortController();
     ctrl.current = c;
@@ -64,18 +70,18 @@ export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; s
       </header>
       <nav className="nb-cv-plugins-tabs" role="tablist">
         {CANVAS_PLUGINS.map((p) => (
-          <button key={p.id} type="button" role="tab" aria-selected={p.id === plugin.id} data-off={p.needsKey ? true : undefined} onClick={() => setTab(p.id)}>
+          <button key={p.id} type="button" role="tab" aria-selected={p.id === plugin.id} data-off={off(p) || undefined} onClick={() => setTab(p.id)}>
             {p.name}
           </button>
         ))}
       </nav>
       <p className="nb-cv-plugins-desc">{plugin.description}</p>
 
-      {plugin.needsKey ? (
+      {locked ? (
         <div className="nb-cv-plugins-key">
           <KeyRound />
           <p>
-            Este plugin precisa de uma chave ({plugin.needsKey}). Quando ela for configurada no servidor, a aba passa a funcionar.
+            Esta fonte precisa de uma chave no servidor ({plugin.needsKey}). Quando ela for criada na Vercel, a aba liga sozinha.
           </p>
         </div>
       ) : (
@@ -118,7 +124,12 @@ export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; s
               </button>
             ))}
           </div>
-          {images.length > 0 && <p className="nb-cv-plugins-foot">Clique para pôr no centro ou arraste para o quadro. A imagem original sobe para o seu Notebook com o crédito do autor.</p>}
+          {images.length > 0 && (
+            <p className="nb-cv-plugins-foot">
+              Clique para pôr no centro ou arraste para o quadro.{' '}
+              {plugin.id === 'unsplash' ? 'A foto fica no Unsplash, com o crédito do fotógrafo.' : 'A imagem original sobe para o seu Notebook com o crédito do autor.'}
+            </p>
+          )}
         </>
       )}
     </aside>

@@ -757,6 +757,7 @@ export function PostComposer({
   const [giphyOffset, setGiphyOffset] = useState<number>(0);
   const [loadingGiphy, setLoadingGiphy] = useState<boolean>(false);
   const [loadingMoreGiphy, setLoadingMoreGiphy] = useState<boolean>(false);
+  const [giphyError, setGiphyError] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -887,8 +888,12 @@ export function PostComposer({
         });
 
         const res = await fetch(`/api/giphy?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          if (nextOffset === 0) setGiphyResults([]);
+          setGiphyError(data.message || 'A busca de GIFs está indisponível no momento.');
+        } else {
+          setGiphyError(null);
           const list: GiphyItem[] = Array.isArray(data.items) ? data.items : [];
           if (nextOffset === 0) {
             setGiphyResults(list);
@@ -898,7 +903,7 @@ export function PostComposer({
           setGiphyOffset(nextOffset);
         }
       } catch {
-        // Ignora falha de rede
+        setGiphyError('Sem conexão para buscar GIFs.');
       } finally {
         setLoadingGiphy(false);
         setLoadingMoreGiphy(false);
@@ -2662,7 +2667,7 @@ export function PostComposer({
                             </div>
                           ) : giphyResults.length === 0 ? (
                             <p className="text-xs text-muted text-center py-6">
-                              Nenhum resultado encontrado.
+                              {giphyError || 'Nenhum resultado encontrado.'}
                             </p>
                           ) : (
                             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">

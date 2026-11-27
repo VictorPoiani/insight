@@ -414,7 +414,8 @@ export async function compressMediaForInsight(
     mounted = true;
     const inputPath = `${mount}/${inputFile.name}`;
 
-    const scale = `scale=-2:'min(${plan.height},ih)':flags=bicubic`;
+    // altura par: o H.264 em yuv420p recusa dimensões ímpares (comum em GIFs, ex.: 480x269)
+    const scale = `scale=-2:'trunc(min(${plan.height},ih)/2)*2':flags=bicubic`;
     const rate = [
       '-b:v', `${plan.videoKbps}k`,
       '-maxrate', `${Math.round(plan.videoKbps * 1.4)}k`,
@@ -441,7 +442,7 @@ export async function compressMediaForInsight(
   } catch (err) {
     console.warn('[mediaCompressor] falha na compressão; avaliando original.', err);
     // memória estourada etc.: o original só segue se couber na cota
-    if (originalSize <= budgetBytes && !isGifInput) {
+    if (originalSize <= budgetBytes) {
       return result(inputFile, originalSize, isGifMode, 'too-heavy-kept', 'compressão falhou no navegador');
     }
     releaseFFmpeg();

@@ -24,6 +24,7 @@ import {
   LayoutGrid,
   Lock,
   LockOpen,
+  Map as MapIcon,
   Maximize,
   Minus,
   Palette,
@@ -177,6 +178,7 @@ export function SelectionBar({
 export interface CanvasPrefs {
   snap: boolean;
   grid: boolean;
+  minimap?: boolean;
 }
 
 export function RightRail({
@@ -489,5 +491,105 @@ export function EntryPicker({ entries, onPick, onClose }: { entries: NotebookEnt
         </div>
       </div>
     </NbPortal>
+  );
+}
+
+/**
+ * Minimapa: o canvas inteiro em miniatura, com a área visível marcada.
+ * Clicar ou arrastar leva a câmera até o ponto. Recolhível.
+ */
+export function Minimap({
+  nodes,
+  view,
+  size,
+  selected,
+  open,
+  onToggle,
+  onCenter,
+}: {
+  nodes: { id: string; type: string; x: number; y: number; width: number; height: number }[];
+  view: { x: number; y: number; k: number };
+  size: { w: number; h: number };
+  selected: Set<string>;
+  open: boolean;
+  onToggle: () => void;
+  onCenter: (x: number, y: number) => void;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const W = 196;
+  const H = 128;
+  const geo = useMemo(() => {
+    const vp = { x: -view.x / view.k, y: -view.y / view.k, w: (size.w || 1) / view.k, h: (size.h || 1) / view.k };
+    let x1 = vp.x;
+    let y1 = vp.y;
+    let x2 = vp.x + vp.w;
+    let y2 = vp.y + vp.h;
+    for (const n of nodes) {
+      x1 = Math.min(x1, n.x);
+      y1 = Math.min(y1, n.y);
+      x2 = Math.max(x2, n.x + n.width);
+      y2 = Math.max(y2, n.y + n.height);
+    }
+    const pad = 40;
+    const s = Math.min((W - 8) / (x2 - x1 + pad * 2), (H - 8) / (y2 - y1 + pad * 2));
+    const ox = (W - (x2 - x1) * s) / 2 - x1 * s;
+    const oy = (H - (y2 - y1) * s) / 2 - y1 * s;
+    return { s, ox, oy, vp };
+  }, [nodes, view, size]);
+
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || !open) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = W * dpr;
+    c.height = H * dpr;
+    const g = c.getContext('2d');
+    if (!g) return;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const { s, ox, oy, vp } = geo;
+    for (const n of nodes) {
+      const r = [n.x * s + ox, n.y * s + oy, Math.max(1.5, n.width * s), Math.max(1.5, n.height * s)] as const;
+      if (n.type === 'group') {
+        g.strokeStyle = 'rgba(255,255,255,0.22)';
+        g.lineWidth = 1;
+        g.strokeRect(...r);
+      } else {
+        g.fillStyle = selected.has(n.id) ? 'rgba(139,108,240,0.9)' : n.type === 'image' || n.type === 'file' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.18)';
+        g.fillRect(...r);
+      }
+    }
+    g.strokeStyle = '#8b6cf0';
+    g.lineWidth = 1.25;
+    g.strokeRect(vp.x * s + ox, vp.y * s + oy, vp.w * s, vp.h * s);
+  }, [geo, nodes, selected, open]);
+
+  const drag = useRef(false);
+  const go = (e: React.PointerEvent) => {
+    const r = ref.current!.getBoundingClientRect();
+    onCenter((e.clientX - r.left - geo.ox) / geo.s, (e.clientY - r.top - geo.oy) / geo.s);
+  };
+
+  return (
+    <div className="nb-cv-minimap" data-cv-ui data-open={open || undefined} onPointerDown={(e) => e.stopPropagation()}>
+      {open && (
+        <canvas
+          ref={ref}
+          style={{ width: W, height: H }}
+          aria-label="Minimapa do canvas"
+          onPointerDown={(e) => {
+            drag.current = true;
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            go(e);
+          }}
+          onPointerMove={(e) => drag.current && go(e)}
+          onPointerUp={() => (drag.current = false)}
+        />
+      )}
+      <button type="button" onClick={onToggle} title={open ? 'Esconder o minimapa' : 'Mostrar o minimapa'} aria-label={open ? 'Esconder o minimapa' : 'Mostrar o minimapa'}>
+        <MapIcon />
+        {open ? null : <span>Minimapa</span>}
+      </button>
+    </div>
   );
 }

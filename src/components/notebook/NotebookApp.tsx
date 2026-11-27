@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Files,
+  Images,
   Inbox,
   ListTodo,
   Search,
@@ -71,8 +72,10 @@ import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
-import { CANVAS_CMD_EVENT, CanvasStudio } from './canvas/CanvasStudio';
+import { CANVAS_CMD_EVENT, CANVAS_FRAMES_EVENT, CanvasStudio } from './canvas/CanvasStudio';
 import { TrashDialog } from './trash/TrashDialog';
+import { AssetLibrary } from './assets/AssetLibrary';
+import { BackupDialog } from './backup/BackupDialog';
 import { TodoPanel } from './todos/TodoPanel';
 import { QUICK_CAPTURE_EVENT, QUICK_CAPTURED_EVENT } from './QuickCapture';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
@@ -82,7 +85,7 @@ import { GlobalContextMenus, type GlobalMenuActions } from './menu/GlobalMenus';
 import { WorldCalendar } from './worldtime/WorldCalendar';
 import { Chronos } from './worldtime/Chronos';
 import { ExportDialog, ImportResultDialog } from './interop/InteropDialogs';
-import { IMPORT_ACCEPT, exportAll, importFiles, type ImportResult } from '@/lib/notebook/interop';
+import { IMPORT_ACCEPT, importFiles, type ImportResult } from '@/lib/notebook/interop';
 import { EntryDialog } from './entries/EntryDialog';
 import { EntryPopover } from './entries/EntryPopover';
 import { SummaryView } from './entries/SummaryView';
@@ -263,7 +266,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const [projectDialog, setProjectDialog] = useState(false);
   const [exporting, setExporting] = useState<NotebookItem | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | 'busy' | null>(null);
-  const [exportingAll, setExportingAll] = useState(false);
+  const [exportingAll] = useState(false);
   const importTarget = useRef<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const [summaryProject, setSummaryProject] = useState<string | null | undefined>(undefined);
@@ -282,6 +285,14 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   const session = useWritingSession(api, viewer.id);
   const codex = useCodex(viewer.id);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [libOpen, setLibOpen] = useState(false);
+  // quadros do canvas aberto (âncoras da paleta)
+  const [canvasFrames, setCanvasFrames] = useState<{ id: string; frames: { id: string; label: string }[] }>({ id: '', frames: [] });
+  useEffect(() => {
+    const h = (e: Event) => setCanvasFrames((e as CustomEvent<{ id: string; frames: { id: string; label: string }[] }>).detail);
+    window.addEventListener(CANVAS_FRAMES_EVENT, h);
+    return () => window.removeEventListener(CANVAS_FRAMES_EVENT, h);
+  }, []);
   // ideia capturada (Ctrl+Alt+N) com o Notebook aberto: aparece na hora na Caixa de entrada
   useEffect(() => {
     const h = () => void api.reload();
@@ -462,15 +473,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     importTarget.current = parentId;
     importInput.current?.click();
   }, []);
-  const runExportAll = useCallback(async () => {
-    setExportingAll(true);
-    try {
-      await exportAll(api, entriesApi.entries);
-    } catch {
-      alert('Não foi possível gerar o arquivo .zip.');
-    }
-    setExportingAll(false);
-  }, [api, entriesApi.entries]);
+  const [backupOpen, setBackupOpen] = useState(false);
+  const runExportAll = useCallback(async () => setBackupOpen(true), []);
 
   const createProject = useCallback(
     async (p: NewProjectInput) => {
@@ -904,6 +908,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   }, []);
 
   const paletteHeadings = useCallback((): PaletteHeading[] => {
+    // canvas: os quadros (grupos com nome) são os "títulos"
+    if (active?.template === 'canvas' && canvasFrames.id === active.id && canvasFrames.frames.length)
+      return canvasFrames.frames.map((f) => ({ text: f.label, level: 2, go: () => window.dispatchEvent(new CustomEvent(CANVAS_CMD_EVENT, { detail: { id: active.id, cmd: `focus:${f.id}` } })) }));
     const root = document.querySelector('.nb-main-body');
     const els = root ? (Array.from(root.querySelectorAll('.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4')) as HTMLElement[]) : [];
     const fromDom = els
@@ -921,7 +928,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     if (active?._full && active.template !== 'chapter' && shown === 'note')
       return extractHeadings(active.content || '').map((h) => ({ text: h.text, level: h.level, go: () => setJump({ line: h.line, at: Date.now() }) }));
     return [];
-  }, [active, shown]);
+  }, [active, shown, canvasFrames]);
 
   const ic = (C: React.ElementType) => <C />;
   const noteOpen = shown === 'note' && !!active;
@@ -931,6 +938,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'template', group: 'Criar', label: 'Novo a partir de modelo', icon: ic(LayoutTemplate), run: () => setPicker({ parentId: null }) },
     { id: 'canvas', group: 'Criar', label: 'Novo canvas', icon: <Glyph name="canvas" />, keywords: 'quadro obsidian cartoes', run: () => void newInContext('canvas') },
     { id: 'capture', group: 'Criar', label: 'Capturar ideia na Caixa de entrada', icon: ic(Inbox), shortcut: 'Ctrl+Alt+N', keywords: 'inbox rapida quick', run: () => window.dispatchEvent(new Event(QUICK_CAPTURE_EVENT)) },
+    { id: 'library', group: 'Notebook', label: 'Biblioteca de mídias', icon: ic(Images), keywords: 'imagens arquivos r2 midia orfas assets', run: () => setLibOpen(true) },
     { id: 'trash-open', group: 'Notebook', label: 'Abrir a lixeira', icon: ic(Trash2), keywords: 'apagados restaurar excluidos', run: () => setTrashOpen(true) },
     { id: 'book', group: 'Criar', label: 'Novo livro', icon: ic(BookPlus), run: () => void createAndOpen({ template: 'book' }) },
     { id: 'daily', group: 'Criar', label: 'Nota de hoje', icon: ic(CalendarDays), keywords: 'diario diário', run: () => void openDaily() },
@@ -988,6 +996,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             C('note', 'Canvas: pôr uma nota', 'note', 'incorporar'),
             C('file', 'Canvas: inserir imagem, PDF, áudio ou vídeo', 'file', 'arquivo upload midia'),
             C('entry', 'Canvas: pôr um verbete do Codex', 'entry', 'worldbuilding personagem'),
+            C('lib', 'Canvas: inserir da biblioteca de mídias', 'library', 'imagem arquivo reaproveitar'),
             C('templates', 'Canvas: inserir modelo…', 'templates', 'tres atos jornada kanban linha do tempo'),
             ...CANVAS_TEMPLATES.map((t) => C(`tpl-${t.id}`, `Canvas: modelo “${t.label}”`, `template:${t.id}`, t.description)),
             C('wm', 'Canvas: buscar imagens livres (Wikimedia)', 'plugin:wikimedia', 'foto imagem commons'),
@@ -997,6 +1006,9 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             C('px', 'Canvas: buscar no Pixabay', 'plugin:pixabay', 'foto imagem'),
             C('us', 'Canvas: buscar no Unsplash', 'plugin:unsplash', 'foto imagem'),
             C('gd', 'Canvas: trazer do Google Drive', 'plugin:gdrive', 'drive arquivo google'),
+            ...(canvasFrames.id === active!.id
+              ? canvasFrames.frames.map((f) => ({ id: `cv-frame-${f.id}`, group: 'Quadros do canvas', label: `Quadro: ${f.label}`, icon: <Glyph name="canvas" />, keywords: `ir ${f.label}`, run: fire(`focus:${f.id}`) }))
+              : []),
             C('fit', 'Canvas: enquadrar tudo', 'fit', 'zoom', 'Shift+1'),
             C('zsel', 'Canvas: ampliar na seleção', 'zoomSel', 'zoom', 'Shift+2'),
             C('arrange', 'Canvas: organizar a seleção em grade', 'arrange', 'alinhar'),
@@ -1067,7 +1079,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
     { id: 'mentions', group: 'Navegar', label: 'Buscar menção…', icon: ic(Sparkles), run: () => setTimeout(() => setPalette({ mode: '+', aside: false }), 0) },
     { id: 'graph', group: 'Navegar', label: 'Grafo de notas', icon: ic(Network), shortcut: 'Ctrl+G', run: () => setView('graph') },
     { id: 'import', group: 'Arquivo', label: 'Importar arquivos', icon: ic(Upload), run: () => startImport(currentProjectId) },
-    { id: 'export-all', group: 'Arquivo', label: 'Exportar tudo (.zip)', icon: ic(Download), run: () => void runExportAll() },
+    { id: 'export-all', group: 'Arquivo', label: 'Backup do Notebook ou do projeto (.zip)', icon: ic(Download), run: () => void runExportAll() },
   ];
 
   // botão direito: ações gerais do Notebook
@@ -1155,7 +1167,10 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             <RibbonBtn label="Buscar (Ctrl+Shift+F)" active={left === 'search'} onClick={() => setLeft((l) => (l === 'search' ? null : 'search'))}>
               <Search />
             </RibbonBtn>
- <RibbonBtn label="Pendências" active={left === 'todos'} onClick={() => setLeft((l) => (l === 'todos' ? null : 'todos'))}>
+<RibbonBtn label="Biblioteca de mídias" active={libOpen} onClick={() => setLibOpen(true)}>
+              <Images />
+            </RibbonBtn>
+            <RibbonBtn label="Pendências" active={left === 'todos'} onClick={() => setLeft((l) => (l === 'todos' ? null : 'todos'))}>
               <ListTodo />
             </RibbonBtn>
             <RibbonBtn label="Grafo (Ctrl+G)" active={shown === 'graph'} onClick={() => setView((v) => (v === 'graph' ? (activeId ? 'note' : 'home') : 'graph'))}>
@@ -1611,6 +1626,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
           setImportResult(res);
         }}
       />
+      {backupOpen && <BackupDialog api={api} entries={entriesApi.entries} projectId={currentProjectId ?? null} onClose={() => setBackupOpen(false)} />}
+      {libOpen && viewer.id && <AssetLibrary api={api} profileId={viewer.id} entries={entriesApi.entries} projectId={currentProjectId ?? null} onOpen={open} onClose={() => setLibOpen(false)} />}
       {trashOpen && viewer.id && (
         <TrashDialog api={api} profileId={viewer.id} onRestoredEntries={entriesApi.reload} onRestoredCodex={codex.reload} onClose={() => setTrashOpen(false)} />
       )}

@@ -2352,6 +2352,12 @@ a.nb-cv-credit:hover { color: var(--nb-ink-2); text-decoration: underline; text-
 .nb-cv-plugins-foot { padding: 8px 14px 12px; border-top: 1px solid rgba(255, 255, 255, 0.07); font-size: 11px; line-height: 1.4; color: var(--nb-ink-3); }
 .nb-cv-plugins-key { display: flex; gap: 10px; margin: 14px; padding: 12px; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.14); font-size: 12px; line-height: 1.5; color: var(--nb-ink-2); }
 .nb-cv-plugins-key svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--nb-ink-3); }
+.nb-cv-drive { padding: 16px 14px; }
+.nb-cv-drive-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 38px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.14); background: var(--nb-bg); font-size: 13px; font-weight: 600; color: var(--nb-ink); }
+.nb-cv-drive-btn:hover:not(:disabled) { border-color: var(--cv-acc); }
+.nb-cv-drive-btn:disabled { opacity: 0.7; }
+.nb-cv-drive-btn svg { width: 15px; height: 15px; }
+.nb-cv-drive > p { margin-top: 10px; font-size: 11.5px; line-height: 1.5; color: var(--nb-ink-3); }
 /* alça para arrastar verbetes do Sumário */
 .nb-entry-grip { position: absolute; right: 8px; top: 8px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; color: var(--nb-ink-3); cursor: grab; opacity: 0.5; }
 .nb-entry-grip:hover { opacity: 1; background: rgba(255, 255, 255, 0.06); }

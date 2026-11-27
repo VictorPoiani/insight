@@ -5,18 +5,33 @@
  * resultados. Clique insere no centro; arrastar solta no ponto escolhido.
  */
 import { useEffect, useRef, useState } from 'react';
-import { KeyRound, Loader2, Search, X } from 'lucide-react';
+import { HardDrive, KeyRound, Loader2, Search, X } from 'lucide-react';
 import { CANVAS_PLUGINS, stockStatus, type PluginResult } from '@/lib/notebook/canvasPlugins';
+import { downloadDriveFile, googleDriveReady, pickFromDrive } from '@/lib/notebook/googleDrive';
 
 export const PLUGIN_DRAG = 'application/x-insight-plugin';
 
-export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; setTab: (t: string) => void; onInsert: (r: PluginResult) => void; onClose: () => void }) {
+export function PluginPanel({
+  tab,
+  setTab,
+  onInsert,
+  onFiles,
+  maxBytes,
+  onClose,
+}: {
+  tab: string;
+  setTab: (t: string) => void;
+  onInsert: (r: PluginResult) => void;
+  onFiles: (files: File[]) => void;
+  maxBytes: number;
+  onClose: () => void;
+}) {
   const [status, setStatus] = useState<Record<string, boolean>>({});
   useEffect(() => {
     void stockStatus().then(setStatus);
   }, []);
   const plugin = CANVAS_PLUGINS.find((p) => p.id === tab) || CANVAS_PLUGINS[0];
-  const off = (p: (typeof CANVAS_PLUGINS)[number]) => !!p.needsKey && !(p.provider && status[p.provider]);
+  const off = (p: (typeof CANVAS_PLUGINS)[number]) => (p.id === 'gdrive' ? !googleDriveReady() : !!p.needsKey && !(p.provider && status[p.provider]));
   const locked = off(plugin);
   const [q, setQ] = useState('');
   const [state, setState] = useState<{ loading: boolean; error: string | null; results: PluginResult[]; for: string }>({ loading: false, error: null, results: [], for: '' });
@@ -84,6 +99,8 @@ export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; s
             Esta fonte precisa de uma chave no servidor ({plugin.needsKey}). Quando ela for criada na Vercel, a aba liga sozinha.
           </p>
         </div>
+      ) : plugin.id === 'gdrive' ? (
+        <DrivePane onFiles={onFiles} maxBytes={maxBytes} />
       ) : (
         <>
           <form
@@ -133,5 +150,45 @@ export function PluginPanel({ tab, setTab, onInsert, onClose }: { tab: string; s
         </>
       )}
     </aside>
+  );
+}
+
+/** Aba do Google Drive: o seletor oficial do Google, sem busca própria. */
+function DrivePane({ onFiles, maxBytes }: { onFiles: (files: File[]) => void; maxBytes: number }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pick = async () => {
+    setError(null);
+    try {
+      setBusy('Abrindo o Google…');
+      const docs = await pickFromDrive();
+      if (!docs.length) return;
+      const files: File[] = [];
+      const fails: string[] = [];
+      for (const [i, d] of docs.slice(0, 20).entries()) {
+        setBusy(`Baixando ${i + 1} de ${Math.min(docs.length, 20)}…`);
+        try {
+          files.push(await downloadDriveFile(d, maxBytes));
+        } catch (err) {
+          fails.push(err instanceof Error ? err.message : d.name);
+        }
+      }
+      if (files.length) onFiles(files);
+      if (fails.length) setError(fails.join(' '));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível abrir o Drive.');
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="nb-cv-drive">
+      <button type="button" className="nb-cv-drive-btn" onClick={() => void pick()} disabled={!!busy}>
+        {busy ? <Loader2 className="animate-spin" /> : <HardDrive />}
+        {busy || 'Escolher do Drive'}
+      </button>
+      <p>Na primeira vez, o Google pede permissão. Os arquivos escolhidos sobem sem perda para o seu Notebook; Google Docs viram cartões de texto e Planilhas e Apresentações viram PDF.</p>
+      {error && <p className="nb-cv-plugins-msg nb-cv-plugins-msg--err">{error}</p>}
+    </div>
   );
 }

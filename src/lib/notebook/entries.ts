@@ -26,6 +26,8 @@ export interface NotebookEntry {
   codex_category_id?: string | null;
   /** segredo do autor: o verbete inteiro fica fora de publicações */
   is_secret?: boolean;
+  /** aparece nos balões e no "Ler mais" de textos publicados */
+  is_public?: boolean;
   created_at: string;
   updated_at: string;
 }

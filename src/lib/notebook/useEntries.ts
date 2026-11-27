@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { writeOrQueue } from './localStore';
 import type { EntryCategory, EntryKind, EntryLink, EntryRel, NotebookEntry } from './entries';
 
-const COLS = 'id, profile_id, project_id, kind, title, summary, target_id, aliases, category, image_url, codex_category_id, is_secret, created_at, updated_at';
+const COLS = 'id, profile_id, project_id, kind, title, summary, target_id, aliases, category, image_url, codex_category_id, is_secret, is_public, created_at, updated_at';
 const LINK_COLS = 'id, profile_id, from_id, to_id, rel, label, created_at';
 
 /** Entradas do Sumário do usuário (todas: são poucas e leves). */
@@ -69,7 +69,7 @@ export function useEntries(profileId: string | null) {
   );
 
   const update = useCallback(
-    async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url' | 'codex_category_id' | 'is_secret'>>) => {
+    async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url' | 'codex_category_id' | 'is_secret' | 'is_public'>>) => {
       setEntries((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
       const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_entries', op: 'update', id, row: patch });
       if (error) alert('Não foi possível salvar a entrada do Sumário.');

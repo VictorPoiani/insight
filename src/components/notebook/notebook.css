@@ -2841,3 +2841,7 @@ a.nb-cv-credit:hover { color: var(--nb-ink-2); text-decoration: underline; text-
 .ar-sheet th, .ar-sheet td { border-left: 0 !important; border-right: 0 !important; border-color: #111 !important; }
 .ar-sheet th { font-weight: 700; }
 .ar-sheet .nb-tag { color: inherit; background: none; padding: 0; }
+
+/* Prova final */
+.nb-proof-close { position: fixed; top: 14px; right: 16px; z-index: 2; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: #8a8784; opacity: 0.35; transition: opacity 0.2s; }
+.nb-proof-close:hover, .nb-proof-close:focus-visible { opacity: 1; color: #e7e5e4; background: rgba(255, 255, 255, 0.06); }

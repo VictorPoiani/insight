@@ -431,6 +431,10 @@ function EntryCard({
               />
             </label>
           </div>
+          <label className="flex items-center gap-1.5 text-[11px] text-[var(--nb-ink-3)] cursor-pointer w-max" title="Aparece nos balões e no Ler mais dos textos publicados">
+            <input type="checkbox" checked={!!entry.is_public && !entry.is_secret} disabled={!!entry.is_secret} onChange={(e) => void entriesApi.update(entry.id, { is_public: e.target.checked })} />
+            Público nas publicações{entry.is_secret ? ' (secreto)' : ''}
+          </label>
           {entry.kind === 'elemento' && (
             <>
               <div className="flex flex-wrap gap-1">

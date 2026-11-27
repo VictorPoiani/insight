@@ -29,6 +29,7 @@ export function Infobox({
   onImage,
   onFields,
   onSecretEntry,
+  onPublicEntry,
   onOpenEntry,
 }: {
   entry: NotebookEntry;
@@ -40,6 +41,7 @@ export function Infobox({
   onImage: (f: File | null) => Promise<void>;
   onFields: () => void;
   onSecretEntry: (v: boolean) => void;
+  onPublicEntry?: (v: boolean) => void;
   onOpenEntry: (id: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -132,6 +134,10 @@ export function Infobox({
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" checked={!!entry.is_secret} onChange={(e) => onSecretEntry(e.target.checked)} className="accent-[var(--nb-ink-2)]" />
           Verbete secreto
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer" title="Aparece nos balões e no Ler mais dos textos publicados">
+          <input type="checkbox" checked={!!entry.is_public && !entry.is_secret} disabled={!!entry.is_secret} onChange={(e) => onPublicEntry?.(e.target.checked)} className="accent-[var(--nb-ink-2)]" />
+          Público
         </label>
       </div>
     </aside>

@@ -3,6 +3,7 @@
 import { OnlineDot, usePresence } from '@/components/presence/PresenceProvider';
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
@@ -665,21 +666,25 @@ function CommunityHomeFeed() {
                 >
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <span className="relative shrink-0">
-                      <img
-                        src={prof.avatar_url || '/assets/net/default-perfil'}
-                        alt={prof.full_name}
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated"
-                      />
+                      <CosmeticAvatar profile={prof} size={44}>
+                        <img
+                          src={prof.avatar_url || '/assets/net/default-perfil'}
+                          alt={prof.full_name}
+                          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-border bg-elevated"
+                        />
+                      </CosmeticAvatar>
                       <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={12} />
                     </span>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                         <span className="text-sm font-extrabold text-primary group-hover:text-accent transition-colors truncate">
-                          {prof.display_name || prof.full_name}
+                          <CosmeticName profile={prof}>{prof.display_name || prof.full_name}</CosmeticName>
                         </span>
 
                         <ShieldCheck className="w-3.5 h-3.5 text-[#00ccff] shrink-0" />
+
+                        <CosmeticTag profile={prof} className="shrink-0" />
 
                         {prof.nickname && (
                           <span
@@ -786,7 +791,7 @@ function CommunityHomeFeed() {
                 ref={carouselRef}
                 onScroll={updateCarouselButtons}
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                className="flex items-center gap-2.5 overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden py-0.5"
+                className="flex items-stretch gap-2.5 overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden py-1.5"
               >
                 {carouselMembers.map((prof) => {
                   const profileHref = `/u/${encodeURIComponent(prof.username)}`;
@@ -797,27 +802,28 @@ function CommunityHomeFeed() {
                     <Link
                       key={prof.id}
                       href={profileHref}
-                      className="w-[215px] sm:w-[240px] shrink-0 p-2.5 rounded-xl bg-surface border border-border hover:border-accent/60 transition-all flex items-center justify-between gap-2 group"
+                      className="w-[240px] sm:w-[272px] shrink-0 p-2.5 rounded-xl bg-surface border border-border hover:border-accent/60 transition-all flex items-center justify-between gap-2 group"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <span className="relative shrink-0">
-                          <img
-                            src={prof.avatar_url || '/assets/net/default-perfil'}
-                            alt={prof.full_name}
-                            className="w-9 h-9 rounded-full object-cover border border-border bg-elevated"
-                          />
+                          <CosmeticAvatar profile={prof} size={36}>
+                            <img
+                              src={prof.avatar_url || '/assets/net/default-perfil'}
+                              alt={prof.full_name}
+                              className="w-9 h-9 rounded-full object-cover border border-border bg-elevated"
+                            />
+                          </CosmeticAvatar>
                           <OnlineDot profileId={prof.id} lastSeenAt={prof.last_seen_at} size={11} />
                         </span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                           <div className="flex items-center gap-1">
                             <p className="text-xs font-bold text-primary group-hover:text-accent transition-colors truncate">
-                              {prof.display_name || prof.full_name}
+                              <CosmeticName profile={prof}>{prof.display_name || prof.full_name}</CosmeticName>
                             </p>
                             <ShieldCheck className="w-3 h-3 text-[#00ccff] shrink-0" />
                           </div>
-                          <p className="text-[11px] text-muted truncate">
-                            @{prof.username}
-                          </p>
+                          <p className="text-[11px] text-muted truncate">@{prof.username}</p>
+                          <CosmeticTag profile={prof} className="mt-0.5 max-w-full" />
                         </div>
                       </div>
 

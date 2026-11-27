@@ -660,11 +660,13 @@ export function PostCard({
             }
 
             if (b.type === 'image' && b.imageUrl) {
+              // no PC, foto em coluna cheia aparece em até 50% (clicar abre em tamanho real)
+              const fullCell = !b.gridSpan || b.gridSpan >= 12;
               return (
                 <div key={b.id || idx} style={cellStyle} className="w-full py-1">
                   <figure
                     style={{ width: b.imageWidth || '100%' }}
-                    className={`${getImageAlignClass(b.imageAlign)} space-y-1.5`}
+                    className={`${getImageAlignClass(b.imageAlign)} space-y-1.5 ${fullCell ? 'md:max-w-[50%]' : ''}`}
                   >
                     <img
                       src={b.imageUrl}
@@ -1183,7 +1185,7 @@ export function PostCard({
                   key={`car-${item.blocks[0].id || item.start}`}
                   slides={item.blocks.map((m, k) => ({
                     key: m.id || `m-${item.start + k}`,
-                    node: renderBlock({ ...m, imageWidth: '100%', videoWidth: '100%', gridSpan: 12, gridStart: 0 }, item.start + k),
+                    node: renderBlock({ ...m, imageWidth: '100%', videoWidth: '100%', gridSpan: 11, gridStart: 0 }, item.start + k),
                   }))}
                 />
               );

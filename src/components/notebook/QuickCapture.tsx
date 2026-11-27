@@ -55,10 +55,21 @@ export function QuickCapture() {
   const [text, setText] = useState('');
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'queued' | 'denied'>('idle');
   const ta = useRef<HTMLTextAreaElement>(null);
+  /** a conta tem o Notebook? (null = ainda não sabe) */
+  const allowed = useRef<boolean | null>(null);
+  useEffect(() => {
+    void createClient()
+      .rpc('notebook_has_access')
+      .then(({ data, error }) => {
+        if (!error) allowed.current = data === true;
+      });
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key.toLowerCase() === 'n' || e.code === 'KeyN')) {
+        // Notebook ainda trancado para a conta: o atalho não faz nada
+        if (allowed.current === false) return;
         e.preventDefault();
         e.stopPropagation();
         setOpen(true);

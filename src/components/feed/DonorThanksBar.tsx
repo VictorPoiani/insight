@@ -6,7 +6,8 @@ import { Heart, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const SEEN_KEY = 'insight-donor-thanks-seen';
-const WINDOW_DAYS = 7;
+/** a faixa só aparece nas 24 horas seguintes à contribuição */
+const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 interface Thanks {
   id: string;
@@ -24,7 +25,8 @@ function readSeen(): string[] {
 }
 
 /**
- * Faixa no topo do feed agradecendo a doação mais recente (últimos 7 dias).
+ * Faixa no topo do feed agradecendo a doação mais recente, só nas 24 horas
+ * seguintes à contribuição.
  * Cada pessoa vê o agradecimento de cada doação uma única vez.
  */
 export function DonorThanksBar() {
@@ -33,7 +35,7 @@ export function DonorThanksBar() {
   useEffect(() => {
     let alive = true;
     const supabase = createClient();
-    const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
+    const since = new Date(Date.now() - WINDOW_MS).toISOString();
     (async () => {
       const { data } = await supabase
         .from('donations')

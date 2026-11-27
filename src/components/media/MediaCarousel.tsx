@@ -53,7 +53,8 @@ export function MediaCarousel({ slides, label = 'Mídias do post' }: { slides: {
 
   return (
     <div
-      className="col-span-12 relative group/carousel py-1"
+      // no PC o carrossel ocupa metade da coluna (como as fotos soltas); no celular, a largura toda
+      className="col-span-12 relative group/carousel py-1 w-full md:max-w-[50%] md:mx-auto"
       role="region"
       aria-roledescription="carrossel"
       aria-label={label}
@@ -74,7 +75,7 @@ export function MediaCarousel({ slides, label = 'Mídias do post' }: { slides: {
             aria-roledescription="slide"
             aria-label={`${i + 1} de ${slides.length}`}
             aria-hidden={i !== active}
-            className={`shrink-0 basis-[86%] sm:basis-[82%] snap-center transition-opacity duration-300 [&_img]:max-h-[560px] [&_img]:object-contain [&_img]:bg-black/30 ${
+            className={`shrink-0 basis-[86%] sm:basis-[82%] md:basis-full snap-center transition-opacity duration-300 [&_img]:max-h-[560px] [&_img]:object-contain [&_img]:bg-black/30 ${
               i === active ? 'opacity-100' : 'opacity-35 hover:opacity-60 cursor-pointer'
             }`}
             onClickCapture={(e) => {

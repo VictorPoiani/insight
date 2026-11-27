@@ -414,30 +414,30 @@ function CommunityHomeFeed() {
   }, [filteredProfiles, isOnline]);
 
   return (
-    <div className="w-full max-w-[42.5rem] mx-auto min-h-screen bg-background md:border-x border-border">
+    <div className="w-full min-h-screen bg-background">
       {/* Agradecimento à doação mais recente (cada pessoa vê uma vez) */}
       <DonorThanksBar />
 
       {/* 1. CABEÇALHO UNIFICADO: 1 LINHA LIMPA NO MOBILE + BUSCA EXPANSÍVEL */}
-      <header className="sticky top-0 z-30 bg-background border-b border-border">
+      <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border">
         <div className="px-4 sm:px-6 flex items-center justify-between gap-2">
           <div
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            className="flex items-center gap-4 sm:gap-5 text-xs sm:text-sm overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm font-bold overflow-x-auto [&::-webkit-scrollbar]:hidden"
           >
             <button
               type="button"
               onClick={() => handleSelectTab('for_you')}
               className={`py-3 relative transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'for_you'
-                  ? 'text-primary font-semibold'
-                  : 'text-muted hover:text-primary'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               {tabSwitching && activeTab === 'for_you' && <AsteriskLoader size="xs" />}
               <span>Para você</span>
               {activeTab === 'for_you' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
               )}
             </button>
 
@@ -446,14 +446,14 @@ function CommunityHomeFeed() {
               onClick={() => handleSelectTab('news')}
               className={`py-3 relative transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'news'
-                  ? 'text-primary font-semibold'
-                  : 'text-muted hover:text-primary'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               {tabSwitching && activeTab === 'news' && <AsteriskLoader size="xs" />}
               <span>Notícias</span>
               {activeTab === 'news' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
               )}
             </button>
 
@@ -462,14 +462,14 @@ function CommunityHomeFeed() {
               onClick={() => handleSelectTab('following')}
               className={`py-3 relative transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'following'
-                  ? 'text-primary font-semibold'
-                  : 'text-muted hover:text-primary'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               {tabSwitching && activeTab === 'following' && <AsteriskLoader size="xs" />}
               <span>Seguindo</span>
               {activeTab === 'following' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
               )}
             </button>
 
@@ -478,17 +478,17 @@ function CommunityHomeFeed() {
               onClick={() => handleSelectTab('members')}
               className={`py-3 relative transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'members'
-                  ? 'text-primary font-semibold'
-                  : 'text-muted hover:text-primary'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               {tabSwitching && activeTab === 'members' && <AsteriskLoader size="xs" />}
               <span>Membros</span>
-              <span className="text-[11px] tabular-nums text-muted">
+              <span className="px-1.5 py-0.2 rounded-full bg-elevated border border-border text-[10px] font-mono text-muted">
                 {filteredProfiles.length}
               </span>
               {activeTab === 'members' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
               )}
             </button>
           </div>
@@ -516,7 +516,7 @@ function CommunityHomeFeed() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar..."
-                className="w-36 focus:w-52 h-8 pl-8 pr-7 rounded-full bg-surface border border-border text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:bg-background transition-all duration-200"
+                className="w-44 focus:w-60 h-8 pl-8 pr-7 rounded-full bg-surface border border-border text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:bg-background transition-all duration-200"
               />
               {search && (
                 <button
@@ -539,11 +539,11 @@ function CommunityHomeFeed() {
                 className={`h-8 px-2.5 sm:px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
                   showQuickComposer
                     ? 'bg-elevated text-primary border border-border'
-                    : 'bg-accent hover:bg-accent-hover text-white'
+                    : 'bg-accent hover:bg-accent-hover text-white shadow-sm'
                 }`}
               >
                 <PenSquare className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Publicar</span>
+                <span className="hidden sm:inline">Publicar Insight</span>
               </button>
             )}
           </div>

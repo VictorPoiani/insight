@@ -31,9 +31,8 @@ export function exactTime(date: Date): string {
 /**
  * Hora do post: há quanto tempo + data e hora exatas. Atualiza sozinho a cada
  * minuto; o texto completo (com segundos e dia da semana) fica no título.
- * `compact` mostra só o relativo ("há 3 h").
  */
-export function PostTime({ iso, className = '', compact = false }: { iso: string; className?: string; compact?: boolean }) {
+export function PostTime({ iso, className = '' }: { iso: string; className?: string }) {
   const date = new Date(iso);
   const [now, setNow] = useState<number | null>(null);
 
@@ -58,9 +57,8 @@ export function PostTime({ iso, className = '', compact = false }: { iso: string
     <time dateTime={iso} title={full} className={className}>
       {/* relativo só no cliente (evita diferença entre servidor e navegador) */}
       {now !== null && <span>{relativeTime(date, now)}</span>}
-      {/* compacto: só o relativo; a data exata fica no título (passar o mouse) */}
-      {now !== null && !compact && <span aria-hidden="true"> · </span>}
-      {(!compact || now === null) && <span>{exactTime(date)}</span>}
+      {now !== null && <span aria-hidden="true"> · </span>}
+      <span>{exactTime(date)}</span>
     </time>
   );
 }

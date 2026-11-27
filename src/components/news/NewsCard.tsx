@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Heart, EyeOff, Share2 } from 'lucide-react';
-import { decodeEntities } from '@/lib/news/rss';
+import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
 import { TOPIC_BY_ID } from '@/lib/news/topics';
 import { PostTime } from '@/components/feed/PostTime';
 import { trackNews, type NewsItem } from './useNews';
+
+function sourceColor(name: string) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h} 55% 45%)`;
+}
 
 /**
  * Cartão de notícia (diferente de um post): fonte, imagem, título, resumo,
@@ -31,7 +36,7 @@ export function NewsCard({
 
   if (hidden) {
     return (
-      <div className="px-4 sm:px-5 py-3 border-b border-border text-xs text-muted flex items-center justify-between gap-2">
+      <div className="px-4 sm:px-6 py-3 border-b border-border text-xs text-muted flex items-center justify-between gap-2">
         <span>Ok — vamos mostrar menos notícias assim.</span>
         <button
           type="button"
@@ -47,23 +52,57 @@ export function NewsCard({
     );
   }
 
-  // itens já gravados podem ter entidades cruas (&eacute;) de antes da correção do leitor
-  const title = decodeEntities(item.title);
-  const summary = item.summary ? decodeEntities(item.summary) : '';
-
   return (
-    <article className="px-4 py-4 sm:px-5 sm:py-5 border-b border-border">
-      {/* fonte · tema · hora — uma linha discreta, sem pílulas */}
-      <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5 min-w-0">
+    <article className="px-4 sm:px-6 py-4 lg:py-6 border-b border-border hover:bg-surface/30 transition-colors lg:flex lg:gap-6">
+      {/* PC: mídia grande à esquerda (imagem ou capa com o tema) */}
+      {!compact && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => void trackNews(item.id, 'open')}
+          className="hidden lg:block shrink-0 w-64 xl:w-72 aspect-[16/10] rounded-2xl overflow-hidden border border-border bg-elevated"
+        >
+          {item.image_url && imgOk ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.image_url}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setImgOk(false)}
+              className="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.03]"
+            />
+          ) : (
+            <span
+              className="w-full h-full flex flex-col items-center justify-center gap-2 text-white"
+              style={{
+                background: `linear-gradient(140deg, ${mainTopic?.color || sourceColor(item.source_name)}, color-mix(in srgb, ${mainTopic?.color || '#334155'} 35%, #0b0b0f))`,
+              }}
+            >
+              <span className="text-4xl drop-shadow">{mainTopic?.emoji || '📰'}</span>
+              <span className="text-xs font-bold tracking-wide opacity-90">{item.source_name}</span>
+            </span>
+          )}
+        </a>
+      )}
+      <div className="flex-1 min-w-0 lg:flex lg:flex-col">
+      <div className="flex items-center gap-2 text-[11px] lg:text-xs text-muted mb-2 min-w-0">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold uppercase tracking-wider text-[9px] shrink-0">
+          <Newspaper className="w-3 h-3" /> Notícia
+        </span>
+        <span
+          className="w-4 h-4 rounded grid place-items-center text-[9px] font-black text-white shrink-0"
+          style={{ background: sourceColor(item.source_name) }}
+          aria-hidden="true"
+        >
+          {item.source_name.slice(0, 1).toUpperCase()}
+        </span>
         <span className="font-semibold text-secondary truncate">{item.source_name}</span>
-        {mainTopic && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className="truncate">{mainTopic.label}</span>
-          </>
-        )}
         <span aria-hidden="true">·</span>
-        <PostTime compact iso={item.published_at} className="shrink-0" />
+        <PostTime iso={item.published_at} className="truncate" />
       </div>
 
       <a
@@ -74,17 +113,22 @@ export function NewsCard({
           if (!item.seen) onPatch(item.id, { seen: true });
           void trackNews(item.id, 'open');
         }}
-        className="group flex gap-4"
+        className="group flex gap-3 sm:gap-4"
       >
         <div className="flex-1 min-w-0">
-          <h3 className={`font-semibold text-primary leading-snug group-hover:underline underline-offset-2 decoration-1 ${compact ? 'text-sm' : 'text-[15px] sm:text-base'} ${item.seen ? 'text-secondary' : ''}`}>
-            {title}
+          <h3 className={`font-extrabold text-primary leading-snug group-hover:text-accent transition-colors ${compact ? 'text-sm' : 'text-[15px] sm:text-base lg:text-xl lg:leading-tight'} ${item.seen ? 'opacity-75' : ''}`}>
+            {item.title}
           </h3>
-          {summary && !compact && (
-            <p className="mt-1 text-sm text-secondary leading-relaxed line-clamp-2">{summary}</p>
+          {item.summary && !compact && (
+            <p className="mt-1 lg:mt-2 text-[13px] lg:text-[15px] text-secondary leading-relaxed line-clamp-2 lg:line-clamp-3">{item.summary}</p>
+          )}
+          {!compact && (
+            <span className="hidden lg:inline-flex mt-2 text-xs font-bold text-accent group-hover:underline underline-offset-2">
+              Ler no {item.source_name} ↗
+            </span>
           )}
         </div>
-        {item.image_url && imgOk ? (
+        {item.image_url && imgOk && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.image_url}
@@ -92,71 +136,84 @@ export function NewsCard({
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={() => setImgOk(false)}
-            className={`shrink-0 rounded-lg object-cover bg-elevated ${compact ? 'w-20 h-16' : 'w-24 h-20 sm:w-32 sm:h-[5.5rem]'}`}
+            className={`shrink-0 rounded-xl object-cover bg-elevated border border-border ${compact ? 'w-20 h-16' : 'w-24 h-20 sm:w-32 sm:h-24 lg:hidden'}`}
           />
-        ) : null}
+        )}
       </a>
 
-      <div className="mt-2 -ml-2 flex items-center gap-1 text-[13px] text-muted tabular-nums">
+      <div className="mt-2.5 lg:mt-auto lg:pt-3 flex items-center gap-1.5 flex-wrap">
+        {item.topics.slice(0, 3).map((t, idx) => {
+          const topic = TOPIC_BY_ID.get(t);
+          if (!topic) return null;
+          return (
+            <span key={t} className={`${idx > 0 ? 'hidden sm:inline-flex' : 'inline-flex'} px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border text-secondary`}>
+              {topic.emoji} {topic.label}
+            </span>
+          );
+        })}
+        {suggestFollow && (
+          <button
+            type="button"
+            onClick={() => onToggleFollow!(mainTopic!.id)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-accent bg-accent/10 hover:bg-accent/20"
+          >
+            <Plus className="w-3 h-3" /> Seguir {mainTopic!.label}
+          </button>
+        )}
+        {follows && mainTopic && follows.has(mainTopic.id) && onToggleFollow && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-400">
+            <Check className="w-3 h-3" /> Você segue
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-0.5 shrink-0">
         <button
           type="button"
           aria-label={item.liked ? 'Descurtir' : 'Curtir'}
           aria-pressed={item.liked}
-          title="Curtir"
           onClick={() => {
             const on = !item.liked;
             onPatch(item.id, { liked: on, like_count: Math.max(0, item.like_count + (on ? 1 : -1)) });
             void trackNews(item.id, 'like', on);
           }}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors ${
-            item.liked ? 'text-rose-500' : 'hover:text-rose-500'
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-colors ${
+            item.liked ? 'text-rose-500' : 'text-muted hover:text-rose-500'
           }`}
         >
-          <Heart className={`w-[18px] h-[18px] ${item.liked ? 'fill-rose-500' : ''}`} />
-          {item.like_count > 0 && <span>{item.like_count}</span>}
+          <Heart className={`w-4 h-4 ${item.liked ? 'fill-rose-500' : ''}`} />
+          {item.like_count > 0 && <span className="font-mono text-[11px]">{item.like_count}</span>}
         </button>
-        {suggestFollow && (
-          <button
-            type="button"
-            onClick={() => onToggleFollow!(mainTopic!.id)}
-            className="px-2 py-1.5 rounded-full text-xs font-medium hover:text-accent transition-colors"
-          >
-            Seguir {mainTopic!.label}
-          </button>
-        )}
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Compartilhar"
-            title="Compartilhar"
-            onClick={async () => {
-              try {
-                if (navigator.share) await navigator.share({ title, url: item.url });
-                else {
-                  await navigator.clipboard.writeText(item.url);
-                  alert('Link copiado!');
-                }
-              } catch {
-                /* cancelado */
+        <button
+          type="button"
+          aria-label="Compartilhar"
+          onClick={async () => {
+            try {
+              if (navigator.share) await navigator.share({ title: item.title, url: item.url });
+              else {
+                await navigator.clipboard.writeText(item.url);
+                alert('Link copiado!');
               }
-            }}
-            className="p-1.5 rounded-full hover:text-primary transition-colors"
-          >
-            <Share2 className="w-[18px] h-[18px]" />
-          </button>
-          <button
-            type="button"
-            aria-label="Não tenho interesse"
-            title="Não tenho interesse"
-            onClick={() => {
-              setHidden(true);
-              void trackNews(item.id, 'hide');
-            }}
-            className="p-1.5 rounded-full hover:text-primary transition-colors"
-          >
-            <EyeOff className="w-[18px] h-[18px]" />
-          </button>
+            } catch {
+              /* cancelado */
+            }
+          }}
+          className="p-1.5 rounded-full text-muted hover:text-primary"
+        >
+          <Share2 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="Não tenho interesse"
+          title="Não tenho interesse"
+          onClick={() => {
+            setHidden(true);
+            void trackNews(item.id, 'hide');
+          }}
+          className="p-1.5 rounded-full text-muted hover:text-primary"
+        >
+          <EyeOff className="w-4 h-4" />
+        </button>
         </div>
+      </div>
       </div>
     </article>
   );

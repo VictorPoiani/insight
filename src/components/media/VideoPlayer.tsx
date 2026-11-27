@@ -81,8 +81,6 @@ export function VideoPlayer({
   const [waiting, setWaiting] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  // proporção do vídeo: o vertical não vira uma faixa preta da largura do feed
-  const [ratio, setRatio] = useState<number | null>(null);
   const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(gif);
@@ -322,7 +320,6 @@ export function VideoPlayer({
         if (playing) setShowUi(false);
       }}
       onClick={(e) => e.stopPropagation()}
-      style={!fullscreen && ratio && ratio < 1 ? { maxWidth: `min(100%, calc(70vh * ${ratio.toFixed(4)}))`, marginInline: 'auto' } : undefined}
       className={`group/vp relative bg-black select-none outline-none focus-visible:ring-2 focus-visible:ring-accent ${
         fullscreen ? 'w-full h-full flex items-center' : ''
       } ${!uiVisible && playing ? 'cursor-none' : ''} ${className}`}
@@ -353,11 +350,7 @@ export function VideoPlayer({
         onPlaying={() => setWaiting(false)}
         onCanPlay={() => setWaiting(false)}
         onError={() => setError(true)}
-        onLoadedMetadata={(e) => {
-          const v = e.currentTarget;
-          setDuration(v.duration);
-          if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
-        }}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           if (!scrubbing) setTime(e.currentTarget.currentTime);
@@ -370,7 +363,7 @@ export function VideoPlayer({
           setVolume(e.currentTarget.volume);
           setMuted(e.currentTarget.muted);
         }}
-        className={`w-full h-auto mx-auto object-contain block ${fullscreen ? '' : 'max-h-[70vh]'}`}
+        className="w-full h-auto mx-auto object-contain block"
         style={{ maxHeight: fullscreen ? '100vh' : maxHeight }}
       />
 

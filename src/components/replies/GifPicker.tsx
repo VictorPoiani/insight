@@ -24,6 +24,7 @@ export function GifPicker({
   const [q, setQ] = useState('');
   const [items, setItems] = useState<GifItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reqId = useRef(0);
 
@@ -34,10 +35,16 @@ export function GifPicker({
       setLoading(true);
       try {
         const res = await fetch(`/api/giphy?${new URLSearchParams({ q, type: 'gifs', limit: '24' })}`);
-        const json = await res.json();
-        if (id === reqId.current) setItems(Array.isArray(json.items) ? json.items : []);
+        const json = await res.json().catch(() => ({}));
+        if (id === reqId.current) {
+          setItems(Array.isArray(json.items) ? json.items : []);
+          setError(!res.ok || json.ok === false ? json.message || 'A busca de GIFs está indisponível no momento.' : null);
+        }
       } catch {
-        if (id === reqId.current) setItems([]);
+        if (id === reqId.current) {
+          setItems([]);
+          setError('Sem conexão para buscar GIFs.');
+        }
       } finally {
         if (id === reqId.current) setLoading(false);
       }
@@ -72,7 +79,7 @@ export function GifPicker({
             <Loader2 className="w-5 h-5 text-muted animate-spin" />
           </div>
         ) : items.length === 0 ? (
-          <p className="h-full grid place-items-center text-xs text-muted">Nenhum GIF encontrado.</p>
+          <p className="h-full grid place-items-center text-xs text-muted">{error || 'Nenhum GIF encontrado.'}</p>
         ) : (
           <div className="columns-3 gap-1.5 [&>*]:mb-1.5">
             {items.map((g) => (

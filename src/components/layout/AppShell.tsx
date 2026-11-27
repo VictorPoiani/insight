@@ -159,7 +159,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="max-w-[1920px] mx-auto flex min-h-screen justify-center pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
         <LeftSidebar />
 
-        <main className="flex-1 min-w-0 min-h-screen md:border-x border-border">
+        {/* no feed a borda fica na própria coluna de leitura (centralizada) */}
+        <main className={`flex-1 min-w-0 min-h-screen ${pathname === '/' ? '' : 'md:border-x border-border'}`}>
           {children}
         </main>
 

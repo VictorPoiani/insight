@@ -48,6 +48,7 @@ import {
   Compass,
   Network,
   Flag,
+  MoreHorizontal,
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -188,6 +189,7 @@ export function PostCard({
   // UI & Modais
   const [isEditing, setIsEditing] = useState(false);
   const [openShareModal, setOpenShareModal] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
 
   const [loggedUserProfile, setLoggedUserProfile] = useState<Profile | null>(null);
 
@@ -660,18 +662,18 @@ export function PostCard({
             }
 
             if (b.type === 'image' && b.imageUrl) {
-              // no PC, foto em coluna cheia aparece em até 50% (clicar abre em tamanho real)
+              // foto em coluna cheia: largura da coluna de leitura, altura limitada (clicar abre em tamanho real)
               const fullCell = !b.gridSpan || b.gridSpan >= 12;
               return (
                 <div key={b.id || idx} style={cellStyle} className="w-full py-1">
                   <figure
                     style={{ width: b.imageWidth || '100%' }}
-                    className={`${getImageAlignClass(b.imageAlign)} space-y-1.5 ${fullCell ? 'md:max-w-[50%]' : ''}`}
+                    className={`${getImageAlignClass(b.imageAlign)} space-y-1.5`}
                   >
                     <img
                       src={b.imageUrl}
                       alt={b.imageCaption || 'Imagem do post'}
-                      className="w-full h-auto rounded-xl border border-border object-cover cursor-zoom-in"
+                      className={`h-auto rounded-xl ring-1 ring-inset ring-black/5 object-cover cursor-zoom-in ${fullCell ? 'w-auto max-w-full max-h-[34rem] mx-auto' : 'w-full'}`}
                       loading="lazy"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -701,7 +703,7 @@ export function PostCard({
                     style={{ width: b.videoWidth || '100%' }}
                     className={`${getImageAlignClass(b.videoAlign)} space-y-1.5`}
                   >
-                    <div className="relative rounded-xl overflow-hidden border border-border bg-black/90">
+                    <div className={`relative rounded-xl overflow-hidden ${isRawGif ? 'bg-black/90' : ''}`}>
                       {isRawGif ? (
                         <img
                           src={b.videoUrl}
@@ -710,7 +712,7 @@ export function PostCard({
                           loading="lazy"
                         />
                       ) : (
-                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} />
+                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} className="rounded-xl overflow-hidden" />
                       )}
 
                       {isGifMode && isRawGif && (
@@ -876,11 +878,11 @@ export function PostCard({
                 <div
                   key={b.id || idx}
                   style={cellStyle}
-                  className="p-3.5 sm:p-4 rounded-xl bg-elevated border border-border space-y-3"
+                  className="space-y-2.5"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-baseline justify-between gap-2">
                     <div>
-                      <p className="text-sm font-bold text-primary">
+                      <p className="text-[15px] font-semibold text-primary">
                         {b.pollQuestion || 'Enquete'}
                       </p>
                       <p className="text-[11px] text-muted">
@@ -889,7 +891,7 @@ export function PostCard({
                           : 'Selecione uma opção'}
                       </p>
                     </div>
-                    <span className="text-[11px] font-mono text-muted shrink-0">
+                    <span className="text-xs tabular-nums text-muted shrink-0">
                       {totalVotes} {totalVotes === 1 ? 'voto' : 'votos'}
                     </span>
                   </div>
@@ -906,10 +908,10 @@ export function PostCard({
                           type="button"
                           disabled={votingBlockId === b.id}
                           onClick={() => handleVotePoll(b.id, opt.id, b.pollMultiple)}
-                          className={`w-full text-left p-2.5 rounded-xl border transition-all space-y-1.5 ${
+                          className={`w-full text-left px-3 py-2 rounded-lg border transition-colors space-y-1.5 ${
                             opt.isChecked
-                              ? 'border-accent bg-accent/10'
-                              : 'border-border bg-surface hover:border-accent/50'
+                              ? 'border-accent/60'
+                              : 'border-border hover:border-secondary/50'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 text-xs">
@@ -923,15 +925,15 @@ export function PostCard({
                               >
                                 {opt.isChecked && <Check className="w-2.5 h-2.5" />}
                               </span>
-                              <span className="font-semibold text-primary truncate">
+                              <span className="text-sm font-medium text-primary truncate">
                                 {opt.text}
                               </span>
                             </div>
-                            <span className="text-[11px] font-mono text-muted shrink-0">
-                              {votes} ({pct}%)
+                            <span className="text-xs tabular-nums text-muted shrink-0">
+                              {pct}% · {votes}
                             </span>
                           </div>
-                          <div className="w-full h-1.5 rounded-full bg-elevated overflow-hidden">
+                          <div className="w-full h-1 rounded-full bg-elevated overflow-hidden">
                             <div
                               style={{ width: `${pct}%` }}
                               className="h-full bg-accent transition-all duration-300"
@@ -1039,12 +1041,12 @@ export function PostCard({
       ref={articleRef}
       id={`post-${post.id}`}
       data-post-view={post.id}
-      className={`p-4 sm:p-6 border-b border-border transition-all duration-300 ${
+      className={`px-4 py-4 sm:px-5 sm:py-5 border-b border-border transition-colors duration-300 ${
         isHighlightedFromUrl
           ? 'bg-accent/[0.07] ring-1 ring-inset ring-accent/40'
           : postVisibility === 'private'
-          ? 'bg-elevated/25 hover:bg-elevated/40'
-          : 'hover:bg-surface/30'
+          ? 'bg-elevated/25'
+          : ''
       }`}
     >
       {/* Indicadores Superiores: Fixado / Privado */}
@@ -1092,56 +1094,91 @@ export function PostCard({
                 <CosmeticTag profile={author} />
               </span>
             </div>
-            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
+            <PostTime compact iso={post.created_at} className="text-xs text-muted block truncate" />
           </div>
         </Link>
 
-        {isAdmin && (
-          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleVisibility}
-              title={
-                postVisibility === 'private'
-                  ? 'Privado (Só para mim) — Clique para tornar Público'
-                  : 'Público — Clique para trancar (Só para mim)'
-              }
-              className={`p-1.5 rounded-lg transition-colors ${
-                postVisibility === 'private'
-                  ? 'text-primary bg-elevated border border-border'
-                  : 'text-muted hover:text-primary hover:bg-elevated'
-              }`}
-            >
-              {postVisibility === 'private' ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Globe className="w-4 h-4" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsEditing(!isEditing)}
-              title={isEditing ? 'Fechar editor' : 'Editar Insight'}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isEditing
-                  ? 'text-accent bg-accent/10'
-                  : 'text-muted hover:text-accent hover:bg-elevated'
-              }`}
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              title="Excluir Insight"
-              className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-elevated transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <div className="relative shrink-0 -mr-1.5">
+          <button
+            type="button"
+            onClick={() => setMoreMenu((v) => !v)}
+            aria-label="Mais opções"
+            title="Mais opções"
+            aria-haspopup="menu"
+            aria-expanded={moreMenu}
+            className={`p-1.5 rounded-full transition-colors ${
+              moreMenu || isEditing ? 'text-primary bg-surface' : 'text-muted hover:text-primary hover:bg-surface'
+            }`}
+          >
+            <MoreHorizontal className="w-[18px] h-[18px]" />
+          </button>
+          {moreMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMoreMenu(false)} />
+              <div role="menu" className="absolute right-0 top-full mt-1 z-50 w-60 py-1 rounded-xl bg-background border border-border shadow-xl">
+                {isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMoreMenu(false);
+                        setIsEditing(!isEditing);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                    >
+                      <Pencil className="w-4 h-4 text-secondary" />
+                      {isEditing ? 'Fechar editor' : 'Editar'}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMoreMenu(false);
+                        void handleToggleVisibility();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                    >
+                      {postVisibility === 'private' ? (
+                        <Globe className="w-4 h-4 text-secondary" />
+                      ) : (
+                        <Lock className="w-4 h-4 text-secondary" />
+                      )}
+                      {postVisibility === 'private' ? 'Tornar público' : 'Deixar só para mim'}
+                    </button>
+                    <div className="my-1 border-t border-border" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMoreMenu(false);
+                        void handleDelete();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger hover:bg-surface text-left"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Excluir
+                    </button>
+                  </>
+                )}
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMoreMenu(false);
+                      void handleReportPost();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                  >
+                    <Flag className="w-4 h-4 text-secondary" />
+                    Denunciar à moderação
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Editor Inline ou Conteúdo Renderizado */}
@@ -1177,7 +1214,7 @@ export function PostCard({
       ) : (
         <NsfwGate active={isNsfw && !isPostOwner}>
         {hasRichBlocks ? (
-        <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
+        <div className="notion-content mt-3 grid grid-cols-12 gap-3 text-[15px] sm:text-base sm:leading-[1.65] text-primary leading-relaxed items-start break-words">
           {groupMediaRuns(blocksState).map((item) => {
             if (item.kind === 'carousel') {
               return (
@@ -1205,7 +1242,7 @@ export function PostCard({
       ) : (
         <>
           {postContent && (
-            <div className="mt-4 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary whitespace-pre-line leading-relaxed break-words">
+            <div className="mt-3 text-[15px] sm:text-base sm:leading-[1.65] text-primary whitespace-pre-line leading-relaxed break-words">
               {postContent}
             </div>
           )}
@@ -1256,11 +1293,11 @@ export function PostCard({
 
       {/* Hashtags */}
       {postTags && postTags.length > 0 && !isEditing && (
-        <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
           {postTags.map((tag) => (
             <span
               key={tag}
-              className="px-2 py-0.5 rounded bg-elevated border border-border font-mono text-[11px] text-accent"
+              className="text-[13px] text-accent"
             >
               #{tag}
             </span>
@@ -1268,109 +1305,108 @@ export function PostCard({
         </div>
       )}
 
-      {/* Barra de Ações (Responsiva para Mobile e Desktop) */}
-      <div className="mt-4 pt-3 flex items-center justify-between gap-2 text-xs text-secondary">
-        <div className="flex items-center gap-5 sm:gap-6">
-          {variant === 'detail' ? (
-            <button
-              type="button"
-              onClick={onReplyClick}
-              aria-label="Comentar Insight"
-              title="Comentar Insight"
-              className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>{displayedRepliesCount}</span>
-            </button>
-          ) : (
-            <Link
-              href={`/post/${post.id}`}
-              aria-label="Comentar Insight"
-              title="Comentar Insight"
-              className="flex items-center gap-1.5 py-1 transition-colors hover:text-accent"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>{displayedRepliesCount}</span>
-            </Link>
-          )}
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                if (!loggedUserProfile) {
-                  window.location.href = loginHref();
-                  return;
-                }
-                setRepostMenu((v) => !v);
-              }}
-              aria-label="Repostar Insight"
-              title="Repostar Insight"
-              aria-haspopup="menu"
-              aria-expanded={repostMenu}
-              className={`flex items-center gap-1.5 py-1 transition-colors ${
-                hasReposted ? 'text-[#1DB954] font-semibold' : 'hover:text-primary'
-              }`}
-            >
-              <Repeat2 className="w-4 h-4" />
-              <span>{reposts}</span>
-            </button>
-            {repostMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setRepostMenu(false)} />
-                <div role="menu" className="absolute bottom-full left-0 mb-2 z-50 w-56 py-1 rounded-xl bg-elevated border border-border shadow-2xl">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setRepostMenu(false);
-                      void handleRepost();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
-                  >
-                    <Repeat2 className="w-4 h-4 text-[#1DB954]" />
-                    {hasReposted ? 'Desfazer repost' : 'Repostar Insight'}
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setRepostMenu(false);
-                      setQuoteOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
-                  >
-                    <MessageCircle className="w-4 h-4 text-accent" />
-                    Repostar com comentário
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
+      {/* Barra de Ações: cinco ícones no mesmo peso; número só quando há interação */}
+      <div className="mt-3 -ml-2 flex items-center gap-1 sm:gap-3 text-[13px] text-muted tabular-nums">
+        {variant === 'detail' ? (
           <button
             type="button"
-            onClick={handleLike}
-            aria-label="Curtir Insight"
-            title="Curtir Insight"
-            className={`flex items-center gap-1.5 py-1 transition-colors ${
-              hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
+            onClick={onReplyClick}
+            aria-label="Comentar Insight"
+            title="Comentar"
+            className="group/act flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors hover:text-accent"
+          >
+            <MessageCircle className="w-[18px] h-[18px]" />
+            {displayedRepliesCount > 0 && <span>{displayedRepliesCount}</span>}
+          </button>
+        ) : (
+          <Link
+            href={`/post/${post.id}`}
+            aria-label="Comentar Insight"
+            title="Comentar"
+            className="group/act flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors hover:text-accent"
+          >
+            <MessageCircle className="w-[18px] h-[18px]" />
+            {displayedRepliesCount > 0 && <span>{displayedRepliesCount}</span>}
+          </Link>
+        )}
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              if (!loggedUserProfile) {
+                window.location.href = loginHref();
+                return;
+              }
+              setRepostMenu((v) => !v);
+            }}
+            aria-label="Repostar Insight"
+            title="Repostar"
+            aria-haspopup="menu"
+            aria-expanded={repostMenu}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors ${
+              hasReposted ? 'text-emerald-600 dark:text-emerald-400' : 'hover:text-emerald-600'
             }`}
           >
-            <Heart className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''}`} />
-            <span>{likes}</span>
+            <Repeat2 className="w-[18px] h-[18px]" />
+            {reposts > 0 && <span>{reposts}</span>}
           </button>
+          {repostMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setRepostMenu(false)} />
+              <div role="menu" className="absolute bottom-full left-0 mb-2 z-50 w-56 py-1 rounded-xl bg-background border border-border shadow-xl">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setRepostMenu(false);
+                    void handleRepost();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                >
+                  <Repeat2 className="w-4 h-4 text-secondary" />
+                  {hasReposted ? 'Desfazer repost' : 'Repostar'}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setRepostMenu(false);
+                    setQuoteOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left"
+                >
+                  <MessageCircle className="w-4 h-4 text-secondary" />
+                  Repostar com comentário
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
+        <button
+          type="button"
+          onClick={handleLike}
+          aria-label={hasLiked ? 'Descurtir Insight' : 'Curtir Insight'}
+          aria-pressed={hasLiked}
+          title="Curtir"
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-colors ${
+            hasLiked ? 'text-rose-500' : 'hover:text-rose-500'
+          }`}
+        >
+          <Heart className={`w-[18px] h-[18px] ${hasLiked ? 'fill-rose-500' : ''}`} />
+          {likes > 0 && <span>{likes}</span>}
+        </button>
+
+        <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
             onClick={() => setOpenShareModal(true)}
             aria-label="Compartilhar Insight"
-            className={`flex items-center gap-1.5 py-1 transition-colors ${
-              openShareModal ? 'text-accent font-semibold' : 'hover:text-primary'
-            }`}
+            title="Compartilhar"
+            className={`p-1.5 rounded-full transition-colors ${openShareModal ? 'text-primary' : 'hover:text-primary'}`}
           >
-            <Share2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Compartilhar</span>
+            <Share2 className="w-[18px] h-[18px]" />
           </button>
 
           <button
@@ -1379,24 +1415,11 @@ export function PostCard({
             aria-pressed={hasSaved}
             aria-label={hasSaved ? 'Remover dos salvos' : 'Salvar Insight'}
             title={hasSaved ? 'Remover dos salvos' : 'Salvar para ler depois'}
-            className={`flex items-center gap-1.5 py-1 transition-colors ${hasSaved ? 'text-accent font-semibold' : 'hover:text-primary'}`}
+            className={`p-1.5 rounded-full transition-colors ${hasSaved ? 'text-primary' : 'hover:text-primary'}`}
           >
-            <Bookmark className={`w-4 h-4 ${hasSaved ? 'fill-accent text-accent' : ''}`} />
-            <span className="hidden sm:inline">{hasSaved ? 'Salvo' : 'Salvar'}</span>
+            <Bookmark className={`w-[18px] h-[18px] ${hasSaved ? 'fill-current' : ''}`} />
           </button>
         </div>
-
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={handleReportPost}
-            title="Denunciar Insight à moderação"
-            aria-label="Denunciar Insight"
-            className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
-          >
-            <Flag className="w-3.5 h-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Modal Insight* Share Studio */}

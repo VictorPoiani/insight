@@ -321,7 +321,7 @@ export function LeftSidebar() {
         href={item.href}
         title={isCollapsed ? item.name : undefined}
         className={`flex items-center rounded-lg text-sm font-medium transition-colors ${layout} ${
-          isActive ? 'bg-surface text-accent border border-border' : 'text-secondary hover:bg-surface hover:text-primary'
+          isActive ? 'text-primary font-semibold' : 'text-secondary hover:bg-surface hover:text-primary'
         }`}
       >
         <div className="relative shrink-0">

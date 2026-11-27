@@ -43,10 +43,11 @@ import { CANVAS_FILE, CANVAS_TEXT, formatSize, imageSize, uploadCanvasFile, uplo
 import { clipPage, fetchExternalImage, trackStockDownload, type PluginResult } from '@/lib/notebook/canvasPlugins';
 import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
 import { PluginPanel, PLUGIN_DRAG } from './CanvasPlugins';
+import { AssetLibrary, type Asset } from '../assets/AssetLibrary';
 import { Glyph } from '../icons/Glyph';
 import { useNotebookMenu, type MenuEntry } from '../menu/ContextMenu';
 import { CanvasNodeView, type NodeCtx } from './CanvasNodeView';
-import { EntryPicker, HelpPanel, NotePicker, RightRail, SelectionBar, TemplateMenu, type CanvasPrefs } from './CanvasChrome';
+import { EntryPicker, HelpPanel, Minimap, NotePicker, RightRail, SelectionBar, TemplateMenu, type CanvasPrefs } from './CanvasChrome';
 
 type View = { x: number; y: number; k: number };
 type Gesture =
@@ -67,6 +68,8 @@ const IMG_W = 400;
 const ENTRY_DRAG = 'application/x-insight-entry';
 /** Pedido vindo de fora (paleta de comandos): { id do canvas, comando }. */
 export const CANVAS_CMD_EVENT = 'nb-canvas-cmd';
+/** O canvas avisa seus quadros (grupos com nome) para a paleta de comandos. */
+export const CANVAS_FRAMES_EVENT = 'nb-canvas-frames';
 
 const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
 const isField = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable="true"]');
@@ -119,6 +122,7 @@ export function CanvasStudio({
   const [entryPicker, setEntryPicker] = useState<{ x: number; y: number } | null>(null);
   const [templates, setTemplates] = useState(false);
   const [plugins, setPlugins] = useState<string | null>(null);
+  const [library, setLibrary] = useState<{ x: number; y: number } | null>(null);
   const [help, setHelp] = useState(false);
   const [uploads, setUploads] = useState(0);
   const [title, setTitle] = useState(item.title);
@@ -159,13 +163,36 @@ export function CanvasStudio({
   /** onde colar: no cursor, se ele estiver sobre o quadro */
   const dropPoint = (): [number, number] => pointer.current || center();
 
-  const zoomTo = useCallback((b: Box | null, max = 1.2) => {
-    const box = boxRef.current?.getBoundingClientRect();
-    if (!box) return;
-    if (!b) return setView({ x: box.width / 2, y: box.height / 2, k: 1 });
-    const k = clampK(Math.min(max, (box.width - 160) / (b.width || 1), (box.height - 180) / (b.height || 1)));
-    setView({ k, x: box.width / 2 - (b.x + b.width / 2) * k - 20, y: box.height / 2 - (b.y + b.height / 2) * k + 10 });
+  /** Câmera suave até a vista pedida (sem animação se o sistema pede menos movimento). */
+  const anim = useRef<number | null>(null);
+  const flyTo = useCallback((to: View) => {
+    if (anim.current) cancelAnimationFrame(anim.current);
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const from = viewRef.current;
+    if (reduce || !fittedRef.current) return setView(to);
+    const t0 = performance.now();
+    const dur = 340;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      // zoom em escala logarítmica (fica natural ao aproximar e afastar)
+      const k = Math.exp(Math.log(from.k) + (Math.log(to.k) - Math.log(from.k)) * e);
+      setView({ k, x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e });
+      anim.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    anim.current = requestAnimationFrame(step);
   }, []);
+  const fittedRef = useRef(false);
+  const zoomTo = useCallback(
+    (b: Box | null, max = 1.2) => {
+      const box = boxRef.current?.getBoundingClientRect();
+      if (!box) return;
+      if (!b) return flyTo({ x: box.width / 2, y: box.height / 2, k: 1 });
+      const k = clampK(Math.min(max, (box.width - 160) / (b.width || 1), (box.height - 180) / (b.height || 1)));
+      flyTo({ k, x: box.width / 2 - (b.x + b.width / 2) * k - 20, y: box.height / 2 - (b.y + b.height / 2) * k + 10 });
+    },
+    [flyTo]
+  );
   const fit = useCallback(() => zoomTo(bboxOf(dataRef.current.nodes)), [zoomTo, dataRef]);
   const zoomSel = useCallback(() => zoomTo(bboxOf(dataRef.current.nodes.filter((n) => selRef.current.has(n.id))), 2), [zoomTo, dataRef]);
   const zoomAt = (factor: number, cx?: number, cy?: number) => {
@@ -185,6 +212,7 @@ export function CanvasStudio({
     if (doc.loaded && !fitted.current) {
       fitted.current = true;
       fit();
+      fittedRef.current = true;
     }
   }, [doc.loaded, fit]);
 
@@ -437,6 +465,20 @@ export function CanvasStudio({
     window.addEventListener('online', on);
     return () => window.removeEventListener('online', on);
   }, [doc.loaded]);
+
+  /** Arquivo já enviado (Biblioteca): entra no quadro sem novo envio. */
+  const insertAsset = (a: Asset, x: number, y: number) => {
+    const t = a.content_type || '';
+    const name = a.original_name || a.r2_key.split('/').pop() || 'arquivo';
+    if (t.startsWith('image/')) {
+      const w = Math.min(IMG_W, a.width || IMG_W);
+      const h = a.width && a.height ? Math.round((w * a.height) / a.width) : 300;
+      addNodes([{ id: cuid(), type: 'image', x: Math.round(x - w / 2), y: Math.round(y - h / 2), width: w, height: h, url: a.url, assetId: a.id, label: name, mime: t, bytes: Number(a.size_bytes) || undefined, natW: a.width || undefined, natH: a.height || undefined }]);
+    } else {
+      const [w, h] = t === 'application/pdf' ? [420, 560] : t.startsWith('audio/') ? [360, 110] : [480, 310];
+      addNodes([{ id: cuid(), type: 'file', x: Math.round(x - w / 2), y: Math.round(y - h / 2), width: w, height: h, url: a.url, assetId: a.id, label: name, mime: t, bytes: Number(a.size_bytes) || undefined }]);
+    }
+  };
 
   /** Cartão de link: aparece na hora e ganha a prévia (título, imagem) do servidor. */
   const addLink = (url: string, at: [number, number], meta?: CanvasNode['meta']) => {
@@ -962,6 +1004,16 @@ export function CanvasStudio({
     };
   });
 
+  // quadros (grupos com nome) viram âncoras na paleta (Ctrl+K)
+  const framesKey = data.nodes
+    .filter((n) => n.type === 'group')
+    .map((n) => `${n.id}\u0001${n.label || 'Grupo'}`)
+    .join('\u0002');
+  useEffect(() => {
+    const frames = framesKey ? framesKey.split('\u0002').map((s) => ({ id: s.split('\u0001')[0], label: s.split('\u0001')[1] })) : [];
+    window.dispatchEvent(new CustomEvent(CANVAS_FRAMES_EVENT, { detail: { id: item.id, frames } }));
+  }, [framesKey, item.id]);
+
   // ------------------------------------------------------------ comandos da paleta (Ctrl+P)
   const cmdRef = useRef<(cmd: string) => void>(() => {});
   cmdRef.current = (cmd: string) => {
@@ -971,6 +1023,7 @@ export function CanvasStudio({
     else if (cmd === 'file') ((filePoint.current = [x, y]), fileRef.current?.click());
     else if (cmd === 'entry') setEntryPicker({ x, y });
     else if (cmd === 'templates') setTemplates(true);
+    else if (cmd === 'library') setLibrary({ x, y });
     else if (cmd.startsWith('template:')) addTemplate(cmd.slice(9));
     else if (cmd.startsWith('plugin:')) setPlugins(cmd.slice(7));
     else if (cmd === 'fit') fit();
@@ -1144,6 +1197,7 @@ export function CanvasStudio({
         { label: 'Nota do Notebook…', icon: <FileText className="w-3.5 h-3.5" />, run: () => setPicker({ x, y }) },
         { label: 'Imagem, PDF, áudio ou vídeo…', icon: <Paperclip className="w-3.5 h-3.5" />, run: () => ((filePoint.current = [x, y]), fileRef.current?.click()) },
         ...(entriesApi && Object.keys(entries).length ? [{ label: 'Verbete do Codex…', icon: <BookMarked className="w-3.5 h-3.5" />, run: () => setEntryPicker({ x, y }) }] : []),
+        { label: 'Da biblioteca de mídias…', icon: <ImagePlus className="w-3.5 h-3.5" />, run: () => setLibrary({ x, y }) },
         { label: 'Modelo…', icon: <LayoutTemplate className="w-3.5 h-3.5" />, run: () => setTemplates(true) },
         { label: 'Fontes externas…', icon: <Globe className="w-3.5 h-3.5" />, run: () => setPlugins('wikimedia') },
         { label: 'Grupo aqui', icon: <Group className="w-3.5 h-3.5" />, run: () => addGroup(x, y, new Set()) },
@@ -1544,6 +1598,16 @@ export function CanvasStudio({
         />
       )}
 
+      <Minimap
+        nodes={data.nodes}
+        view={v}
+        size={size}
+        selected={sel}
+        open={prefs.minimap !== false && (size.w || 0) > 640}
+        onToggle={() => setPrefs({ ...prefs, minimap: prefs.minimap === false })}
+        onCenter={(x, y) => setView((cur) => ({ ...cur, x: (size.w || 0) / 2 - x * cur.k, y: (size.h || 0) / 2 - y * cur.k }))}
+      />
+
       <RightRail
         zoom={v.k}
         canUndo={doc.canUndo}
@@ -1586,6 +1650,21 @@ export function CanvasStudio({
         />
       )}
       {help && <HelpPanel onClose={() => setHelp(false)} />}
+      {library && (
+        <AssetLibrary
+          api={api}
+          profileId={item.profile_id}
+          entries={entries}
+          projectId={projectRootOf(api.items, item.id)}
+          onOpen={onOpen}
+          onClose={() => setLibrary(null)}
+          onPick={(a: Asset) => {
+            const at = library;
+            setLibrary(null);
+            insertAsset(a, at.x, at.y);
+          }}
+        />
+      )}
       {entryPicker && (
         <EntryPicker
           entries={Object.values(entries)}

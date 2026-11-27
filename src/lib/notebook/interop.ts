@@ -398,9 +398,45 @@ export async function exportItem(item: NotebookItem, format: ExportFormat, api: 
 // ============================================================ exportar tudo (.zip)
 export const BACKUP_FORMAT = 'insight-notebook-backup';
 
-export async function exportAll(api: NotebookApi, entries: Record<string, NotebookEntry>, onProgress?: (n: number, total: number) => void) {
+/** Baixa o original de um anexo (endereço público; se o CORS barrar, link temporário assinado). */
+async function fetchAsset(a: { id: string; url: string }, signed: Record<string, string>): Promise<Uint8Array | null> {
+  for (const url of [a.url, signed[a.id]].filter(Boolean)) {
+    try {
+      const r = await fetch(url, { mode: 'cors' });
+      if (r.ok) return new Uint8Array(await r.arrayBuffer());
+    } catch {
+      /* tenta o próximo */
+    }
+  }
+  return null;
+}
+
+export interface ExportOptions {
+  /** só um projeto (pasta de topo); vazio = o Notebook inteiro */
+  projectId?: string | null;
+  /** inclui a pasta midias/ com os originais */
+  media?: boolean;
+}
+
+/**
+ * Backup portátil (.zip):
+ *   Markdown/  notas, capítulos e fichas (com as imagens apontando para midias/)
+ *   dados/     verbetes, relações, Codex, fontes, canvases (JSON Canvas) e a lista de mídias
+ *   midias/    os arquivos originais, sem perda
+ *   insight-notebook-backup.json  tudo junto, para importar de volta
+ */
+export async function exportAll(api: NotebookApi, entries: Record<string, NotebookEntry>, onProgress?: (n: number, total: number) => void, opts: ExportOptions = {}) {
   const { zipSync, strToU8 } = await import('fflate');
-  const live = Object.values(api.items).filter((i) => !i.archived_at);
+  const { createClient } = await import('@/lib/supabase/client');
+  const supabase = createClient();
+  const projectId = opts.projectId || null;
+  const rootOf = (id: string) => {
+    let cur: NotebookItem | undefined = api.items[id];
+    for (let g = 0; cur && cur.parent_id && g < 64; g++) cur = api.items[cur.parent_id];
+    return cur?.id || null;
+  };
+  const live = Object.values(api.items).filter((i) => !i.archived_at && (!projectId || rootOf(i.id) === projectId));
+  const liveIds = new Set(live.map((i) => i.id));
   const files: Record<string, Uint8Array> = {};
   const full: NotebookItem[] = [];
   const pathOf = (it: NotebookItem): string => {
@@ -412,9 +448,76 @@ export async function exportAll(api: NotebookApi, entries: Record<string, Notebo
     }
     return parts.join('/');
   };
+
+  // ---------- dados estruturados (do servidor)
+  const ents = Object.values(entries).filter((e) => !projectId || e.project_id === projectId || (e.target_id && liveIds.has(e.target_id)));
+  const entIds = new Set(ents.map((e) => e.id));
+  const pid = live[0]?.profile_id;
+  const q = <T,>(p: PromiseLike<{ data: T[] | null }>) => Promise.resolve(p).then((r) => r.data || []);
+  const [links, cats, srcs, quotes, assets] = await Promise.all([
+    q<Record<string, unknown>>(supabase.from('notebook_entry_links').select('*').limit(20000)),
+    q<Record<string, unknown>>(supabase.from('notebook_codex_categories').select('*').is('deleted_at', null).limit(5000)),
+    q<Record<string, unknown>>(supabase.from('notebook_sources').select('*').is('deleted_at', null).limit(10000)),
+    q<Record<string, unknown>>(supabase.from('notebook_source_quotes').select('*').is('deleted_at', null).limit(20000)),
+    q<{ id: string; url: string; r2_key: string; original_name: string | null; content_type: string | null; size_bytes: number; project_id: string | null; item_id: string | null }>(
+      supabase.from('notebook_assets').select('id, url, r2_key, original_name, content_type, size_bytes, width, height, project_id, item_id, sha256').is('deleted_at', null).limit(5000)
+    ),
+  ]);
+  const citedSources = new Set(live.flatMap((i) => i.source_refs || []));
+  const scopedSources = srcs.filter((s) => !projectId || s.project_id === projectId || citedSources.has(String(s.id)));
+  const srcIds = new Set(scopedSources.map((s) => String(s.id)));
+  const scopedAssets = assets.filter((a) => !projectId || a.project_id === projectId || (a.item_id && liveIds.has(a.item_id)) || live.some((i) => (i.media_refs || []).includes(a.url)));
+  const canvases = live.filter((i) => i.template === 'canvas');
+  const canvasRows: Record<string, { nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }> = {};
+  for (const c of canvases) {
+    const [nodes, edges] = await Promise.all([
+      q<Record<string, unknown>>(supabase.from('notebook_canvas_nodes').select('*').eq('canvas_id', c.id).order('z').limit(20000)),
+      q<Record<string, unknown>>(supabase.from('notebook_canvas_edges').select('*').eq('canvas_id', c.id).limit(40000)),
+    ]);
+    canvasRows[c.id] = { nodes, edges };
+  }
+
+  // ---------- mídias originais
+  const mediaPath = new Map<string, string>();
+  const failed: string[] = [];
+  const total = live.length + (opts.media ? scopedAssets.length : 0);
   let n = 0;
+  if (opts.media && scopedAssets.length) {
+    let signed: Record<string, string> = {};
+    try {
+      const r = await fetch('/api/notebook/asset-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: scopedAssets.map((a) => a.id).slice(0, 200) }) });
+      if (r.ok) signed = (await r.json()).urls || {};
+    } catch {
+      /* segue só com o endereço público */
+    }
+    const used = new Set<string>();
+    for (const a of scopedAssets) {
+      onProgress?.(++n, total);
+      const bytes = await fetchAsset(a, signed);
+      if (!bytes) {
+        failed.push(a.original_name || a.url);
+        continue;
+      }
+      let name = `midias/${safeName((a.original_name || a.r2_key.split('/').pop() || 'arquivo').replace(/\.[^.]+$/, ''))}`;
+      const ext = (/\.([a-z0-9]{2,5})$/i.exec(a.original_name || a.r2_key)?.[1] || (a.content_type || '').split('/')[1] || 'bin').toLowerCase();
+      let k = 2;
+      while (used.has(`${name}.${ext}`)) name = `${name.replace(/ \(\d+\)$/, '')} (${k++})`;
+      used.add(`${name}.${ext}`);
+      files[`${name}.${ext}`] = bytes;
+      mediaPath.set(a.url, `${name}.${ext}`);
+    }
+  }
+  /** troca os endereços do R2 pelo caminho relativo dentro do .zip */
+  const relink = (text: string, fromDir: string) => {
+    if (!mediaPath.size) return text;
+    const up = '../'.repeat(fromDir.split('/').filter(Boolean).length);
+    let out = text;
+    mediaPath.forEach((path, url) => (out = out.split(url).join(encodeURI(up + path))));
+    return out;
+  };
+
   for (const it of live) {
-    onProgress?.(++n, live.length);
+    onProgress?.(++n, total);
     const f = (await api.loadFull(it.id)) || it;
     const clean = { ...f } as Partial<NotebookItem>;
     delete clean._full;
@@ -428,18 +531,71 @@ export async function exportAll(api: NotebookApi, entries: Record<string, Notebo
       const t = itemTables(f)[0];
       if (t) files[`${base}.csv`] = strToU8(toCsv(t.rows));
       if (((f.data || {}) as TopicWorkspaceData).agendaEvents?.length) files[`${base}.ics`] = strToU8(toIcs(f));
+    } else if (f.template === 'canvas') {
+      const rows = canvasRows[f.id] || { nodes: [], edges: [] };
+      const jc = {
+        nodes: rows.nodes.map((r) => {
+          const b = { id: r.id, x: Math.round(Number(r.x)), y: Math.round(Number(r.y)), width: Math.round(Number(r.width)), height: Math.round(Number(r.height)), ...(r.color ? { color: r.color } : {}) };
+          if (r.type === 'group') return { ...b, type: 'group', label: r.label || '' };
+          if (r.type === 'text') return { ...b, type: 'text', text: relink(String(r.text || ''), `Markdown/${dir}`) };
+          if ((r.type === 'image' || r.type === 'file') && r.url && mediaPath.has(String(r.url))) return { ...b, type: 'file', file: mediaPath.get(String(r.url)) };
+          if (r.type === 'note' && r.item_id && api.items[String(r.item_id)]) return { ...b, type: 'file', file: `Markdown/${pathOf(api.items[String(r.item_id)]) ? `${pathOf(api.items[String(r.item_id)])}/` : ''}${safeName(api.items[String(r.item_id)].title)}.md` };
+          return { ...b, type: 'link', url: r.url || '' };
+        }),
+        edges: rows.edges.map((e) => ({ id: e.id, fromNode: e.from_node, toNode: e.to_node, ...(e.from_side ? { fromSide: e.from_side } : {}), ...(e.to_side ? { toSide: e.to_side } : {}), ...(e.label ? { label: e.label } : {}), toEnd: 'arrow' })),
+      };
+      files[`${base}.canvas`] = strToU8(JSON.stringify(jc, null, 2));
     } else {
-      files[`${base}.md`] = strToU8(await itemMarkdown(f, api));
+      files[`${base}.md`] = strToU8(relink(await itemMarkdown(f, api), `Markdown/${dir}`));
     }
   }
-  const backup = { format: BACKUP_FORMAT, version: 1, exported_at: new Date().toISOString(), items: full, entries: Object.values(entries) };
+
+  // ---------- dados/
+  const scopedLinks = links.filter((l) => entIds.has(String(l.from_id)) && entIds.has(String(l.to_id)));
+  const scopedCats = cats.filter((c) => !projectId || c.project_id === projectId);
+  const scopedQuotes = quotes.filter((x) => srcIds.has(String(x.source_id)));
+  const json = (o: unknown) => strToU8(JSON.stringify(o, null, 2));
+  files['dados/verbetes.json'] = json(ents);
+  files['dados/relacoes.json'] = json(scopedLinks);
+  files['dados/codex-categorias.json'] = json(scopedCats);
+  files['dados/fontes.json'] = json(scopedSources);
+  files['dados/trechos-de-fontes.json'] = json(scopedQuotes);
+  files['dados/midias.json'] = json(scopedAssets.map((a) => ({ ...a, arquivo: mediaPath.get(a.url) || null })));
+  for (const c of canvases) files[`dados/canvas/${safeName(c.title)}-${c.id.slice(0, 8)}.json`] = json(canvasRows[c.id]);
+
+  const backup = {
+    format: BACKUP_FORMAT,
+    version: 2,
+    exported_at: new Date().toISOString(),
+    scope: projectId ? { project: projectId, title: api.items[projectId]?.title || '' } : 'tudo',
+    items: full,
+    entries: ents,
+    entry_links: scopedLinks,
+    codex_categories: scopedCats,
+    sources: scopedSources,
+    source_quotes: scopedQuotes,
+    canvas: canvasRows,
+    assets: scopedAssets,
+  };
   files['insight-notebook-backup.json'] = strToU8(JSON.stringify(backup, null, 2));
   files['LEIA-ME.txt'] = strToU8(
-    'Exportação do Notebook do Insight.\n\n- Markdown/: suas notas, capítulos e fichas em Markdown (abre no Obsidian, Notion, Typora…).\n- insight-notebook-backup.json: cópia completa para importar de volta no Insight.\n'
+    [
+      `Backup do Notebook do Insight${projectId ? ` — projeto “${api.items[projectId]?.title || ''}”` : ''}`,
+      `Gerado em ${new Date().toLocaleString('pt-BR')}.`,
+      '',
+      '- Markdown/: notas, capítulos e fichas em Markdown (abre no Obsidian, Typora…). Canvases em .canvas (JSON Canvas).',
+      '- dados/: verbetes do Sumário, relações, categorias do Codex, fontes, trechos, canvases e a lista de mídias, em JSON.',
+      opts.media ? '- midias/: os arquivos originais, sem perda de qualidade.' : '- (mídias não incluídas nesta exportação)',
+      '- insight-notebook-backup.json: tudo junto, para importar de volta no Insight (Importar → este arquivo).',
+      ...(failed.length ? ['', `Não foi possível baixar ${failed.length} ${failed.length === 1 ? 'arquivo' : 'arquivos'}: ${failed.slice(0, 20).join(', ')}`] : []),
+    ].join('\n') + '\n'
   );
+  void pid;
   const zip = zipSync(files, { level: 6 });
   const d = new Date();
-  download(`notebook-insight-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.zip`, zip as Uint8Array<ArrayBuffer>, 'application/zip');
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  download(`${projectId ? safeName(api.items[projectId]?.title || 'projeto') : 'notebook-insight'}-${stamp}.zip`, zip as Uint8Array<ArrayBuffer>, 'application/zip');
+  return { files: Object.keys(files).length, media: mediaPath.size, failed };
 }
 
 // ============================================================ importar
@@ -580,7 +736,16 @@ export async function importFiles(files: File[], parentId: string | null, api: N
 
 /** Restaura um backup como cópia, dentro de um projeto novo (nada é sobrescrito). */
 async function restoreBackup(
-  json: { items: NotebookItem[]; entries?: NotebookEntry[] },
+  json: {
+    items: NotebookItem[];
+    entries?: NotebookEntry[];
+    version?: number;
+    entry_links?: Record<string, unknown>[];
+    codex_categories?: Record<string, unknown>[];
+    sources?: Record<string, unknown>[];
+    source_quotes?: Record<string, unknown>[];
+    canvas?: Record<string, { nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }>;
+  },
   parentId: string | null,
   api: NotebookApi,
   entriesApi: EntriesApi,
@@ -596,6 +761,24 @@ async function restoreBackup(
   for (const e of json.entries || []) {
     const ne = await entriesApi.create({ kind: e.kind, title: e.title, summary: e.summary || '', target_id: null, project_id: null, aliases: e.aliases || [] });
     if (ne) idMap.set(e.id, ne.id);
+  }
+  // v2: fontes ganham ids novos antes das notas (as citações do texto apontam para elas)
+  const { createClient } = await import('@/lib/supabase/client');
+  const supabase = createClient();
+  const profileId = root.profile_id;
+  for (const src of json.sources || []) {
+    const nid = crypto.randomUUID();
+    const row = { ...src, id: nid, profile_id: profileId, project_id: null } as Record<string, unknown>;
+    delete row.created_at;
+    delete row.updated_at;
+    delete row.deleted_at;
+    const { error } = await supabase.from('notebook_sources').insert(row);
+    if (!error) idMap.set(String(src.id), nid);
+  }
+  for (const qt of json.source_quotes || []) {
+    const sid = idMap.get(String(qt.source_id));
+    if (!sid) continue;
+    await supabase.from('notebook_source_quotes').insert({ profile_id: profileId, source_id: sid, text: qt.text, page: qt.page ?? null, comment: qt.comment || '' });
   }
   const swap = (s: string) => {
     let out = s;
@@ -628,6 +811,48 @@ async function restoreBackup(
   for (const e of json.entries || []) {
     const ne = idMap.get(e.id);
     if (ne && e.target_id && idMap.has(e.target_id)) void entriesApi.update(ne, { target_id: idMap.get(e.target_id)! });
+    if (ne && e.project_id && idMap.has(e.project_id)) void entriesApi.update(ne, { project_id: idMap.get(e.project_id)! });
+  }
+  // v2: categorias do Codex (pais antes dos filhos), relações e canvases
+  const cats = [...(json.codex_categories || [])];
+  for (let pass = 0; pass < 4 && cats.length; pass++) {
+    for (let k = 0; k < cats.length; k++) {
+      const c = cats[k];
+      if (c.parent_id && !idMap.has(String(c.parent_id)) && cats.some((x) => x.id === c.parent_id)) continue;
+      cats.splice(k--, 1);
+      const nid = crypto.randomUUID();
+      const project = idMap.get(String(c.project_id)) || root.id;
+      const { error } = await supabase.from('notebook_codex_categories').insert({ id: nid, profile_id: profileId, project_id: project, parent_id: c.parent_id ? idMap.get(String(c.parent_id)) || null : null, name: c.name, glyph: c.glyph, kind: c.kind, fields: c.fields, position: c.position ?? 0 });
+      if (!error) idMap.set(String(c.id), nid);
+    }
+  }
+  for (const e of json.entries || []) {
+    const ne = idMap.get(e.id);
+    if (ne && e.codex_category_id && idMap.has(e.codex_category_id)) void entriesApi.update(ne, { codex_category_id: idMap.get(e.codex_category_id)! });
+  }
+  for (const l of json.entry_links || []) {
+    const a = idMap.get(String(l.from_id));
+    const b = idMap.get(String(l.to_id));
+    if (a && b) await entriesApi.addLink(a, b, l.rel as never, String(l.label || ''));
+  }
+  for (const [oldId, rows] of Object.entries(json.canvas || {})) {
+    const cid = idMap.get(oldId);
+    if (!cid) continue;
+    const nodes = rows.nodes.map((r) => {
+      const n = { ...r, canvas_id: cid, profile_id: profileId, asset_id: null } as Record<string, unknown>;
+      delete n.updated_at;
+      if (n.item_id) n.item_id = idMap.get(String(n.item_id)) || null;
+      if (n.entry_id) n.entry_id = idMap.get(String(n.entry_id)) || null;
+      if (typeof n.text === 'string') n.text = swap(n.text);
+      return n;
+    });
+    for (let i = 0; i < nodes.length; i += 300) await supabase.from('notebook_canvas_nodes').insert(nodes.slice(i, i + 300));
+    const edges = rows.edges.map((r) => {
+      const e = { ...r, canvas_id: cid, profile_id: profileId } as Record<string, unknown>;
+      delete e.updated_at;
+      return e;
+    });
+    for (let i = 0; i < edges.length; i += 300) await supabase.from('notebook_canvas_edges').insert(edges.slice(i, i + 300));
   }
   res.created.push({ id: root.id, title: `${items.length} itens restaurados`, kind: 'Backup' });
 }

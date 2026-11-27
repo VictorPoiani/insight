@@ -69,7 +69,8 @@ import { CharacterSheet } from './character/CharacterSheet';
 import { NoteEditor } from './editor/NoteEditor';
 import { ProjectHome } from './projects/ProjectHome';
 import { MapStudio } from './map/MapStudio';
-import { CanvasStudio } from './canvas/CanvasStudio';
+import { CANVAS_CMD_EVENT, CanvasStudio } from './canvas/CanvasStudio';
+import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
 import { ArticleMode } from './article/ArticleMode';
 import { ContextMenuProvider } from './menu/ContextMenu';
 import { GlobalContextMenus, type GlobalMenuActions } from './menu/GlobalMenus';
@@ -797,7 +798,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
   }, [split, activeId, open]);
   const renderSplitItem = (it: NotebookItem) => {
     if (it.template === 'canvas')
-      return <CanvasStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
+      return <CanvasStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} entriesApi={entriesApi} onOpenEntry={readMore} />;
     if (it.template === 'map')
       return <MapStudio key={`split-${it.id}-${reloadKey}`} item={it} api={api} path={[]} onOpen={open} onRename={(t) => void rename(it.id, t)} role={viewer.role} level={viewer.contributor_level} />;
     if (it.template === 'mindmap' && NOTEBOOK_FEATURES.studio)
@@ -942,6 +943,32 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
             },
           },
         ]
+      : []),
+    ...(noteOpen && active!.template === 'canvas'
+      ? (() => {
+          const fire = (cmd: string) => () => window.dispatchEvent(new CustomEvent(CANVAS_CMD_EVENT, { detail: { id: active!.id, cmd } }));
+          const C = (id: string, label: string, cmd: string, keywords = '', shortcut?: string): PaletteCommand => ({ id: `cv-${id}`, group: 'Canvas', label, icon: <Glyph name="canvas" />, keywords: `canvas ${keywords}`, shortcut, run: fire(cmd) });
+          return [
+            C('text', 'Canvas: novo cartão de texto', 'text', 'cartao nota'),
+            C('note', 'Canvas: pôr uma nota', 'note', 'incorporar'),
+            C('file', 'Canvas: inserir imagem, PDF, áudio ou vídeo', 'file', 'arquivo upload midia'),
+            C('entry', 'Canvas: pôr um verbete do Codex', 'entry', 'worldbuilding personagem'),
+            C('templates', 'Canvas: inserir modelo…', 'templates', 'tres atos jornada kanban linha do tempo'),
+            ...CANVAS_TEMPLATES.map((t) => C(`tpl-${t.id}`, `Canvas: modelo “${t.label}”`, `template:${t.id}`, t.description)),
+            C('wm', 'Canvas: buscar imagens livres (Wikimedia)', 'plugin:wikimedia', 'foto imagem commons'),
+            C('ov', 'Canvas: buscar no Openverse', 'plugin:openverse', 'foto imagem creative commons'),
+            C('wp', 'Canvas: buscar na Wikipedia', 'plugin:wikipedia', 'artigo resumo'),
+            C('clip', 'Canvas: recortar uma página da web', 'plugin:clipper', 'link url site'),
+            C('fit', 'Canvas: enquadrar tudo', 'fit', 'zoom', 'Shift+1'),
+            C('zsel', 'Canvas: ampliar na seleção', 'zoomSel', 'zoom', 'Shift+2'),
+            C('arrange', 'Canvas: organizar a seleção em grade', 'arrange', 'alinhar'),
+            C('group', 'Canvas: criar grupo', 'group', '', 'Ctrl+G'),
+            C('snap', 'Canvas: ligar ou desligar as guias magnéticas', 'snap', 'ima alinhamento'),
+            C('grid', 'Canvas: ligar ou desligar o encaixe na grade', 'grid', 'ima'),
+            C('help', 'Canvas: atalhos de teclado', 'help', 'ajuda', '?'),
+            C('dl', 'Canvas: baixar .canvas (Obsidian)', 'download', 'exportar json'),
+          ];
+        })()
       : []),
     ...(noteOpen && active!.kind === 'note'
       ? [
@@ -1344,6 +1371,8 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
                 onRename={(t) => void rename(active.id, t)}
                 role={viewer.role}
                 level={viewer.contributor_level}
+                entriesApi={entriesApi}
+                onOpenEntry={(e) => setSplit({ kind: 'entry', id: e.id })}
               />
             )}
 

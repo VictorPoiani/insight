@@ -14,6 +14,7 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
+  BookMarked,
   CircleHelp,
   Download,
   ExternalLink,
@@ -36,6 +37,9 @@ import {
 } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
 import { CANVAS_COLORS } from '@/lib/notebook/canvas';
+import { CANVAS_TEMPLATES } from '@/lib/notebook/canvasTemplates';
+import { entryLook, type NotebookEntry } from '@/lib/notebook/entries';
+import { Glyph } from '../icons/Glyph';
 import type { AlignKind } from '@/lib/notebook/canvasGeom';
 import { itemIcon } from '../FileExplorer';
 import { NbPortal } from '../history/VersionHistory';
@@ -401,6 +405,86 @@ export function NotePicker({ items, onPick, onClose }: { items: NotebookItem[]; 
               </button>
             ))}
             {!list.length && <p className="px-4 py-8 text-center text-sm text-[var(--nb-ink-3)]">Nenhuma nota encontrada.</p>}
+          </div>
+        </div>
+      </div>
+    </NbPortal>
+  );
+}
+
+/** Lista de modelos (abre acima da barra de inserir). */
+export function TemplateMenu({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
+  const ref = useOutside(true, onClose);
+  return (
+    <div ref={ref} className="nb-cv-pop nb-cv-templates" role="menu" aria-label="Modelos">
+      <span className="nb-cv-pop-h">Modelos</span>
+      {CANVAS_TEMPLATES.map((t) => (
+        <button key={t.id} type="button" role="menuitem" className="nb-cv-tpl" onClick={() => onPick(t.id)}>
+          <strong>{t.label}</strong>
+          <span>{t.description}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function EntryPicker({ entries, onPick, onClose }: { entries: NotebookEntry[]; onPick: (e: NotebookEntry) => void; onClose: () => void }) {
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(0);
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return entries
+      .filter((e) => !t || e.title.toLowerCase().includes(t) || e.aliases.some((a) => a.toLowerCase().includes(t)))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .slice(0, 50);
+  }, [entries, q]);
+  return (
+    <NbPortal>
+      <div className="nb-modal-back" onClick={onClose}>
+        <div className="nb-modal !max-w-lg" role="dialog" aria-label="Escolher verbete" onClick={(e) => e.stopPropagation()}>
+          <label className="flex items-center gap-3 px-4 h-14 border-b border-[var(--nb-line)]">
+            <BookMarked className="w-4 h-4 text-[var(--nb-ink-3)]" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => (setQ(e.target.value), setSel(0))}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') (e.preventDefault(), setSel((s) => Math.min(list.length - 1, s + 1)));
+                if (e.key === 'ArrowUp') (e.preventDefault(), setSel((s) => Math.max(0, s - 1)));
+                if (e.key === 'Enter' && list[sel]) onPick(list[sel]);
+                if (e.key === 'Escape') onClose();
+              }}
+              placeholder="Verbete para pôr no canvas…"
+              aria-label="Buscar verbete"
+              className="flex-1 bg-transparent outline-none text-[15px]"
+            />
+            <button type="button" onClick={onClose} aria-label="Fechar" className="p-1 text-[var(--nb-ink-3)]">
+              <X className="w-4 h-4" />
+            </button>
+          </label>
+          <div className="nb-scroll overflow-y-auto py-1.5">
+            {list.map((e, k) => {
+              const look = entryLook(e);
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onMouseMove={() => sel !== k && setSel(k)}
+                  onClick={() => onPick(e)}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-left ${k === sel ? 'bg-white/[0.05]' : ''}`}
+                >
+                  <span className="w-5 text-center" style={{ color: look.color }}>
+                    <Glyph name={look.glyph} />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate text-sm">{e.title}</span>
+                    {e.summary && <span className="block truncate text-[11.5px] text-[var(--nb-ink-3)]">{e.summary}</span>}
+                  </span>
+                  <span className="text-[11px] text-[var(--nb-ink-3)]">{look.label}</span>
+                </button>
+              );
+            })}
+            {!list.length && <p className="px-4 py-8 text-center text-sm text-[var(--nb-ink-3)]">Nenhum verbete encontrado.</p>}
           </div>
         </div>
       </div>

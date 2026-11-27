@@ -1,8 +1,11 @@
 'use client';
 
 import { memo } from 'react';
-import { Link2, Loader2, Lock } from 'lucide-react';
+import { ExternalLink, FileAudio, FileText, FileVideo, Link2, Loader2, Lock } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
+import { entryLook, type NotebookEntry } from '@/lib/notebook/entries';
+import { fileKind, formatSize } from '@/lib/notebook/canvasMedia';
+import { Glyph } from '../icons/Glyph';
 import { renderMarkdown } from '@/lib/notebook/markdown';
 import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { canvasColor, type CanvasNode, type CanvasSide } from '@/lib/notebook/canvas';
@@ -23,6 +26,7 @@ export interface NodeCtx {
   finishText: (n: CanvasNode, text: string) => void;
   finishLabel: (n: CanvasNode, label: string) => void;
   openNote: (id: string) => void;
+  openEntry: (id: string) => void;
   linkClick: (e: React.MouseEvent) => void;
   titleExists: (t: string) => boolean;
 }
@@ -34,10 +38,11 @@ interface Props {
   handles: boolean;
   editing: boolean;
   note: NotebookItem | null;
+  entry?: NotebookEntry | null;
   ctx: NodeCtx;
 }
 
-function NodeViewImpl({ n, selected, handles, editing, note, ctx }: Props) {
+function NodeViewImpl({ n, selected, handles, editing, note, entry, ctx }: Props) {
   const color = canvasColor(n.color);
   return (
     <div
@@ -51,7 +56,7 @@ function NodeViewImpl({ n, selected, handles, editing, note, ctx }: Props) {
       onDoubleClick={(e) => ctx.dbl(e, n)}
       onContextMenu={(e) => ctx.menu(e, n)}
     >
-      <Body n={n} editing={editing} note={note} ctx={ctx} />
+      <Body n={n} editing={editing} note={note} entry={entry || null} selected={selected} ctx={ctx} />
       {n.locked && selected && (
         <span className="nb-cv-lock" title="Travado">
           <Lock />
@@ -88,7 +93,21 @@ function NodeViewImpl({ n, selected, handles, editing, note, ctx }: Props) {
   );
 }
 
-function Body({ n, editing, note, ctx }: { n: CanvasNode; editing: boolean; note: NotebookItem | null; ctx: NodeCtx }) {
+/** Campos do frontmatter (ficha de personagem, etc.). */
+function frontFields(md: string): [string, string][] {
+  const m = /^---\n([\s\S]*?)\n---/.exec(md || '');
+  if (!m) return [];
+  return m[1]
+    .split('\n')
+    .map((l) => l.match(/^([\w\p{L} -]{1,40}):\s*(.+)$/u))
+    .filter((x): x is RegExpMatchArray => !!x && x[1].trim().toLowerCase() !== 'tags')
+    .slice(0, 6)
+    .map((x) => [x[1].trim(), x[2].trim()]);
+}
+
+const STATUS: Record<string, string> = { ideia: 'Ideia', rascunho: 'Rascunho', revisao: 'Em revisão', revisão: 'Em revisão', pronto: 'Pronto', final: 'Pronto' };
+
+function Body({ n, editing, note, entry, selected, ctx }: { n: CanvasNode; editing: boolean; note: NotebookItem | null; entry: NotebookEntry | null; selected: boolean; ctx: NodeCtx }) {
   if (n.type === 'group')
     return editing ? (
       <input
@@ -128,8 +147,23 @@ function Body({ n, editing, note, ctx }: { n: CanvasNode; editing: boolean; note
       <>
         <button type="button" className="nb-cv-note-head" onPointerDown={(e) => e.stopPropagation()} onClick={() => note && ctx.openNote(note.id)} title="Abrir a nota">
           <span className="text-[13px]">{note ? itemIcon(note) : null}</span>
-          <span className="truncate">{note?.title || 'Nota removida'}</span>
+          <span className="truncate flex-1">{note?.title || 'Nota removida'}</span>
+          {note?.template === 'chapter' && (
+            <span className="nb-cv-chip">
+              {STATUS[String(note.data?.status || '').toLowerCase()] || 'Capítulo'} · {(note.word_count || 0).toLocaleString('pt-BR')} palavras
+            </span>
+          )}
         </button>
+        {note?._full && note.template === 'character' && frontFields(note.content || '').length > 0 && (
+          <dl className="nb-cv-fields">
+            {frontFields(note.content || '').map(([k, v]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         <div className="nb-cv-scroll nb-cv-note-body" onClick={ctx.linkClick}>
           {!note ? null : !note._full ? (
             <Loader2 className="w-4 h-4 m-3 animate-spin text-[var(--nb-ink-3)]" />
@@ -150,6 +184,7 @@ function Body({ n, editing, note, ctx }: { n: CanvasNode; editing: boolean; note
         <span className="nb-cv-caption">{n.label}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={n.url} alt={n.label || ''} draggable={false} decoding="async" loading="lazy" />
+        {n.credit && <span className="nb-cv-credit">{n.credit}</span>}
         {n.pending && (
           <span className="nb-cv-uploading">
             <Loader2 className="animate-spin" /> Enviando o original…
@@ -157,6 +192,80 @@ function Body({ n, editing, note, ctx }: { n: CanvasNode; editing: boolean; note
         )}
       </>
     );
+
+  if (n.type === 'file') {
+    const kind = fileKind(n.mime);
+    const Icon = kind === 'audio' ? FileAudio : kind === 'video' ? FileVideo : FileText;
+    return (
+      <>
+        <div className="nb-cv-file-head">
+          <Icon />
+          <span className="truncate flex-1">{n.label || 'Arquivo'}</span>
+          <span className="nb-cv-chip">{[kind === 'pdf' ? 'PDF' : (n.mime || '').split('/')[1]?.toUpperCase(), formatSize(n.bytes)].filter(Boolean).join(' · ')}</span>
+          {n.url && !n.pending && (
+            <a href={n.url} target="_blank" rel="noopener noreferrer" onPointerDown={(e) => e.stopPropagation()} title="Abrir o original" aria-label="Abrir o original">
+              <ExternalLink />
+            </a>
+          )}
+        </div>
+        {/* o conteúdo só recebe o mouse com o cartão selecionado (senão arrastaria o PDF, não o cartão) */}
+        <div className="nb-cv-file-body" data-live={selected || undefined} onPointerDown={(e) => selected && e.stopPropagation()}>
+          {kind === 'pdf' ? (
+            <iframe src={`${n.url}#view=FitH&toolbar=0`} title={n.label || 'PDF'} loading="lazy" />
+          ) : kind === 'video' ? (
+            <video src={n.url} controls preload="metadata" playsInline />
+          ) : kind === 'audio' ? (
+            <audio src={n.url} controls preload="metadata" />
+          ) : (
+            <p className="nb-cv-empty">Pré-visualização indisponível.</p>
+          )}
+          {n.pending && (
+            <span className="nb-cv-uploading">
+              <Loader2 className="animate-spin" /> Enviando o original…
+            </span>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  if (n.type === 'entry') {
+    const look = entryLook(entry);
+    return (
+      <div className="nb-cv-entry" style={{ ['--ent' as string]: look.color }}>
+        {entry?.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={entry.image_url} alt="" draggable={false} />
+        )}
+        <div className="nb-cv-entry-body">
+          <span className="nb-cv-entry-kind">
+            <Glyph name={look.glyph} /> {look.label}
+          </span>
+          <button type="button" className="nb-cv-entry-title" onPointerDown={(e) => e.stopPropagation()} onClick={() => entry && ctx.openEntry(entry.id)} title="Abrir o verbete">
+            {entry?.title || n.label || 'Verbete removido'}
+          </button>
+          {entry?.aliases?.length ? <span className="nb-cv-entry-alias">Também: {entry.aliases.join(', ')}</span> : null}
+          <p className="nb-cv-scroll">{entry?.summary || (entry ? 'Sem resumo ainda.' : '')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (n.type === 'link' && n.meta && (n.meta.title || n.meta.image)) {
+    return (
+      <a className="nb-cv-card-link" href={n.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.preventDefault()} draggable={false}>
+        {n.meta.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={n.meta.image} alt="" draggable={false} referrerPolicy="no-referrer" />
+        )}
+        <span className="nb-cv-card-link-body">
+          <span className="nb-cv-card-link-site">{n.meta.site}</span>
+          <span className="nb-cv-card-link-title">{n.meta.title}</span>
+          {n.meta.description && <span className="nb-cv-card-link-desc">{n.meta.description}</span>}
+        </span>
+      </a>
+    );
+  }
 
   let host = n.url || '';
   try {

@@ -14,7 +14,7 @@ import type { NotebookItem } from './types';
 import type { NotebookApi } from './useNotebook';
 import { canvasToContent, normalizeCanvas, type CanvasData, type CanvasEdge, type CanvasNode } from './canvas';
 
-const NODE_COLS = 'id, type, x, y, width, height, z, color, text, item_id, url, label, asset_id, locked, extra';
+const NODE_COLS = 'id, type, x, y, width, height, z, color, text, item_id, url, label, asset_id, entry_id, locked, extra';
 const EDGE_COLS = 'id, from_node, to_node, from_side, to_side, label, color, extra';
 const HISTORY = 150;
 
@@ -32,6 +32,7 @@ type NodeRow = {
   url: string | null;
   label: string | null;
   asset_id: string | null;
+  entry_id: string | null;
   locked: boolean;
   extra: Record<string, unknown>;
 };
@@ -54,6 +55,8 @@ function nodeRow(n: CanvasNode, z: number): NodeRow {
   if (n.bytes) extra.bytes = n.bytes;
   if (n.natW) extra.natW = n.natW;
   if (n.natH) extra.natH = n.natH;
+  if (n.meta) extra.meta = n.meta;
+  if (n.credit) extra.credit = n.credit.slice(0, 500);
   return {
     id: n.id,
     type: n.type,
@@ -68,6 +71,7 @@ function nodeRow(n: CanvasNode, z: number): NodeRow {
     url: n.url && /^https?:\/\//i.test(n.url) ? n.url.slice(0, 2000) : null,
     label: n.label ? n.label.slice(0, 300) : null,
     asset_id: n.assetId || null,
+    entry_id: n.type === 'entry' ? n.entryId || null : null,
     locked: !!n.locked,
     extra,
   };
@@ -87,6 +91,9 @@ function fromNodeRow(r: NodeRow): CanvasNode {
     url: r.url ?? undefined,
     label: r.label ?? undefined,
     assetId: r.asset_id,
+    entryId: r.entry_id ?? undefined,
+    meta: e.meta && typeof e.meta === 'object' ? (e.meta as CanvasNode['meta']) : undefined,
+    credit: typeof e.credit === 'string' ? e.credit : undefined,
     locked: r.locked || undefined,
     mime: typeof e.mime === 'string' ? e.mime : undefined,
     bytes: typeof e.bytes === 'number' ? e.bytes : undefined,
@@ -123,7 +130,7 @@ const persistable = (n: CanvasNode) => !n.pending && !(n.url && n.url.startsWith
 
 export type CanvasStatus = 'loading' | 'saved' | 'saving' | 'error';
 
-export function useCanvasDoc(item: NotebookItem, api: NotebookApi) {
+export function useCanvasDoc(item: NotebookItem, api: NotebookApi, entryTitle: (id: string) => string | null = () => null) {
   const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState<CanvasData>({ nodes: [], edges: [] });
   const [status, setStatus] = useState<CanvasStatus>('loading');
@@ -133,6 +140,8 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi) {
   itemRef.current = item;
   const apiRef = useRef(api);
   apiRef.current = api;
+  const entryTitleRef = useRef(entryTitle);
+  entryTitleRef.current = entryTitle;
   const saved = useRef({ nodes: new Map<string, string>(), edges: new Map<string, string>() });
   const undoStack = useRef<CanvasData[]>([]);
   const redoStack = useRef<CanvasData[]>([]);
@@ -198,7 +207,7 @@ export function useCanvasDoc(item: NotebookItem, api: NotebookApi) {
       // texto do canvas para busca, [[links]] e #tags; o JSON antigo sai do item
       const it = itemRef.current;
       const a = apiRef.current;
-      const content = canvasToContent(cur, (id) => a.items[id]?.title || null);
+      const content = canvasToContent(cur, (id) => a.items[id]?.title || null, (id) => entryTitleRef.current(id));
       const d = (it.data || {}) as Record<string, unknown>;
       if (content !== it.content || d.canvasV !== 2 || 'canvas' in d) {
         const rest = { ...d };

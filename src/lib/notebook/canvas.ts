@@ -5,7 +5,7 @@
  */
 
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left';
-export type CanvasNodeType = 'text' | 'note' | 'image' | 'link' | 'group';
+export type CanvasNodeType = 'text' | 'note' | 'image' | 'link' | 'group' | 'file' | 'entry';
 
 export interface CanvasNode {
   id: string;
@@ -33,6 +33,12 @@ export interface CanvasNode {
   bytes?: number;
   natW?: number;
   natH?: number;
+  /** verbete do Codex (cartão vivo) */
+  entryId?: string | null;
+  /** prévia de um endereço (capturada pelo servidor) */
+  meta?: { title?: string; description?: string; image?: string; site?: string } | null;
+  /** autoria e licença (imagens de bancos livres) */
+  credit?: string;
   /** só no navegador: envio em andamento (não é gravado) */
   pending?: boolean;
 }
@@ -72,7 +78,7 @@ export function normalizeCanvas(raw: unknown): CanvasData {
     .filter((n) => n && typeof n.id === 'string')
     .map((n) => ({
       ...n,
-      type: (['text', 'note', 'image', 'link', 'group'] as const).includes(n.type) ? n.type : 'text',
+      type: (['text', 'note', 'image', 'link', 'group', 'file', 'entry'] as const).includes(n.type) ? n.type : 'text',
       x: num(n.x, 0),
       y: num(n.y, 0),
       width: Math.max(80, num(n.width, 260)),
@@ -117,16 +123,21 @@ export function edgePath(p1: [number, number], s1: CanvasSide, p2: [number, numb
  * Texto do canvas para busca, [[links]] e #tags (vira o `content` da nota):
  * o texto dos cartões e os títulos das notas incorporadas como [[links]].
  */
-export function canvasToContent(c: CanvasData, titleOf: (id: string) => string | null): string {
+export function canvasToContent(c: CanvasData, titleOf: (id: string) => string | null, entryTitle: (id: string) => string | null = () => null): string {
   const parts: string[] = [];
   for (const n of c.nodes) {
     if (n.type === 'text' && n.text?.trim()) parts.push(n.text.trim());
     if (n.type === 'group' && n.label?.trim()) parts.push(`## ${n.label.trim()}`);
+    if (n.type === 'entry' && n.entryId) {
+      const t = entryTitle(n.entryId);
+      if (t) parts.push(t);
+    }
     if (n.type === 'note' && n.itemId) {
       const t = titleOf(n.itemId);
       if (t) parts.push(`[[${t}]]`);
     }
-    if (n.type === 'link' && n.url) parts.push(n.url);
+    if (n.type === 'link' && n.url) parts.push(n.meta?.title ? `${n.meta.title} ${n.url}` : n.url);
+    if ((n.type === 'file' || n.type === 'image') && n.label) parts.push(n.label);
   }
   for (const e of c.edges) if (e.label?.trim()) parts.push(e.label.trim());
   return parts.join('\n\n');
@@ -139,7 +150,8 @@ export function toJsonCanvas(c: CanvasData, titleOf: (id: string) => string | nu
       const base = { id: n.id, x: Math.round(n.x), y: Math.round(n.y), width: Math.round(n.width), height: Math.round(n.height), ...(n.color ? { color: n.color } : {}) };
       if (n.type === 'group') return { ...base, type: 'group', label: n.label || '' };
       if (n.type === 'link') return { ...base, type: 'link', url: n.url || '' };
-      if (n.type === 'image') return { ...base, type: 'link', url: n.url || '' };
+      if (n.type === 'image' || n.type === 'file') return { ...base, type: 'link', url: n.url || '' };
+      if (n.type === 'entry') return { ...base, type: 'text', text: n.label || '' };
       if (n.type === 'note') return { ...base, type: 'file', file: `${titleOf(n.itemId || '') || 'Nota'}.md` };
       return { ...base, type: 'text', text: n.text || '' };
     }),

@@ -1,5 +1,6 @@
 'use client';
 
+import { SignupSwitch } from '@/components/account/SignupSwitch';
 import { BlockedAccounts } from '@/components/account/BlockedAccounts';
 import { askText } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
@@ -1863,6 +1864,7 @@ export default function ConfigPage() {
 
       {activeTab === 'staff' && isStaff && (
         <div className="divide-y divide-border">
+          <SignupSwitch />
           <div className="px-6 py-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

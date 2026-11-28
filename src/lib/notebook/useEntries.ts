@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { writeOrQueue } from './localStore';
@@ -58,7 +59,7 @@ export function useEntries(profileId: string | null) {
         .select(COLS)
         .single();
       if (error || !data) {
-        alert('Não foi possível criar a entrada do Sumário.');
+        notify('Não foi possível criar a entrada do Sumário.');
         return null;
       }
       const row = data as NotebookEntry;
@@ -72,7 +73,7 @@ export function useEntries(profileId: string | null) {
     async (id: string, patch: Partial<Pick<NotebookEntry, 'kind' | 'title' | 'summary' | 'target_id' | 'project_id' | 'aliases' | 'category' | 'image_url' | 'codex_category_id' | 'is_secret' | 'is_public'>>) => {
       setEntries((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
       const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_entries', op: 'update', id, row: patch });
-      if (error) alert('Não foi possível salvar a entrada do Sumário.');
+      if (error) notify('Não foi possível salvar a entrada do Sumário.');
     },
     [supabase, profileId]
   );
@@ -100,7 +101,7 @@ export function useEntries(profileId: string | null) {
         .select(LINK_COLS)
         .single();
       if (error || !data) {
-        if (!String(error?.message || '').includes('duplicate')) alert('Não foi possível criar a relação.');
+        if (!String(error?.message || '').includes('duplicate')) notify('Não foi possível criar a relação.');
         return null;
       }
       setLinks((prev) => [...prev, data as EntryLink]);

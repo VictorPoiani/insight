@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { writeOrQueue } from './localStore';
@@ -46,7 +47,7 @@ export function useSources(profileId: string | null) {
         .select(COLS)
         .single();
       if (error || !data) {
-        alert(error?.message?.includes('url') ? 'O endereço precisa começar com http:// ou https://.' : 'Não foi possível salvar a fonte.');
+        notify(error?.message?.includes('url') ? 'O endereço precisa começar com http:// ou https://.' : 'Não foi possível salvar a fonte.');
         return null;
       }
       const row = data as Source;
@@ -60,7 +61,7 @@ export function useSources(profileId: string | null) {
     async (id: string, patch: Partial<SourceInput>) => {
       setSources((p) => (p[id] ? { ...p, [id]: { ...p[id], ...patch } } : p));
       const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_sources', op: 'update', id, row: patch as Record<string, unknown> });
-      if (error) alert(error.message?.includes('url') ? 'O endereço precisa começar com http:// ou https://.' : 'Não foi possível salvar a fonte.');
+      if (error) notify(error.message?.includes('url') ? 'O endereço precisa começar com http:// ou https://.' : 'Não foi possível salvar a fonte.');
     },
     [supabase, profileId]
   );

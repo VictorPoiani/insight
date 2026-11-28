@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { usePresence, lastSeenLabel } from '@/components/presence/PresenceProvider';
 import { ShareProfileModal } from '@/components/feed/SharePostModal';
 import { FollowListModal, type FollowTab } from '@/components/feed/FollowListModal';
@@ -876,7 +877,7 @@ export function ProfileHeader({
       } else {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-          alert(
+          notify(
             'Permissão negada no navegador. Para receber alertas instantâneos, permita as notificações no cadeado da barra de endereços.'
           );
           setLoadingPush(false);
@@ -912,7 +913,7 @@ export function ProfileHeader({
         await refreshTotalFollowersCount();
       }
     } catch (err: any) {
-      alert(err?.message || 'Não foi possível configurar o Web Push.');
+      notify(err?.message || 'Não foi possível configurar o Web Push.');
     } finally {
       setLoadingPush(false);
     }
@@ -936,12 +937,12 @@ export function ProfileHeader({
       });
       const data = await res.json();
       if (data.sent === 0) {
-        alert(
+        notify(
           'Nenhum dispositivo inscrito ainda. Clique em "Ativar com 1 Clique" ao lado para inscrever o seu dispositivo e testar!'
         );
       }
     } catch {
-      alert('Erro ao disparar notificação de teste.');
+      notify('Erro ao disparar notificação de teste.');
     } finally {
       setTestingPush(false);
     }
@@ -970,7 +971,7 @@ export function ProfileHeader({
       setExpandStatusMenu(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao salvar status: ' + error.message);
+      notify('Erro ao salvar status: ' + error.message);
     }
   }
 
@@ -1006,7 +1007,7 @@ export function ProfileHeader({
     setSavingLinks(false);
 
     if (error) {
-      alert('Erro ao guardar links: ' + error.message);
+      notify('Erro ao guardar links: ' + error.message);
       return;
     }
 
@@ -1063,7 +1064,7 @@ export function ProfileHeader({
       const res = await uploadMediaToInsight(file, { budgetBytes: 50 * 1024 * 1024, asImage: file.type !== 'image/gif' });
       finalPublicUrl = res.publicUrl;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
+      notify(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
       return;
     }
 
@@ -1086,7 +1087,7 @@ export function ProfileHeader({
       const res = await setMyBirthday(profile.id, birthday);
       if (!res.ok) {
         setSavingProfile(false);
-        alert(res.error);
+        notify(res.error || "Não foi possível salvar o aniversário.");
         return;
       }
     }
@@ -1110,7 +1111,7 @@ export function ProfileHeader({
       setExpandEdit(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao atualizar perfil: ' + error.message);
+      notify('Erro ao atualizar perfil: ' + error.message);
     }
   }
 
@@ -1143,7 +1144,7 @@ export function ProfileHeader({
       setExpandTags(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao salvar tags: ' + error.message);
+      notify('Erro ao salvar tags: ' + error.message);
     }
   }
 
@@ -1171,7 +1172,7 @@ export function ProfileHeader({
 
     if (error) {
       setSubmittingSub(false);
-      alert('Erro ao realizar inscrição: ' + error.message);
+      notify('Erro ao realizar inscrição: ' + error.message);
       return;
     }
 
@@ -1385,7 +1386,7 @@ export function ProfileHeader({
                 </button>
 
                 {isAdmin && expandStatusMenu && (
-                  <div className="absolute left-0 top-full mt-2 z-30 w-64 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
+                  <div className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] max-h-[70vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">
                         Definir Status
@@ -1497,7 +1498,7 @@ export function ProfileHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3 ml-auto shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto lg:ml-auto min-w-0">
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-secondary whitespace-nowrap">
               <button type="button" onClick={() => setFollowList('following')} className="hover:underline underline-offset-2" title="Ver quem este perfil segue">
                 <b className="text-primary font-bold">{followingCount}</b> Seguindo

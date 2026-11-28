@@ -1,8 +1,11 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useState } from 'react';
 import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
 import { TOPIC_BY_ID } from '@/lib/news/topics';
+import { decodeEntities } from '@/lib/news/rss';
 import { PostTime } from '@/components/feed/PostTime';
 import { trackNews, type NewsItem } from './useNews';
 
@@ -82,7 +85,7 @@ export function NewsCard({
                 background: `linear-gradient(140deg, ${mainTopic?.color || sourceColor(item.source_name)}, color-mix(in srgb, ${mainTopic?.color || '#334155'} 35%, #0b0b0f))`,
               }}
             >
-              <span className="text-4xl drop-shadow">{mainTopic?.emoji || '📰'}</span>
+              <InsightIcon name={mainTopic?.id || 'newspaper'} className="w-10 h-10 drop-shadow" />
               <span className="text-xs font-bold tracking-wide opacity-90">{item.source_name}</span>
             </span>
           )}
@@ -117,10 +120,10 @@ export function NewsCard({
       >
         <div className="flex-1 min-w-0">
           <h3 className={`font-extrabold text-primary leading-snug group-hover:text-accent transition-colors ${compact ? 'text-sm' : 'text-[15px] sm:text-base lg:text-xl lg:leading-tight'} ${item.seen ? 'opacity-75' : ''}`}>
-            {item.title}
+            {decodeEntities(item.title)}
           </h3>
           {item.summary && !compact && (
-            <p className="mt-1 lg:mt-2 text-[13px] lg:text-[15px] text-secondary leading-relaxed line-clamp-2 lg:line-clamp-3">{item.summary}</p>
+            <p className="mt-1 lg:mt-2 text-[13px] lg:text-[15px] text-secondary leading-relaxed line-clamp-2 lg:line-clamp-3">{decodeEntities(item.summary)}</p>
           )}
           {!compact && (
             <span className="hidden lg:inline-flex mt-2 text-xs font-bold text-accent group-hover:underline underline-offset-2">
@@ -147,7 +150,7 @@ export function NewsCard({
           if (!topic) return null;
           return (
             <span key={t} className={`${idx > 0 ? 'hidden sm:inline-flex' : 'inline-flex'} px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border text-secondary`}>
-              {topic.emoji} {topic.label}
+              <InsightIcon name={topic.id} className="w-3 h-3 mr-1" /> {topic.label}
             </span>
           );
         })}
@@ -190,7 +193,7 @@ export function NewsCard({
               if (navigator.share) await navigator.share({ title: item.title, url: item.url });
               else {
                 await navigator.clipboard.writeText(item.url);
-                alert('Link copiado!');
+                notify('Link copiado!', 'success');
               }
             } catch {
               /* cancelado */

@@ -313,7 +313,7 @@ export function useNotebook(profileId: string | null) {
             blocks: full.blocks ?? null,
             data: full.data ?? null,
             word_count: deriveFields(full as NotebookItem).word_count,
-          });
+          }).then(() => {}); // .then() dispara a requisição
         }
       }
     },

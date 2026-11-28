@@ -6,6 +6,7 @@
  * Caixa de entrada do Notebook, de onde pode ser movido para um projeto ou
  * arrastado para um canvas. Sem rede, fica guardado e sobe depois.
  */
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -135,7 +136,7 @@ export function QuickCapture() {
         setState('queued');
       } else {
         setState('idle');
-        alert('Não foi possível guardar a ideia agora.');
+        notify('Não foi possível guardar a ideia agora.');
         return;
       }
     }

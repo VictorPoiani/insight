@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Flame, Timer, Type, X } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -362,8 +363,8 @@ export function SessionPill({ s, dim }: { s: WritingSessionApi; dim?: boolean })
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!confirm('Descartar esta sessão? As palavras continuam nas notas, só o contador some.')) return;
+                onClick={async () => {
+                  if (!(await confirmDialog({ message: 'Descartar esta sessão? As palavras continuam nas notas, só o contador some.', danger: true }))) return;
                   setOpen(false);
                   s.end(false);
                 }}

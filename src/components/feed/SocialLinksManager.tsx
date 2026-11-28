@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CustomSocialLink, SocialLinks } from '@/types/database';
@@ -217,7 +218,7 @@ export function SocialLinksManager({
     setSaving(false);
 
     if (error) {
-      alert('Erro ao guardar links: ' + error.message);
+      notify('Erro ao guardar links: ' + error.message);
       return;
     }
 

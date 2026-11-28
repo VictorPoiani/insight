@@ -1,5 +1,8 @@
 'use client';
 
+import { SupportImpact } from '@/components/apoie/SupportImpact';
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -436,7 +439,7 @@ export default function ApoiePage() {
       setCopiedPayload(true);
       setTimeout(() => setCopiedPayload(false), 2200);
     } catch {
-      alert(activeCharge.qrCode);
+      notify(activeCharge.qrCode);
     }
   }
 
@@ -468,12 +471,12 @@ export default function ApoiePage() {
 
     const numeric = Number(adminAmount.replace(',', '.'));
     if (!numeric || numeric <= 0) {
-      alert('Informe um valor válido maior que zero.');
+      notify('Informe um valor válido maior que zero.');
       return;
     }
 
     if (!selectedProfileId && !externalDonorName.trim()) {
-      alert('Selecione um membro cadastrado ou informe o nome do apoiador.');
+      notify('Selecione um membro cadastrado ou informe o nome do apoiador.');
       return;
     }
 
@@ -495,7 +498,7 @@ export default function ApoiePage() {
     setSavingDonation(false);
 
     if (error) {
-      alert('Erro ao registrar apoio: ' + error.message);
+      notify('Erro ao registrar apoio: ' + error.message);
       return;
     }
 
@@ -516,7 +519,7 @@ export default function ApoiePage() {
       .in('id', donationIds);
 
     if (error) {
-      alert('Erro ao vincular conta: ' + error.message);
+      notify('Erro ao vincular conta: ' + error.message);
       return;
     }
 
@@ -527,7 +530,7 @@ export default function ApoiePage() {
 
   async function handleDeleteSingleDonation(donationId: string) {
     if (!isAdmin) return;
-    if (!confirm('Remover este registro de apoio? Os pontos e o nível serão recalculados.')) {
+    if (!(await confirmDialog({ message: 'Remover este registro de apoio? Os pontos e o nível serão recalculados.', danger: true }))) {
       return;
     }
     const { error } = await supabase.from('donations').delete().eq('id', donationId);
@@ -1037,6 +1040,8 @@ export default function ApoiePage() {
       {/* ====================================================================
           1. SEÇÃO SUPERIOR: DOAÇÃO COM PIX AUTOMÁTICO + WEBHOOK TEMPO REAL
           ==================================================================== */}
+      <SupportImpact />
+
       <section className="relative px-4 sm:px-6 py-7 border-b border-border overflow-hidden">
         <div
           aria-hidden="true"

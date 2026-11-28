@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { newId, type DiaryEntry } from '@/lib/notebook/character';
@@ -122,8 +123,8 @@ export function DiaryBook({
                         type="button"
                         aria-label="Arrancar esta página"
                         title="Arrancar esta página"
-                        onClick={() => {
-                          if (pg.text.trim() && !confirm('Arrancar esta página do diário?')) return;
+                        onClick={async () => {
+                          if (pg.text.trim() && !(await confirmDialog({ message: 'Arrancar esta página do diário?', danger: true }))) return;
                           onChange(
                             diary.filter((e) => e.id !== pg.id),
                             0

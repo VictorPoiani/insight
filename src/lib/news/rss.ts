@@ -15,13 +15,22 @@ export interface ParsedItem {
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', mdash: '—', ndash: '–', laquo: '«', raquo: '»', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
 
+// letras acentuadas (&eacute;, &Atilde;, &ccedil;...): vários feeds brasileiros mandam assim
+for (const [mark, combining] of [['acute', '\u0301'], ['grave', '\u0300'], ['circ', '\u0302'], ['tilde', '\u0303'], ['uml', '\u0308']] as const) {
+  for (const base of 'aeiouyAEIOUYnN') {
+    const ch = (base + combining).normalize('NFC');
+    if (ch.length === 1) ENTITIES[base + mark] = ch;
+  }
+}
+Object.assign(ENTITIES, { ccedil: 'ç', Ccedil: 'Ç', ordm: 'º', ordf: 'ª', deg: '°', euro: '€', copy: '©', reg: '®', trade: '™', bull: '•', middot: '·' });
+
 export function decodeEntities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {
       const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
       return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : '';
     }
-    return ENTITIES[e.toLowerCase()] ?? m;
+    return ENTITIES[e] ?? ENTITIES[e.toLowerCase()] ?? m;
   });
 }
 

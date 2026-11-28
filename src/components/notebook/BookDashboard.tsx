@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -171,7 +172,7 @@ export function BookDashboard({ book, api, onOpen, onNew, onExport, role, level 
       await api.registerAsset(book.id, res.r2Key, res.publicUrl);
       setData({ coverUrl: res.publicUrl, coverR2Key: res.r2Key }, 0);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Falha no envio da capa.');
+      notify(err instanceof Error ? err.message : 'Falha no envio da capa.');
     }
     setUploading(false);
   }

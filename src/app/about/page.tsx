@@ -23,6 +23,7 @@ import {
   Palette,
   Lightbulb,
   Check,
+  Repeat2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { InsightAsterisk } from '@/components/brand/InsightAsterisk';
@@ -150,8 +151,8 @@ function HeroArt({ tilt }: { tilt: { x: number; y: number } }) {
           </div>
           <Lines />
           <div className="mt-2 flex gap-3 text-[9px] text-muted">
-            <span>♥ 24</span>
-            <span>↻ 6</span>
+            <span className="inline-flex items-center gap-0.5"><Heart className="w-2.5 h-2.5" /> 24</span>
+            <span className="inline-flex items-center gap-0.5"><Repeat2 className="w-2.5 h-2.5" /> 6</span>
           </div>
         </MiniCard>
       </div>

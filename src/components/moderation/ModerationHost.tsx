@@ -51,6 +51,8 @@ export function kickModeration() {
 export function moderationErrorMessage(err: { message?: string; hint?: string } | null | undefined): string | null {
   const m = `${err?.message || ''}`;
   if (/moderation_cooldown/.test(m)) return err?.hint || 'Muitos conteúdos bloqueados em sequência. Tente de novo em 1 hora.';
+  if (/post_rate_day/.test(m)) return 'Limite de 10 posts por dia alcançado. Você poderá publicar de novo a partir das 03:00 (horário de Brasília).';
+  if (/post_rate_hour/.test(m)) return 'Limite de 3 posts por hora atingido. Tente de novo em alguns minutos.';
   if (/rate_limited/.test(m)) return err?.hint || 'Você publicou muito em pouco tempo. Aguarde alguns minutos.';
   return null;
 }

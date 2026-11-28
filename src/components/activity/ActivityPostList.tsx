@@ -1,5 +1,6 @@
 'use client';
 
+import { firstPostImage } from '@/lib/postMedia';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Bookmark, BookmarkX, Heart, FileText, Loader2 } from 'lucide-react';
@@ -24,8 +25,8 @@ function excerptOf(post: { content?: string | null; blocks?: unknown }): { text:
   let text = '';
   let image: string | null = null;
   if (Array.isArray(post.blocks)) {
+    image = firstPostImage(post.blocks as Parameters<typeof firstPostImage>[0]);
     for (const b of post.blocks as { type?: string; html?: string; imageUrl?: string; pollQuestion?: string }[]) {
-      if (!image && b.type === 'image' && b.imageUrl) image = b.imageUrl;
       if (text.length < 160) {
         const t = (b.html || b.pollQuestion || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
         if (t.trim()) text += (text ? ' ' : '') + t.trim();

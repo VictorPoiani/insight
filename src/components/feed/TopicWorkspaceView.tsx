@@ -1,5 +1,7 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { kickModeration } from '@/components/moderation/ModerationHost';
 import { WritingDesk } from './WritingDesk';
 import { DietPlanner } from './DietPlanner';
@@ -404,7 +406,7 @@ export function TopicWorkspaceView({
         }
       }
     } catch (err: any) {
-      alert(err?.message || 'Erro ao enviar mídia para Cloudflare R2');
+      notify(err?.message || 'Erro ao enviar mídia para Cloudflare R2');
     } finally {
       setUploadingNodeMediaId(null);
     }
@@ -2069,8 +2071,8 @@ export function TopicWorkspaceView({
               {isAdmin && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!confirm('Limpar marcações para iniciar uma nova semana?'))
+                  onClick={async () => {
+                    if (!(await confirmDialog({ message: 'Limpar marcações para iniciar uma nova semana?', danger: true })))
                       return;
                     const next = (data.habits || []).map((h) => ({
                       ...h,

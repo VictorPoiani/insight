@@ -27,6 +27,8 @@ export function ActivityTracker() {
     let lastInput = Date.now();
     let lastTick = Date.now();
     const seen = new Set<string>();
+    // ids vistos ainda não enviados (contador de visualizações de cada post)
+    let viewedIds: string[] = [];
 
     const touch = () => {
       lastInput = Date.now();
@@ -39,12 +41,17 @@ export function ActivityTracker() {
     };
     const flush = () => {
       tick();
+      if (signedIn && viewedIds.length) {
+        const ids = viewedIds.slice(0, 100);
+        viewedIds = viewedIds.slice(100);
+        void supabase.rpc('record_post_views', { p_ids: ids }).then(() => {}); // .then() dispara a requisição
+      }
       if (!signedIn || (seconds < 1 && !views && !videos)) return;
       const payload = { p_seconds: seconds, p_views: views, p_videos: videos };
       seconds = 0;
       views = 0;
       videos = 0;
-      void supabase.rpc('track_activity', payload);
+      void supabase.rpc('track_activity', payload).then(() => {}); // .then() dispara a requisição
     };
 
     // post visto = pelo menos metade dele na tela por 1,5 s
@@ -60,6 +67,7 @@ export function ActivityTracker() {
               window.setTimeout(() => {
                 seen.add(id);
                 views++;
+                viewedIds.push(id);
               }, 1500)
             );
           } else {

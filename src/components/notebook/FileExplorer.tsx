@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { Glyph } from './icons/Glyph';
 import { resolveGlyph, type GlyphName } from '@/lib/notebook/glyphs';
 
@@ -401,8 +402,8 @@ export function FileExplorer({ api, activeId, onOpen, onNew, onPickTemplate, onR
                 <button
                   type="button"
                   title="Excluir para sempre"
-                  onClick={() => {
-                    if (confirm(`Excluir "${i.title}" para sempre? Não dá para desfazer.`)) void api.destroy(i.id);
+                  onClick={async () => {
+                    if ((await confirmDialog({ message: `Excluir "${i.title}" para sempre? Não dá para desfazer.`, danger: true }))) void api.destroy(i.id);
                   }}
                   className="p-1 hover:text-red-400"
                 >

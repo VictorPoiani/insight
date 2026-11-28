@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Columns2, Lock, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -123,9 +124,9 @@ export function CodexArticle({
           label: 'Apagar verbete',
           icon: <Trash2 className="w-3.5 h-3.5" />,
           danger: true,
-          run: () => {
+          run: async () => {
             const n = inText.length + inWorld.length;
-            if (confirm(n ? `“${entry.title}” é citado em ${n} ${n === 1 ? 'lugar' : 'lugares'}. Os trechos continuam, sem o balão. Apagar o verbete?` : `Apagar o verbete “${entry.title}”?`)) {
+            if ((await confirmDialog({ message: n ? `“${entry.title}” é citado em ${n} ${n === 1 ? 'lugar' : 'lugares'}. Os trechos continuam, sem o balão. Apagar o verbete?` : `Apagar o verbete “${entry.title}”?`, danger: true }))) {
               void w.removeVerbete(entry).then(() => onCat(entry.codex_category_id ?? null));
             }
           },

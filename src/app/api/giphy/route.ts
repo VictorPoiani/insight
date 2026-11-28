@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/net/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';
 
 
@@ -20,6 +21,8 @@ export interface GiphyMediaResult {
 }
 
 export async function GET(req: NextRequest) {
+  const limited = await rateLimit(req, 'giphy', 60, 60);
+  if (limited) return limited;
   try {
     const { searchParams } = new URL(req.url);
 

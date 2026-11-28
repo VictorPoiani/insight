@@ -1,19 +1,17 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useNitro } from '@/components/nitro/NitroProvider';
 
 /**
  * Status online automático.
  *
- * - Tempo real: todo mundo com o site aberto entra no canal de presença do
- *   Supabase Realtime; quem está logado (e visível) se anuncia nele. A bolinha
- *   verde aparece/some na hora, sem recarregar.
+ * - Sem canal de tempo real: com milhares de visitantes ele estourava as
+ *   conexões e mensagens do Supabase Realtime. Online = visto nos últimos 3 min.
  * - "Visto por último": enquanto a aba está aberta e visível, o perfil grava
  *   last_seen_at a cada minuto (RPC touch_presence, com trava de 45 s no banco).
- * - Aba escondida por mais de 3 min conta como ausente (sai do canal).
+ * - Aba escondida não grava batimento, então em ~3 min a pessoa sai de "online".
  */
 
 /** Sem sinal em tempo real, considera online quem foi visto nos últimos 3 min. */
@@ -37,66 +35,26 @@ export function usePresence() {
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const { viewer } = useNitro();
-  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const trackedRef = useRef(false);
+  // sem canal de tempo real (não escala no plano do Supabase): online = visto nos últimos 3 min
+  const [onlineIds] = useState<Set<string>>(() => new Set());
   const visible = viewer ? (viewer as { presence_visible?: boolean }).presence_visible !== false : false;
   const meId = viewer?.id ?? null;
-
-  // canal de presença (todos assistem; logados visíveis se anunciam)
-  useEffect(() => {
-    const channel = supabase.channel('insight-online', { config: { presence: { key: meId || `anon-${Math.random().toString(36).slice(2)}` } } });
-    channelRef.current = channel;
-    const sync = () => {
-      const state = channel.presenceState<{ profile_id?: string }>();
-      const ids = new Set<string>();
-      for (const metas of Object.values(state)) for (const m of metas) if (m.profile_id) ids.add(m.profile_id);
-      setOnlineIds(ids);
-    };
-    channel.on('presence', { event: 'sync' }, sync).subscribe(async (status) => {
-      if (status === 'SUBSCRIBED' && meId && visible && document.visibilityState === 'visible') {
-        await channel.track({ profile_id: meId, at: Date.now() });
-        trackedRef.current = true;
-      }
-    });
-    return () => {
-      trackedRef.current = false;
-      void supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
-  }, [supabase, meId, visible]);
 
   // batimento do "visto por último" + ausência quando a aba fica escondida
   useEffect(() => {
     if (!meId || !visible) return;
-    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
     const beat = () => {
-      if (document.visibilityState === 'visible') void supabase.rpc('touch_presence');
+      // .then() dispara a requisição (o construtor do supabase-js é preguiçoso)
+      if (document.visibilityState === 'visible') void supabase.rpc('touch_presence').then(() => {});
     };
     beat();
     const interval = setInterval(beat, 60_000);
     const onVis = () => {
-      const ch = channelRef.current;
-      if (document.visibilityState === 'visible') {
-        if (hiddenTimer) clearTimeout(hiddenTimer);
-        beat();
-        if (ch && !trackedRef.current) {
-          void ch.track({ profile_id: meId, at: Date.now() });
-          trackedRef.current = true;
-        }
-      } else {
-        hiddenTimer = setTimeout(() => {
-          if (ch && trackedRef.current) {
-            void ch.untrack();
-            trackedRef.current = false;
-          }
-        }, 3 * 60_000);
-      }
+      if (document.visibilityState === 'visible') beat();
     };
     document.addEventListener('visibilitychange', onVis);
     return () => {
       clearInterval(interval);
-      if (hiddenTimer) clearTimeout(hiddenTimer);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [supabase, meId, visible]);

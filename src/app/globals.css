@@ -270,3 +270,53 @@ body {
 .ins-ref { cursor: help; text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
 .ins-ref--nota_autor { text-decoration-style: dashed; text-decoration-color: #a78bfa; }
 .ins-ref--aviso { text-decoration-style: wavy; text-decoration-color: #f59e0b; }
+
+/* ---------------------------------------------------------- micro-interações do feed */
+@keyframes insight-like-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  65% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+@keyframes insight-count-roll {
+  from { transform: translateY(70%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes insight-heart-burst {
+  0% { transform: scale(0.2); opacity: 0; }
+  25% { transform: scale(1.15); opacity: 0.95; }
+  45% { transform: scale(0.95); opacity: 0.95; }
+  75% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.25) translateY(-12px); opacity: 0; }
+}
+@keyframes insight-pop-in {
+  from { transform: translate(-50%, 6px) scale(0.92); opacity: 0; }
+  to { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+@keyframes insight-slide-down {
+  from { transform: translate(-50%, -10px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.insight-like-pop { animation: insight-like-pop 0.45s cubic-bezier(0.17, 0.89, 0.32, 1.28); }
+.insight-count-roll { display: inline-block; animation: insight-count-roll 0.22s ease-out; }
+.insight-heart-burst { animation: insight-heart-burst 0.75s ease-out forwards; }
+.insight-pop-in { animation: insight-pop-in 0.16s ease-out; }
+.insight-slide-down { animation: insight-slide-down 0.25s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .insight-like-pop, .insight-count-roll, .insight-heart-burst, .insight-pop-in, .insight-slide-down { animation: none; }
+}
+@keyframes insight-toast-in {
+  from { transform: translateY(10px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes insight-dialog-in {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.insight-toast-in { animation: insight-toast-in 0.2s ease-out; }
+.insight-dialog-in { animation: insight-dialog-in 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .insight-toast-in, .insight-dialog-in { animation: none; }
+}
+/* atalho J/K: realce do post em destaque */
+.insight-kbd-focus { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); transition: box-shadow 0.2s, background 0.2s; }

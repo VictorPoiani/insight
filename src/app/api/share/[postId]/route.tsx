@@ -1,4 +1,6 @@
+import { rateLimit } from '@/lib/net/rateLimit';
 import { ImageResponse } from 'next/og';
+import { firstPostImage } from '@/lib/postMedia';
 import { createClient } from '@supabase/supabase-js';
 import { getShareTheme, SHARE_SIZES, ShareFormat } from '@/lib/share/themes';
 import { siteUrl } from '@/lib/account/mailer';
@@ -18,6 +20,8 @@ import { Asterisk, VerifiedTick, clip, loadFonts, plain, toDataUrl } from '@/lib
 export const revalidate = 300;
 
 export async function GET(req: Request, ctx: { params: Promise<{ postId: string }> }) {
+  const limited = await rateLimit(req, 'share-post', 40, 60);
+  if (limited) return limited;
   const { postId } = await ctx.params;
   const url = new URL(req.url);
   const format = (['story', 'square', 'og'].includes(url.searchParams.get('format') || '')
@@ -60,7 +64,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
   const [fonts, avatar, image] = await Promise.all([
     loadFonts(),
     toDataUrl(author?.avatar_url),
-    format === 'og' ? Promise.resolve(null) : toDataUrl(blocks.find((b) => b.type === 'image' && b.imageUrl)?.imageUrl),
+    format === 'og' ? Promise.resolve(null) : toDataUrl(firstPostImage(blocks as Parameters<typeof firstPostImage>[0])),
   ]);
 
   const name = author?.display_name || author?.full_name || author?.username || 'Membro do Insight';
@@ -207,7 +211,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
         fontWeight: 700,
       }}
     >
-      Leia no {host}
+      {format === 'og' ? `Leia no ${host}` : (
+        <span style={{ display: 'flex', alignItems: 'center' }}>
+          {/* elo de corrente desenhado: o link curto leva direto ao post */}
+          <svg width={30 * S} height={30 * S} viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 12 * S }}>
+            <path d="M10 13.5a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1.2 1.2" />
+            <path d="M14 10.5a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1.2-1.2" />
+          </svg>
+          {host}/s/{String(post.id).slice(0, 8)}
+        </span>
+      )}
     </div>
   );
 

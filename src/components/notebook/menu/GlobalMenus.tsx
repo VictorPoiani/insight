@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/core';
 import {
@@ -95,7 +96,7 @@ const has = (ed: Editor, name: string) => ed.extensionManager.extensions.some((x
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function blocked() {
-  alert('O navegador bloqueou o acesso à área de transferência. Use Ctrl+V (ou Cmd+V) para colar.');
+  notify('O navegador bloqueou o acesso à área de transferência. Use Ctrl+V (ou Cmd+V) para colar.');
 }
 
 async function pasteInto(ed: Editor, plain: boolean) {

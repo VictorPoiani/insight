@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bold,
@@ -394,7 +395,7 @@ export function WriterMode({ item, api, book, chapters, onOpen, onPublish, immer
         await api.registerAsset(item.id, res.r2Key, res.publicUrl);
         editor?.chain().focus().setImage({ src: res.publicUrl, alt: '' }).run();
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+        notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
       }
     }
     setUploading(false);

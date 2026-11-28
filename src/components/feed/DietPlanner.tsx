@@ -1,5 +1,6 @@
 'use client';
 
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Droplets, Flame, Plus, Scale, Trash2, Trophy, Beef, CalendarDays } from 'lucide-react';
 import type { DietDayLog, DietMealItem, TopicWorkspaceData } from '@/types/database';
@@ -467,7 +468,7 @@ export function DietPlanner({
                   <div key={s.key}>
                     <p className="text-[10px] font-bold text-muted">{WEEKDAYS[week[i].getDay()]}</p>
                     <p className="text-[10px] font-mono text-emerald-400">{s.planned ? `${s.done}/${s.planned}` : '—'}</p>
-                    <p className="text-[10px] font-mono text-sky-400">{s.water}💧</p>
+                    <p className="text-[10px] font-mono text-sky-400 inline-flex items-center gap-0.5">{s.water}<InsightIcon name="drop" className="w-2.5 h-2.5" /></p>
                   </div>
                 ))}
               </div>

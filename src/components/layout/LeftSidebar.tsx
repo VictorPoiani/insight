@@ -1,5 +1,6 @@
 'use client';
 
+import { useVisiblePolling } from '@/lib/useVisiblePolling';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { InsightLogo } from '@/components/brand/InsightLogo';
@@ -188,6 +189,9 @@ export function LeftSidebar() {
     setUnreadCount(count || 0);
   }, [currentUser?.id, supabase]);
 
+  // o tempo real pode não estar ligado para notificações: confere a cada minuto
+  useVisiblePolling(() => void fetchUnreadCount(), 60_000, Boolean(currentUser?.id));
+
   useEffect(() => {
     fetchUnreadCount();
 
@@ -199,25 +203,9 @@ export function LeftSidebar() {
       };
     }
 
-    const channel = supabase
-      .channel(`sidebar-notifs-${currentUser.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `recipient_id=eq.${currentUser.id}`,
-        },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
+    // sem canal de tempo real (a tabela não está publicada nele): a checagem periódica cuida disso
     return () => {
       window.removeEventListener('insight-notifications-updated', fetchUnreadCount);
-      supabase.removeChannel(channel);
     };
   }, [currentUser?.id, pathname, fetchUnreadCount, supabase]);
 

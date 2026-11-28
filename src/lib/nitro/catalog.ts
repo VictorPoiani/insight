@@ -563,7 +563,7 @@ const INTROS: IntroItem[] = [
     reveal: { kind: 'split', colors: ['#b91c1c', '#15803d'] }, particles: { glyph: '✦', mode: 'burst', count: 18, colors: ['#facc15', '#ffffff'] } },
   { id: 'intro-hell-portal', kind: 'intro', name: 'Portal Infernal', collection: 'infernal', rarity: 'lendária', requirement: NITRO,
     description: 'Brasas em espiral, núcleo incandescente e um anel de fogo que se abre.', durationMs: 2000, scene: 'portal',
-    reveal: { kind: 'iris', colors: ['#1c0a00', '#7f1d1d', '#f97316'] }, particles: { glyph: '🔥', mode: 'burst', count: 14 } },
+    reveal: { kind: 'iris', colors: ['#1c0a00', '#7f1d1d', '#f97316'] }, particles: { glyph: '✦', mode: 'burst', count: 14 } },
   { id: 'intro-imperial-decree', kind: 'intro', name: 'Decreto Imperial', collection: 'imperial', rarity: 'épica', requirement: NITRO,
     description: 'A coroa desce, o pergaminho se desenrola e o selo real bate.', durationMs: 2300, scene: 'decree',
     reveal: { kind: 'curtain', colors: ['#3b0764', '#581c87'] }, particles: { glyph: '✦', mode: 'fall', count: 22, colors: ['#facc15', '#fde68a'] } },

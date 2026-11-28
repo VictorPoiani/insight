@@ -1,5 +1,6 @@
 'use client';
 
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { observeFrame } from './inViewBudget';
 import { BackArt, FrontArt, FRONT_ART_KINDS } from './frameArt';
@@ -192,7 +193,7 @@ function FrameShell({
             };
             return (
               <span key={i} className="nx-part nx-anim" style={pStyle}>
-                {frame.particles!.glyph}
+                {`${frame.particles!.glyph}\uFE0E`}
               </span>
             );
           })}
@@ -348,7 +349,7 @@ function FrameOrnamentSvg({ kind, animated }: { kind: FrameOrnament; animated: b
             const p = polar(deg, R + 6);
             return (
               <text key={deg} x={p.x} y={p.y + 2.5} fontSize="7" textAnchor="middle" fill="#e0f2fe">
-                ❄
+                {'❄\uFE0E'}
               </text>
             );
           })}
@@ -485,7 +486,7 @@ export function TitleText({
   return (
     <span className={`nx-title-wrap ${className}`}>
       {title.icon === 'crown' && <Crown aria-hidden className="nx-title-icon" style={{ color: '#facc15' }} />}
-      {title.icon === 'snow' && <span aria-hidden className="nx-title-glyph">❄</span>}
+      {title.icon === 'snow' && <span aria-hidden className="nx-title-glyph">{'❄\uFE0E'}</span>}
       <span
         className={`nx-title nx-title--${title.anim}`}
         style={style}
@@ -494,7 +495,11 @@ export function TitleText({
         {children}
       </span>
       {title.icon === 'sparkle' && <span aria-hidden className="nx-title-glyph nx-twinkle-glyph">✦</span>}
-      {title.icon === 'petal' && <span aria-hidden className="nx-title-glyph nx-petal">🌸</span>}
+      {title.icon === 'petal' && (
+        <span aria-hidden className="nx-title-glyph nx-petal inline-flex">
+          <InsightIcon name="blossom" className="w-[1em] h-[1em]" />
+        </span>
+      )}
     </span>
   );
 }

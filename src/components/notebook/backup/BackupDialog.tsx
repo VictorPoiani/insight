@@ -4,6 +4,7 @@
  * Backup portátil em um clique: o Notebook inteiro ou um projeto, com os
  * textos em Markdown, os dados em JSON e (opcional) as mídias originais.
  */
+import { notify } from '@/lib/ui/feedback';
 import { useMemo, useState } from 'react';
 import { Download, Loader2, X } from 'lucide-react';
 import type { NotebookApi } from '@/lib/notebook/useNotebook';
@@ -26,7 +27,7 @@ export function BackupDialog({ api, entries, projectId, onClose }: { api: Notebo
       const r = await exportAll(api, entries, (n, t) => setProgress([n, t]), { projectId: scope === 'tudo' ? null : scope, media });
       setDone(r);
     } catch {
-      alert('Não foi possível gerar o arquivo .zip.');
+      notify('Não foi possível gerar o arquivo .zip.');
     }
     setProgress(null);
   };

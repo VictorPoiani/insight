@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/net/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';
 
 export interface SpotifyTrackMetadata {
@@ -11,6 +12,8 @@ export interface SpotifyTrackMetadata {
 }
 
 export async function GET(req: NextRequest) {
+  const limited = await rateLimit(req, 'spotify', 60, 60);
+  if (limited) return limited;
   const { searchParams } = new URL(req.url);
   const rawParam = searchParams.get('trackId')?.trim();
 

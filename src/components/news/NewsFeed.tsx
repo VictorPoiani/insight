@@ -1,5 +1,6 @@
 'use client';
 
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useState } from 'react';
 import { Check, Loader2, Plus, Sparkles } from 'lucide-react';
 import { NEWS_TOPICS } from '@/lib/news/topics';
@@ -41,7 +42,10 @@ export function NewsTopicPicker({
               style={on ? { background: t.color } : undefined}
             >
               {on ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 opacity-60" />}
-              <span>{t.emoji}</span> {t.label}
+              <span style={on ? undefined : { color: t.color }} className="inline-flex">
+                <InsightIcon name={t.id} className="w-3.5 h-3.5" />
+              </span>{' '}
+              {t.label}
             </button>
           );
         })}
@@ -83,7 +87,10 @@ export function NewsFeed({ profileId }: { profileId: string | null }) {
             }`}
             style={topic === t.id ? { background: t.color } : undefined}
           >
-            <span>{t.emoji}</span> {t.label}
+            <span style={topic === t.id ? undefined : { color: t.color }} className="inline-flex">
+              <InsightIcon name={t.id} className="w-3.5 h-3.5" />
+            </span>{' '}
+            {t.label}
             {follows.has(t.id) && topic !== t.id && <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-label="seguindo" />}
           </button>
         ))}

@@ -1,5 +1,7 @@
 'use client';
 
+import { useVisiblePolling } from '@/lib/useVisiblePolling';
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { NitroBadge } from '@/components/nitro/Cosmetics';
 import { displaysNitro } from '@/lib/nitro/entitlement';
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -184,30 +186,8 @@ export default function NotificationsPage() {
     loadAllNotifications();
   }, [loadAllNotifications]);
 
-  // Subscrição Realtime para novas notificações chegarem ao vivo
-  useEffect(() => {
-    if (!myProfile) return;
-
-    const channel = supabase
-      .channel(`realtime-notifs-${myProfile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `recipient_id=eq.${myProfile.id}`,
-        },
-        () => {
-          loadAllNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [myProfile, supabase, loadAllNotifications]);
+  // novas notificações: confere a cada minuto com a aba visível (sem canal de tempo real)
+  useVisiblePolling(() => void loadAllNotifications(), 60_000, Boolean(myProfile));
 
   async function handleMarkAllRead() {
     if (mainTab === 'official') {
@@ -270,7 +250,7 @@ export default function NotificationsPage() {
     if (!myProfile || selected.size === 0) return;
     const ids = Array.from(selected);
     const label = ids.length === 1 ? 'esta notificação' : `estas ${ids.length} notificações`;
-    if (!window.confirm(`Apagar ${label}?`)) return;
+    if (!(await confirmDialog({ message: `Apagar ${label}?`, danger: true }))) return;
     setNotifications((prev) => prev.filter((n) => !selected.has(n.id)));
     exitSelectMode();
     for (let i = 0; i < ids.length; i += 100) {
@@ -301,6 +281,31 @@ export default function NotificationsPage() {
     return notifications.filter((n) => n.type === typeFilter);
   }, [notifications, typeFilter]);
 
+  // Agrupa avisos parecidos: "Ana e mais 3 curtiram seu Insight" em vez de 4 linhas.
+  // Curtidas, reposts e votos agrupam por post; novos seguidores, por dia.
+  const groupedInbox = useMemo(() => {
+    const GROUPABLE = new Set(['like', 'repost', 'poll_vote', 'follow']);
+    const groups: { lead: NotificationItem; items: NotificationItem[] }[] = [];
+    const byKey = new Map<string, { lead: NotificationItem; items: NotificationItem[] }>();
+    for (const n of filteredInbox) {
+      if (!GROUPABLE.has(n.type)) {
+        groups.push({ lead: n, items: [n] });
+        continue;
+      }
+      const key = n.type === 'follow' ? `follow:${n.created_at.slice(0, 10)}` : `${n.type}:${n.post_id || ''}`;
+      const g = byKey.get(key);
+      if (g) {
+        // entra no grupo (para marcar como lida); a mesma pessoa repetida conta uma vez só na contagem
+        g.items.push(n);
+      } else {
+        const ng = { lead: n, items: [n] };
+        byKey.set(key, ng);
+        groups.push(ng);
+      }
+    }
+    return groups;
+  }, [filteredInbox]);
+
   function getNotificationMeta(n: NotificationItem) {
     switch (n.type) {
       case 'like':
@@ -308,6 +313,7 @@ export default function NotificationsPage() {
           icon: Heart,
           iconClass: 'text-rose-500 fill-rose-500',
           actionText: 'curtiu seu Insight',
+          actionPlural: 'curtiram seu Insight',
         };
       case 'reply':
         return {
@@ -326,18 +332,21 @@ export default function NotificationsPage() {
           icon: BarChart3,
           iconClass: 'text-amber-400',
           actionText: 'votou na sua enquete',
+          actionPlural: 'votaram na sua enquete',
         };
       case 'follow':
         return {
           icon: UserPlus,
           iconClass: 'text-emerald-400',
           actionText: 'começou a seguir você',
+          actionPlural: 'começaram a seguir você',
         };
       case 'repost':
         return {
           icon: Repeat2,
           iconClass: 'text-[#1DB954]',
           actionText: 'repostou seu Insight',
+          actionPlural: 'repostaram seu Insight',
         };
       case 'new_post':
         return {
@@ -656,7 +665,13 @@ export default function NotificationsPage() {
               </div>
             );
           })()}
-          {filteredInbox.map((notif) => {
+          {(selectMode ? filteredInbox.map((n) => ({ lead: n, items: [n] })) : groupedInbox).map((group) => {
+            const notif = group.lead;
+            const groupItems = group.items;
+            // pessoas distintas do grupo (para avatares e "e mais N")
+            const people = groupItems.filter((x, i, arr) => x.actor_id && arr.findIndex((y) => y.actor_id === x.actor_id) === i);
+            const others = Math.max(0, people.length - 1);
+            const groupUnread = groupItems.some((x) => !x.is_read);
             const meta = getNotificationMeta(notif);
             const Icon = meta.icon;
             const actorName =
@@ -675,7 +690,7 @@ export default function NotificationsPage() {
 
             const isSelected = selected.has(notif.id);
             const rowClass = `px-4 sm:px-6 py-4 flex items-start gap-3.5 transition-colors hover:bg-surface/40 ${
-              isSelected ? 'bg-accent-soft' : !notif.is_read ? 'bg-accent/[0.06]' : ''
+              isSelected ? 'bg-accent-soft' : groupUnread ? 'bg-accent/[0.06]' : ''
             }`;
             const renderRow = (children: React.ReactNode) =>
               selectMode ? (
@@ -699,7 +714,7 @@ export default function NotificationsPage() {
                   key={notif.id}
                   href={targetHref}
                   onClick={() => {
-                    if (!notif.is_read) handleMarkSingleRead(notif.id);
+                    for (const x of groupItems) if (!x.is_read) handleMarkSingleRead(x.id);
                   }}
                   className={rowClass}
                 >
@@ -711,11 +726,24 @@ export default function NotificationsPage() {
               <>
                 {/* Avatar com selo do tipo de interação */}
                 <div className="relative shrink-0">
+                  {others > 0 ? (
+                    <span className="relative block w-10 h-10" aria-hidden="true">
+                      {people.slice(0, 2).map((x, i) => (
+                        <img
+                          key={x.id}
+                          src={x.actor?.avatar_url || '/assets/net/default-perfil'}
+                          alt=""
+                          className={`absolute w-7 h-7 rounded-full object-cover ring-2 ring-background bg-elevated ${i === 0 ? 'top-0 left-0 z-10' : 'bottom-0 right-0'}`}
+                        />
+                      ))}
+                    </span>
+                  ) : (
                   <img
                     src={notif.actor?.avatar_url || '/assets/net/default-perfil'}
                     alt={actorName}
                     className="w-10 h-10 rounded-full object-cover border border-border bg-elevated"
                   />
+                  )}
                   <span className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center absolute -bottom-1 -right-1 shadow-sm">
                     <Icon className={`w-3 h-3 ${meta.iconClass}`} />
                   </span>
@@ -728,7 +756,12 @@ export default function NotificationsPage() {
                       <span className="font-extrabold">{actorName}</span>
                       {notif.actor && displaysNitro(notif.actor) === true && <NitroBadge className="mx-0.5" size={13} />}{' '}
                       <ShieldCheck className="w-3.5 h-3.5 text-[#00ccff] inline-block align-text-bottom mr-1" />
-                      <span className="text-secondary">{meta.actionText}</span>
+                      {others > 0 && (
+                        <span className="text-secondary">
+                          e mais <span className="font-bold text-primary">{others}</span>{' '}
+                        </span>
+                      )}
+                      <span className="text-secondary">{others > 0 && 'actionPlural' in meta && meta.actionPlural ? meta.actionPlural : meta.actionText}</span>
                     </p>
                     <span className="text-[11px] text-muted shrink-0">
                       {formatRelativeTime(notif.created_at)}
@@ -742,7 +775,7 @@ export default function NotificationsPage() {
                   )}
                 </div>
 
-                {!notif.is_read && (
+                {groupUnread && (
                   <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-2" />
                 )}
               </>

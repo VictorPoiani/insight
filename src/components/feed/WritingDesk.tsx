@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Feather, NotebookPen, Plus, Trash2, Pencil, Check, X, Download, Lock } from 'lucide-react';
@@ -261,7 +262,7 @@ export function WritingDesk({
                       <button
                         type="button"
                         title="Apagar"
-                        onClick={() => window.confirm(`Apagar “${p.title}”?`) && save(pieces.filter((x) => x.id !== p.id))}
+                        onClick={async () => (await confirmDialog({ message: `Apagar “${p.title}”?`, danger: true })) && save(pieces.filter((x) => x.id !== p.id))}
                         className="p-1 rounded hover:text-danger"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

@@ -1,5 +1,7 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { VideoPlayer } from '@/components/media/VideoPlayer';
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -686,7 +688,7 @@ export default function NotificacoesPage() {
     const file = e.target.files?.[0];
     if (!file || !isAdmin) return;
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert(`A imagem deve ter no máximo ${MAX_FILE_SIZE_MB}MB.`);
+      notify(`A imagem deve ter no máximo ${MAX_FILE_SIZE_MB}MB.`);
       return;
     }
 
@@ -696,7 +698,7 @@ export default function NotificacoesPage() {
       const res = await uploadMediaToInsight(file, { budgetBytes: MAX_FILE_SIZE_BYTES, asImage: file.type !== 'image/gif' });
       updateBlock(blockId, { imageUrl: res.publicUrl });
     } catch (err) {
-      alert('Erro ao enviar imagem: ' + (err instanceof Error ? err.message : 'tente de novo'));
+      notify('Erro ao enviar imagem: ' + (err instanceof Error ? err.message : 'tente de novo'));
     } finally {
       setUploadingBlockId(null);
     }
@@ -722,7 +724,7 @@ export default function NotificacoesPage() {
         isGif: result.isGif,
       });
     } catch (err: any) {
-      alert(err?.message || 'Erro ao enviar mídia para Cloudflare R2');
+      notify(err?.message || 'Erro ao enviar mídia para Cloudflare R2');
     } finally {
       setUploadingBlockId(null);
     }
@@ -735,7 +737,7 @@ export default function NotificacoesPage() {
     const file = e.target.files?.[0];
     if (!file || !isAdmin) return;
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert(`O arquivo excede o limite de ${MAX_FILE_SIZE_MB}MB.`);
+      notify(`O arquivo excede o limite de ${MAX_FILE_SIZE_MB}MB.`);
       return;
     }
 
@@ -751,7 +753,7 @@ export default function NotificacoesPage() {
         fileType: ext.toUpperCase(),
       });
     } catch (err) {
-      alert('Erro ao anexar arquivo: ' + (err instanceof Error ? err.message : 'tente de novo'));
+      notify('Erro ao anexar arquivo: ' + (err instanceof Error ? err.message : 'tente de novo'));
     } finally {
       setUploadingBlockId(null);
     }
@@ -880,7 +882,7 @@ export default function NotificacoesPage() {
       setBlocks([createNewBlock('h1'), createNewBlock('paragraph')]);
       await loadOfficialUpdates();
     } catch (err: any) {
-      alert('Erro ao guardar atualização: ' + (err?.message || 'Erro desconhecido'));
+      notify('Erro ao guardar atualização: ' + (err?.message || 'Erro desconhecido'));
     } finally {
       setIsSubmitting(false);
     }
@@ -888,7 +890,7 @@ export default function NotificacoesPage() {
 
   async function handleDeleteUpdate(item: OfficialUpdateRecord) {
     if (!isAdmin) return;
-    if (!confirm('Excluir esta atualização oficial da linha do tempo?')) return;
+    if (!(await confirmDialog({ message: 'Excluir esta atualização oficial da linha do tempo?', danger: true }))) return;
 
     const { error } = await supabase
       .from(item.sourceTable)
@@ -898,7 +900,7 @@ export default function NotificacoesPage() {
     if (!error) {
       setUpdates((prev) => prev.filter((u) => u.id !== item.id));
     } else {
-      alert('Erro ao excluir atualização: ' + error.message);
+      notify('Erro ao excluir atualização: ' + error.message);
     }
   }
 

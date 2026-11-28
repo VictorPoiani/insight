@@ -1,9 +1,14 @@
 'use client';
 
+import { askReport } from '@/lib/ui/feedback';
+import { useMyBlocks, setProfileBlock } from '@/lib/blocks';
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { NsfwGate } from '@/components/moderation/NsfwGate';
 import { ModerationBanner } from '@/components/moderation/ModerationBanner';
 import { moderateNow } from '@/components/moderation/ModerationHost';
 import { MediaCarousel } from '@/components/media/MediaCarousel';
+import { MediaStrip } from '@/components/media/MediaStrip';
 import { linkifyMentionsHtml, sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useNitro } from '@/components/nitro/NitroProvider';
 import { getPostFlags, setPostFlag } from '@/lib/postFlags';
@@ -28,6 +33,18 @@ import { createClient } from '@/lib/supabase/client';
 import { gridCellStyle } from '@/lib/grid';
 import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Cosmetics';
 import { PostTime } from './PostTime';
+import { LikedBy, ReplyPreview, ReactionChips, ReactionButton, HeartBurst } from './PostSocial';
+import { ProfileHoverCard } from './ProfileHoverCard';
+import { LinkPreview, firstLinkIn } from './LinkPreview';
+import {
+  getPostSocial,
+  patchPostSocial,
+  subscribePostSocial,
+  setMyReaction,
+  rememberReaction,
+  type PostSocial,
+  type ReactionId,
+} from '@/lib/postSocial';
 import { PostComposer } from './PostComposer';
 import { SharePostModal } from './SharePostModal';
 import {
@@ -48,6 +65,11 @@ import {
   Compass,
   Network,
   Flag,
+  AtSign,
+  MoreHorizontal,
+  VolumeX,
+  Ban,
+  Eye,
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -171,6 +193,7 @@ export function PostCard({
   const [postSpotifyId, setPostSpotifyId] = useState<string | null>(
     post.spotify_track_id || null
   );
+  const [editedAt, setEditedAt] = useState<string | null>(post.edited_at || null);
 
   // Enquetes
   const [votedOptions, setVotedOptions] = useState<Record<string, string[]>>({});
@@ -216,6 +239,7 @@ export function PostCard({
     setPostVisibility(resolvePostVisibility(post, nextBlocks));
     setPostImageUrl(post.image_url);
     setPostSpotifyId(post.spotify_track_id || null);
+    setEditedAt(post.edited_at || null);
     setLikes(post.likes_count || 0);
     setReposts(post.reposts_count || 0);
     setRepliesCount(post.replies_count || 0);
@@ -255,6 +279,62 @@ export function PostCard({
   }, [isPostOwner, modStatus, post.id]);
   const [hasSaved, setHasSaved] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
+
+  // Contexto social (quem curtiu, resposta em destaque, reações) — em lote com os outros cartões
+  const [social, setSocial] = useState<PostSocial | null>(null);
+  const [likePulse, setLikePulse] = useState(0);
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    getPostSocial(post.id, viewer?.id ?? null).then((s) => alive && setSocial(s));
+    const off = subscribePostSocial(post.id, (s) => alive && setSocial(s));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [post.id, viewer?.id]);
+
+  async function handleReact(r: ReactionId) {
+    if (!viewer) {
+      window.location.href = loginHref();
+      return;
+    }
+    const prev = social;
+    const next: ReactionId | null = social?.myReaction === r ? null : r;
+    if (next) rememberReaction(next);
+    patchPostSocial(post.id, viewer.id, (s) => {
+      const counts = { ...s.reactions };
+      if (s.myReaction) counts[s.myReaction] = Math.max(0, (counts[s.myReaction] || 0) - 1);
+      if (next) counts[next] = (counts[next] || 0) + 1;
+      return { ...s, reactions: counts, myReaction: next };
+    });
+    const { error } = await setMyReaction(post.id, viewer.id, next);
+    if (error && prev) patchPostSocial(post.id, viewer.id, () => prev);
+  }
+
+  // Prévia do primeiro link do texto — só quando o post não tem mídia própria
+  const previewUrl = useMemo(() => {
+    const hasMedia =
+      Boolean(postImageUrl) ||
+      blocksState.some((b) => ['image', 'video', 'gif', 'carousel', 'spotify', 'mindmap'].includes(b.type));
+    if (hasMedia) return null;
+    const texts = blocksState.length ? blocksState.map((b) => b.html || '') : [postContent || ''];
+    return firstLinkIn(texts);
+  }, [blocksState, postContent, postImageUrl]);
+
+  const blocks = useMyBlocks(viewer?.id ?? null);
+  const blockKind = !isPostOwner ? blocks.get(author.id) : undefined;
+  const [revealBlocked, setRevealBlocked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // Menciona quem está vendo (e não é o autor)
+  const mentionsViewer = useMemo(() => {
+    const handle = viewer?.username;
+    if (!handle || viewer?.id === author.id) return false;
+    const text = [postContent || '', ...blocksState.map((b) => b.html || '')].join(' ');
+    const esc = handle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\w])@${esc}(?![\\w])`, 'i').test(text);
+  }, [viewer?.username, viewer?.id, author.id, postContent, blocksState]);
 
   // Salvar para ler depois (lista privada em "Sua atividade" → Salvos)
   async function handleToggleSave() {
@@ -408,7 +488,7 @@ export function PostCard({
       if (error || !data) {
         setBlocksState(blocksState);
         setVotedOptions(votedOptions);
-        alert('Não foi possível registrar seu voto. Tente novamente.');
+        notify('Não foi possível registrar seu voto. Tente novamente.');
         return;
       }
 
@@ -436,6 +516,17 @@ export function PostCard({
     const nextLikes = nextLiked ? likes + 1 : Math.max(0, likes - 1);
     setHasLiked(nextLiked);
     setLikes(nextLikes);
+    if (nextLiked) setLikePulse((n) => n + 1);
+    const me = loggedUserProfile;
+    patchPostSocial(post.id, me.id, (s) => ({
+      ...s,
+      likers: nextLiked
+        ? [
+            { id: me.id, username: me.username, name: me.display_name || me.full_name || me.username, avatar_url: me.avatar_url },
+            ...s.likers.filter((x) => x.id !== me.id),
+          ].slice(0, 3)
+        : s.likers.filter((x) => x.id !== me.id),
+    }));
 
     const { data, error } = await supabase.rpc('toggle_post_like', {
       target_post_id: post.id,
@@ -491,15 +582,59 @@ export function PostCard({
     }
   }
 
+  async function handleBlock(kind: 'mute' | 'block' | null) {
+    setMoreOpen(false);
+    if (!viewer) {
+      window.location.href = loginHref();
+      return;
+    }
+    const handle = `@${author.username}`;
+    if (kind === 'block') {
+      const ok = await confirmDialog({
+        title: `Bloquear ${handle}?`,
+        message: 'Os posts dessa conta somem do seu feed, e ela não vai conseguir seguir você, responder nem reagir aos seus posts. Vocês deixam de se seguir.',
+        confirmLabel: 'Bloquear',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    const done = await setProfileBlock(viewer.id, author.id, kind);
+    if (!done) {
+      notify('Não foi possível concluir agora. Tente de novo.', 'error');
+      return;
+    }
+    notify(
+      kind === 'block' ? `${handle} foi bloqueado.` : kind === 'mute' ? `${handle} foi silenciado. Os posts dessa conta não aparecem mais no seu feed.` : `${handle} voltou a aparecer no seu feed.`,
+      'success'
+    );
+  }
+
+  async function handleTogglePin() {
+    if (!isAdmin) return;
+    const next = !isPostPinned;
+    setIsPostPinned(next);
+    const ownerId = post.profile_id || post.author_id;
+    // um fixado por perfil: desafixa os outros
+    if (next && ownerId) {
+      await supabase.from('posts').update({ is_pinned: false }).eq('is_pinned', true).neq('id', post.id).or(`profile_id.eq.${ownerId},author_id.eq.${ownerId}`);
+    }
+    const { error } = await supabase.from('posts').update({ is_pinned: next }).eq('id', post.id);
+    if (error) {
+      setIsPostPinned(!next);
+      notify('Não foi possível fixar agora.', 'error');
+    } else {
+      notify(next ? 'Fixado no topo do seu perfil.' : 'Insight desafixado.', 'success');
+    }
+  }
+
   async function handleReportPost() {
+    setMoreOpen(false);
     if (!loggedUserProfile) {
       window.location.href = loginHref();
       return;
     }
 
-    const reason = prompt(
-      'Descreva o motivo da denúncia desta publicação (ex: spam, ofensa, conteúdo impróprio):'
-    );
+    const reason = await askReport();
     if (!reason || !reason.trim()) return;
 
     const { error } = await supabase.from('reports').insert({
@@ -510,22 +645,23 @@ export function PostCard({
     });
 
     if (!error) {
-      alert('Denúncia enviada para a Equipe de Moderação do Insight.');
+      notify('Denúncia enviada para a Equipe de Moderação do Insight.', 'success');
     } else {
-      alert('Erro ao enviar denúncia: ' + error.message);
+      notify('Erro ao enviar denúncia: ' + error.message);
     }
   }
 
   async function handleDelete() {
     if (!isAdmin) return;
-    if (!confirm('Excluir este Insight? Esta ação não pode ser desfeita.')) return;
+    if (!(await confirmDialog({ message: 'Excluir este Insight? Esta ação não pode ser desfeita.', danger: true }))) return;
 
     for (const blk of blocksState) {
-      if (blk.r2Key) {
+      const keys = [blk.r2Key, ...(blk.carouselImages || []).map((img) => img.r2Key)].filter(Boolean);
+      for (const r2Key of keys) {
         fetch('/api/upload/r2', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ r2Key: blk.r2Key }),
+          body: JSON.stringify({ r2Key }),
         }).catch(() => {});
       }
       if (Array.isArray(blk.mindMapNodes)) {
@@ -550,17 +686,62 @@ export function PostCard({
   // Imagens do post em tela cheia (na ordem em que aparecem)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lightboxImages = useMemo(() => {
-    const list = blocksState.filter((x) => x.type === 'image' && x.imageUrl).map((x) => ({ src: x.imageUrl!, alt: x.imageCaption || '' }));
+    const list: { src: string; alt: string }[] = [];
+    for (const x of blocksState) {
+      if (x.type === 'image' && x.imageUrl) list.push({ src: x.imageUrl, alt: x.imageCaption || '' });
+      if (x.type === 'carousel') for (const img of x.carouselImages || []) if (img.imageUrl) list.push({ src: img.imageUrl, alt: img.caption || '' });
+    }
     if (!list.length && postImageUrl) list.push({ src: postImageUrl, alt: '' });
     return list;
   }, [blocksState, postImageUrl]);
+  const lastTouchRef = useRef(0);
+  const pointerTypeRef = useRef<string>('mouse');
+  const lightboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openLightbox = (src: string) => {
     const i = lightboxImages.findIndex((x) => x.src === src);
-    setLightboxIndex(i >= 0 ? i : 0);
+    const go = () => setLightboxIndex(i >= 0 ? i : 0);
+    if (pointerTypeRef.current !== 'touch') return go();
+    if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+    lightboxTimer.current = setTimeout(go, 300);
   };
+  // duplo toque no conteúdo (celular) = curtir, como no Instagram
+  const onContentPointerUp = (e: React.PointerEvent) => {
+    pointerTypeRef.current = e.pointerType;
+    if (e.pointerType !== 'touch') return;
+    // vídeo, botões e links têm toques próprios (ex.: duplo toque no vídeo avança 10 s)
+    if ((e.target as HTMLElement).closest('video, button, a, input, iframe, [role="slider"]')) return;
+    const now = Date.now();
+    if (now - lastTouchRef.current < 300) {
+      lastTouchRef.current = 0;
+      if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+      setBurst((n) => n + 1);
+      if (!hasLiked) void handleLike();
+    } else {
+      lastTouchRef.current = now;
+    }
+  };
+  useEffect(() => () => {
+    if (lightboxTimer.current) clearTimeout(lightboxTimer.current);
+  }, []);
 
   if (!isAdmin && postVisibility === 'private') {
     return null;
+  }
+  // autor silenciado/bloqueado por quem vê: post recolhido (dá para mostrar)
+  if (blockKind && !revealBlocked && variant === 'feed') {
+    return (
+      <div className="px-4 sm:px-6 py-3 border-b border-border flex items-center justify-between gap-3 text-xs text-muted">
+        <span className="flex items-center gap-1.5 min-w-0">
+          {blockKind === 'block' ? <Ban className="w-3.5 h-3.5 shrink-0" /> : <VolumeX className="w-3.5 h-3.5 shrink-0" />}
+          <span className="truncate">
+            Post de @{author.username} · você {blockKind === 'block' ? 'bloqueou' : 'silenciou'} esta conta
+          </span>
+        </span>
+        <button type="button" onClick={() => setRevealBlocked(true)} className="shrink-0 font-semibold text-secondary hover:text-primary">
+          Mostrar
+        </button>
+      </div>
+    );
   }
 
   const displayedRepliesCount = repliesCountOverride ?? repliesCount;
@@ -659,6 +840,15 @@ export function PostCard({
               );
             }
 
+            if (b.type === 'carousel' && Array.isArray(b.carouselImages) && b.carouselImages.length > 0) {
+              const imgs = b.carouselImages.filter((img) => img.imageUrl);
+              return (
+                <div key={b.id || idx} style={{ ...cellStyle, gridColumn: '1 / -1' }} className="min-w-0 py-1">
+                  <MediaStrip images={imgs} onOpen={(i) => openLightbox(imgs[i].imageUrl)} />
+                </div>
+              );
+            }
+
             if (b.type === 'image' && b.imageUrl) {
               // no PC, foto em coluna cheia aparece em até 50% (clicar abre em tamanho real)
               const fullCell = !b.gridSpan || b.gridSpan >= 12;
@@ -701,7 +891,8 @@ export function PostCard({
                     style={{ width: b.videoWidth || '100%' }}
                     className={`${getImageAlignClass(b.videoAlign)} space-y-1.5`}
                   >
-                    <div className="relative rounded-xl overflow-hidden border border-border bg-black/90">
+                    {/* o player ajusta a própria moldura à proporção do vídeo (sem tarjas pretas) */}
+                    <div className={`relative ${isRawGif ? 'rounded-xl overflow-hidden border border-border bg-black/90' : ''}`}>
                       {isRawGif ? (
                         <img
                           src={b.videoUrl}
@@ -710,7 +901,7 @@ export function PostCard({
                           loading="lazy"
                         />
                       ) : (
-                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} />
+                        <VideoPlayer src={b.videoUrl} gif={isGifMode} label={b.videoCaption || 'Vídeo do post'} autoPlayInView={!isGifMode} className="rounded-xl overflow-hidden border border-border" />
                       )}
 
                       {isGifMode && isRawGif && (
@@ -1048,6 +1239,12 @@ export function PostCard({
       }`}
     >
       {/* Indicadores Superiores: Fixado / Privado */}
+      {mentionsViewer && (
+        <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-secondary">
+          <AtSign className="w-3.5 h-3.5 text-accent" />
+          <span>{author.display_name || author.full_name || author.username} mencionou você</span>
+        </div>
+      )}
       {(isPostPinned || postVisibility === 'private') && (
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {isPostPinned && (
@@ -1068,6 +1265,7 @@ export function PostCard({
 
       {/* Cabeçalho do Post */}
       <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <ProfileHoverCard profile={author}>
         <Link
           href={authorProfileHref}
           className="flex items-center gap-2.5 sm:gap-3 group/author min-w-0"
@@ -1092,9 +1290,20 @@ export function PostCard({
                 <CosmeticTag profile={author} />
               </span>
             </div>
-            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
+            <span className="flex items-center gap-1 text-[11px] sm:text-xs text-muted min-w-0">
+              <PostTime iso={post.created_at} className="truncate" />
+              {editedAt && (
+                <span
+                  className="shrink-0"
+                  title={`Editado em ${new Date(editedAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                >
+                  · editado
+                </span>
+              )}
+            </span>
           </div>
         </Link>
+        </ProfileHoverCard>
 
         {isAdmin && (
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
@@ -1131,6 +1340,20 @@ export function PostCard({
             >
               <Pencil className="w-4 h-4" />
             </button>
+
+            {isPostOwner && (
+              <button
+                type="button"
+                onClick={() => void handleTogglePin()}
+                title={isPostPinned ? 'Desafixar do perfil' : 'Fixar no topo do perfil'}
+                aria-pressed={isPostPinned}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isPostPinned ? 'text-accent bg-accent/10' : 'text-muted hover:text-accent hover:bg-elevated'
+                }`}
+              >
+                <Pin className="w-4 h-4" />
+              </button>
+            )}
 
             <button
               type="button"
@@ -1170,12 +1393,15 @@ export function PostCard({
               setPostVisibility(resolvePostVisibility(updated, nextBlocks));
               setPostImageUrl(updated.image_url);
               setPostSpotifyId(updated.spotify_track_id || null);
+              setEditedAt(updated.edited_at || new Date().toISOString());
               setIsEditing(false);
             }}
           />
         </div>
       ) : (
         <NsfwGate active={isNsfw && !isPostOwner}>
+        <div className="relative" onPointerUp={onContentPointerUp}>
+        <HeartBurst show={burst} />
         {hasRichBlocks ? (
         <div className="notion-content mt-4 grid grid-cols-12 gap-3 text-sm sm:text-base lg:text-[17px] lg:leading-[1.75] text-primary leading-relaxed items-start break-words">
           {groupMediaRuns(blocksState).map((item) => {
@@ -1240,6 +1466,7 @@ export function PostCard({
           )}
         </>
       )}
+        </div>
         </NsfwGate>
       )}
 
@@ -1252,21 +1479,27 @@ export function PostCard({
         <ModerationBanner kind="post" id={post.id} status={modStatus} reason={modReason} onAppealed={() => setModStatus('appealed')} />
       )}
 
+      {previewUrl && !isEditing && !(isNsfw && !isPostOwner) && <LinkPreview url={previewUrl} />}
+
       {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}
 
       {/* Hashtags */}
       {postTags && postTags.length > 0 && !isEditing && (
         <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
           {postTags.map((tag) => (
-            <span
+            <Link
               key={tag}
-              className="px-2 py-0.5 rounded bg-elevated border border-border font-mono text-[11px] text-accent"
+              href={`/?tag=${encodeURIComponent(tag.toLowerCase())}`}
+              title={`Ver Insights com #${tag}`}
+              className="px-2 py-0.5 rounded bg-elevated border border-border font-mono text-[11px] text-accent hover:border-accent/60 hover:bg-accent/10 transition-colors"
             >
               #{tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}
+
+      {social && !isEditing && <ReactionChips social={social} onReact={(r) => void handleReact(r)} />}
 
       {/* Barra de Ações (Responsiva para Mobile e Desktop) */}
       <div className="mt-4 pt-3 flex items-center justify-between gap-2 text-xs text-secondary">
@@ -1313,7 +1546,7 @@ export function PostCard({
               }`}
             >
               <Repeat2 className="w-4 h-4" />
-              <span>{reposts}</span>
+              <span key={reposts} className="insight-count-roll tabular-nums">{reposts}</span>
             </button>
             {repostMenu && (
               <>
@@ -1357,9 +1590,11 @@ export function PostCard({
               hasLiked ? 'text-accent font-semibold' : 'hover:text-primary'
             }`}
           >
-            <Heart className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''}`} />
-            <span>{likes}</span>
+            <Heart key={likePulse} className={`w-4 h-4 ${hasLiked ? 'fill-accent text-accent' : ''} ${likePulse ? 'insight-like-pop' : ''}`} />
+            <span key={likes} className="insight-count-roll tabular-nums">{likes}</span>
           </button>
+
+          <ReactionButton mine={social?.myReaction ?? null} onReact={(r) => void handleReact(r)} />
 
           <button
             type="button"
@@ -1386,18 +1621,60 @@ export function PostCard({
           </button>
         </div>
 
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={handleReportPost}
-            title="Denunciar Insight à moderação"
-            aria-label="Denunciar Insight"
-            className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
-          >
-            <Flag className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {(post.views_count || 0) > 0 && (
+            <span
+              className="flex items-center gap-1 text-muted tabular-nums"
+              title={`${post.views_count} ${post.views_count === 1 ? 'pessoa viu' : 'pessoas viram'} este Insight`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              {post.views_count}
+            </span>
+          )}
+          {!isPostOwner && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                title="Mais opções"
+                aria-label="Mais opções"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-elevated transition-colors"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+              {moreOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+                  <div role="menu" className="absolute bottom-full right-0 mb-2 z-50 w-60 py-1 rounded-xl bg-elevated border border-border shadow-2xl">
+                    <button type="button" role="menuitem" onClick={() => void handleBlock(blockKind === 'mute' ? null : 'mute')} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left">
+                      <VolumeX className="w-4 h-4 text-secondary" />
+                      {blockKind === 'mute' ? `Deixar de silenciar @${author.username}` : `Silenciar @${author.username}`}
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => void handleBlock(blockKind === 'block' ? null : 'block')} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left">
+                      <Ban className="w-4 h-4 text-secondary" />
+                      {blockKind === 'block' ? `Desbloquear @${author.username}` : `Bloquear @${author.username}`}
+                    </button>
+                    <div className="my-1 border-t border-border" />
+                    <button type="button" role="menuitem" onClick={() => void handleReportPost()} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger hover:bg-surface text-left">
+                      <Flag className="w-4 h-4" />
+                      Denunciar à moderação
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {social && !isEditing && (
+        <LikedBy likers={social.likers} total={likes} viewerLiked={hasLiked} />
+      )}
+      {social?.topReply && variant === 'feed' && !isEditing && (
+        <ReplyPreview reply={social.topReply} total={displayedRepliesCount} postId={post.id} />
+      )}
 
       {/* Modal Insight* Share Studio */}
       {lightboxIndex !== null && lightboxImages.length > 0 && (

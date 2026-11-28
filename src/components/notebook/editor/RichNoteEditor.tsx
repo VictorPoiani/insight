@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ACADEMIC_EXTENSIONS, CitationContext, academicSlashItems, citeItems } from './academic';
 import { createPortal } from 'react-dom';
@@ -391,7 +392,7 @@ export function RichNoteEditor({ item, titles, titleExists, onChange, onOpenLink
           ed.chain().focus().setImage({ src: res.publicUrl, alt: f.name.replace(/\.[^.]+$/, '') }).run();
         }
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+        notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
       }
       setUploading(false);
     },

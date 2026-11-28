@@ -1,5 +1,6 @@
 'use client';
 
+import { Turnstile, TURNSTILE_SITE_KEY } from '@/components/account/Turnstile';
 import { safeNext } from '@/lib/account/loginRedirect';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -25,7 +26,6 @@ import {
 // ============================================================================
 // CONTROLE DO BETA FECHADO: Mude para false quando sair do Closed Beta
 // ============================================================================
-const IS_CLOSED_BETA = true;
 
 const FOUNDER_AUTH_EMAIL = 'victorhugopoiani12@gmail.com';
 const FOUNDER_ALIASES = new Set([
@@ -205,6 +205,22 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  // cadastro com convite enquanto o interruptor do lançamento estiver desligado (vem do banco)
+  const [isClosedBeta, setIsClosedBeta] = useState(true);
+  useEffect(() => {
+    void supabase.rpc('signup_invite_required').then(({ data, error }) => {
+      if (!error && typeof data === 'boolean') setIsClosedBeta(data);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // CAPTCHA (Turnstile): cada token vale uma vez; captchaKey renova o widget
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const renewCaptcha = () => {
+    setCaptchaToken(null);
+    setCaptchaKey((k) => k + 1);
+  };
+  const captchaMissing = Boolean(TURNSTILE_SITE_KEY) && !captchaToken;
   const [birthday, setBirthday] = useState('');
 
   const [usernameStatus, setUsernameStatus] = useState<
@@ -376,7 +392,7 @@ export default function LoginPage() {
 
     setUsernameStatus('available');
 
-    if (IS_CLOSED_BETA) {
+    if (isClosedBeta) {
       setSignupStep(2);
     } else {
       await executeSignUp();
@@ -402,14 +418,17 @@ export default function LoginPage() {
 
       await supabase.auth.signOut().catch(() => {});
 
+      if (captchaMissing) throw new Error('Confirme a verificação anti-robô para entrar.');
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: targetEmail,
         password: password.trim(),
+        options: captchaToken ? { captchaToken } : undefined,
       });
+      if (TURNSTILE_SITE_KEY) renewCaptcha();
 
       let finalData = data;
       let finalError = signInError;
-      if (signInError && password !== password.trim()) {
+      if (signInError && password !== password.trim() && !TURNSTILE_SITE_KEY) {
         const retry = await supabase.auth.signInWithPassword({
           email: targetEmail,
           password,
@@ -474,7 +493,7 @@ export default function LoginPage() {
         );
       }
 
-      if (IS_CLOSED_BETA) {
+      if (isClosedBeta) {
         if (cleanCode.length < 14) {
           throw new Error('Digite o código de convite completo.');
         }
@@ -502,23 +521,32 @@ export default function LoginPage() {
         }
       }
 
+      if (captchaMissing) throw new Error('Confirme a verificação anti-robô para criar a conta.');
       const { error: signUpError } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
         options: {
+          ...(captchaToken ? { captchaToken } : {}),
           data: {
             full_name: fullName.trim(),
             username: cleanUsername,
             // o banco valida e consome o convite na criação da conta
-            invite_code: IS_CLOSED_BETA ? cleanCode : undefined,
+            invite_code: isClosedBeta ? cleanCode : undefined,
             // obrigatória: o banco recusa a conta sem data válida ou com menos de 13 anos
             birthday,
           },
         },
       });
 
+      if (TURNSTILE_SITE_KEY) renewCaptcha();
       if (signUpError) {
         const low = signUpError.message.toLowerCase();
+        if (low.includes('captcha')) {
+          throw new Error('A verificação anti-robô expirou. Confirme de novo e tente outra vez.');
+        }
+        if (low.includes('rate limit') || low.includes('too many')) {
+          throw new Error('Muitos cadastros a partir desta rede. Aguarde alguns minutos e tente de novo.');
+        }
         if (low.includes('birthday_underage')) {
           setSignupStep(1);
           throw new Error('O Insight é para pessoas com 13 anos ou mais.');
@@ -811,9 +839,11 @@ export default function LoginPage() {
               </p>
             </div>
 
+            <Turnstile key={`c2-${captchaKey}`} onToken={setCaptchaToken} theme={isDark ? 'dark' : 'light'} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || captchaMissing}
               className="w-full py-2.5 px-4 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
             >
               <ShieldCheck className="w-4 h-4" />
@@ -1088,10 +1118,15 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {(mode === 'login' || !isClosedBeta) && (
+                <Turnstile key={`c1-${captchaKey}`} onToken={setCaptchaToken} theme={isDark ? 'dark' : 'light'} />
+              )}
+
               <button
                 type="submit"
                 disabled={
                   loading ||
+                  ((mode === 'login' || !isClosedBeta) && captchaMissing) ||
                   (mode === 'signup' &&
                     (usernameStatus === 'taken' ||
                       usernameStatus === 'invalid' ||
@@ -1104,7 +1139,7 @@ export default function LoginPage() {
                     ? 'Verificando...'
                     : mode === 'login'
                     ? 'Entrar no Insight'
-                    : IS_CLOSED_BETA
+                    : isClosedBeta
                     ? 'Continuar para Código Beta'
                     : 'Criar Conta e Ir ao Perfil'}
                 </span>

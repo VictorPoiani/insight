@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/net/rateLimit';
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
 import { getShareTheme, SHARE_SIZES } from '@/lib/share/themes';
@@ -20,6 +21,8 @@ function compact(n: number) {
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ username: string }> }) {
+  const limited = await rateLimit(req, 'share-profile', 40, 60);
+  if (limited) return limited;
   const { username } = await ctx.params;
   const url = new URL(req.url);
   const fmtParam = url.searchParams.get('format');

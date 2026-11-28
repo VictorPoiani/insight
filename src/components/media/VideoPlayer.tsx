@@ -30,6 +30,17 @@ import {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const PLAY_EVENT = 'insight:video-play';
+/** um vídeo começou a tocar sozinho (mudo): os outros que tocavam sozinhos param */
+const AUTO_EVENT = 'insight:video-autoplay';
+/** vídeo que está tocando COM som agora (o autoplay não o interrompe) */
+let soundPlayingId: string | null = null;
+
+function autoplayAllowed() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  return !conn?.saveData;
+}
 
 function fmt(t: number) {
   if (!Number.isFinite(t) || t < 0) t = 0;
@@ -62,12 +73,15 @@ export function VideoPlayer({
   className = '',
   maxHeight = 520,
   label = 'Vídeo',
+  autoPlayInView = false,
 }: {
   src: string;
   gif?: boolean;
   className?: string;
   maxHeight?: number;
   label?: string;
+  /** toca sozinho e sem som quando aparece na tela (feed) */
+  autoPlayInView?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -92,6 +106,22 @@ export function VideoPlayer({
   const [scrubbing, setScrubbing] = useState(false);
   const [flash, setFlash] = useState<'fwd' | 'back' | null>(null);
   const [error, setError] = useState(false);
+  // autoplay: tocando sozinho e mudo; pausa feita pelo próprio player; pausa feita pela pessoa
+  const [autoMuted, setAutoMuted] = useState(false);
+  // proporção real do vídeo (largura/altura): a moldura se ajusta e não sobram tarjas pretas
+  const [ratio, setRatio] = useState<number | null>(null);
+  // player estreito (vídeo vertical, celular): barra de controles compacta
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < 420));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const autoRef = useRef(false);
+  const autoPausingRef = useRef(false);
+  const userPausedRef = useRef(false);
   const pipSupported = typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
 
   // preferências salvas
@@ -113,8 +143,19 @@ export function VideoPlayer({
     const onOther = (e: Event) => {
       if ((e as CustomEvent<string>).detail !== id.current) videoRef.current?.pause();
     };
+    // outro vídeo começou sozinho: este só para se também estava no modo automático
+    const onOtherAuto = (e: Event) => {
+      const v = videoRef.current;
+      if ((e as CustomEvent<string>).detail === id.current || !v || v.paused || !autoRef.current) return;
+      autoPausingRef.current = true;
+      v.pause();
+    };
     window.addEventListener(PLAY_EVENT, onOther);
-    return () => window.removeEventListener(PLAY_EVENT, onOther);
+    window.addEventListener(AUTO_EVENT, onOtherAuto);
+    return () => {
+      window.removeEventListener(PLAY_EVENT, onOther);
+      window.removeEventListener(AUTO_EVENT, onOtherAuto);
+    };
   }, [gif]);
 
   // fora da tela: pausa (vídeo) / toca só quando visível (GIF)
@@ -127,15 +168,43 @@ export function VideoPlayer({
         if (gif) {
           if (entry.isIntersecting) void v.play().catch(() => {});
           else v.pause();
-        } else if (!entry.isIntersecting && !v.paused && document.pictureInPictureElement !== v) {
+          return;
+        }
+        const ratio = entry.isIntersecting ? entry.intersectionRatio : 0;
+        if (document.pictureInPictureElement === v) return;
+        // autoplay mudo: quando a maior parte do vídeo está na tela
+        if (
+          autoPlayInView &&
+          ratio >= 0.6 &&
+          v.paused &&
+          !v.ended &&
+          !userPausedRef.current &&
+          (!soundPlayingId || soundPlayingId === id.current) &&
+          autoplayAllowed()
+        ) {
+          autoRef.current = true;
+          setAutoMuted(true);
+          v.muted = true;
+          void v.play().then(
+            () => window.dispatchEvent(new CustomEvent(AUTO_EVENT, { detail: id.current })),
+            () => {
+              autoRef.current = false;
+              setAutoMuted(false);
+            }
+          );
+          return;
+        }
+        // saiu da tela: pausa (o automático para antes, ao sair a maior parte)
+        if (!v.paused && (ratio === 0 || (autoRef.current && ratio < 0.35))) {
+          autoPausingRef.current = true;
           v.pause();
         }
       },
-      { threshold: gif ? 0.25 : 0.15 }
+      { threshold: gif ? 0.25 : [0, 0.15, 0.35, 0.6, 0.85] }
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [gif]);
+  }, [gif, autoPlayInView]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(document.fullscreenElement === wrapRef.current);
@@ -187,6 +256,15 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     v.muted = !v.muted;
+    if (!v.muted && autoRef.current) {
+      // ligou o som de um vídeo automático: vira reprodução normal (e para os outros com som)
+      autoRef.current = false;
+      setAutoMuted(false);
+      if (!v.paused) {
+        soundPlayingId = id.current;
+        window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id.current }));
+      }
+    }
     if (!v.muted && v.volume === 0) v.volume = 1;
     writePref('insight:video-muted', v.muted);
   }, []);
@@ -276,6 +354,12 @@ export function VideoPlayer({
     if (gif) return;
     const isTouch = (e.nativeEvent as PointerEvent).pointerType === 'touch' || matchMedia('(hover: none)').matches;
     if (!isTouch) {
+      // clique num vídeo que toca sozinho e mudo: liga o som em vez de pausar
+      if (autoRef.current && videoRef.current?.muted && !videoRef.current.paused) {
+        toggleMute();
+        poke();
+        return;
+      }
       toggle();
       return;
     }
@@ -320,6 +404,11 @@ export function VideoPlayer({
         if (playing) setShowUi(false);
       }}
       onClick={(e) => e.stopPropagation()}
+      style={
+        !fullscreen && ratio
+          ? { width: '100%', maxWidth: `min(100%, ${Math.round(maxHeight * ratio)}px)`, marginInline: 'auto', aspectRatio: String(ratio) }
+          : undefined
+      }
       className={`group/vp relative bg-black select-none outline-none focus-visible:ring-2 focus-visible:ring-accent ${
         fullscreen ? 'w-full h-full flex items-center' : ''
       } ${!uiVisible && playing ? 'cursor-none' : ''} ${className}`}
@@ -337,20 +426,36 @@ export function VideoPlayer({
         onPlay={() => {
           setPlaying(true);
           setStarted(true);
-          if (!gif) window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id.current }));
+          userPausedRef.current = false;
+          const v = videoRef.current;
+          // tocando sozinho e mudo não interrompe ninguém
+          if (!gif && !(autoRef.current && v?.muted)) {
+            autoRef.current = false;
+            setAutoMuted(false);
+            if (v && !v.muted) soundPlayingId = id.current;
+            window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id.current }));
+          }
           if (!gif && !started) window.dispatchEvent(new CustomEvent('insight-activity', { detail: { kind: 'video' } }));
           poke();
         }}
-        onPause={() => {
+        onPause={(e) => {
           setPlaying(false);
           setShowUi(true);
+          if (soundPlayingId === id.current) soundPlayingId = null;
+          // pausa que não veio do próprio player = a pessoa pausou: não volta a tocar sozinho
+          if (autoPausingRef.current) autoPausingRef.current = false;
+          else if (!e.currentTarget.ended) userPausedRef.current = true;
         }}
         onEnded={() => setShowUi(true)}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
         onCanPlay={() => setWaiting(false)}
         onError={() => setError(true)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget;
+          setDuration(v.duration);
+          if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
+        }}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           if (!scrubbing) setTime(e.currentTarget.currentTime);
@@ -362,8 +467,12 @@ export function VideoPlayer({
         onVolumeChange={(e) => {
           setVolume(e.currentTarget.volume);
           setMuted(e.currentTarget.muted);
+          if (!e.currentTarget.muted && autoRef.current) {
+            autoRef.current = false;
+            setAutoMuted(false);
+          }
         }}
-        className="w-full h-auto mx-auto object-contain block"
+        className={`w-full mx-auto object-contain block ${ratio && !fullscreen ? 'h-full' : 'h-auto'}`}
         style={{ maxHeight: fullscreen ? '100vh' : maxHeight }}
       />
 
@@ -395,6 +504,22 @@ export function VideoPlayer({
             >
               {flash === 'fwd' ? <RotateCw className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />} 10 s
             </span>
+          )}
+
+          {/* tocando sozinho sem som: atalho para ligar o som (como no X) */}
+          {autoMuted && playing && !uiVisible && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMute();
+              }}
+              aria-label="Ativar som"
+              title="Ativar som"
+              className="absolute bottom-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-black/65 text-white grid place-items-center hover:bg-black/80 transition-colors"
+            >
+              <VolumeX className="w-4 h-4" />
+            </button>
           )}
 
           {/* barra inferior */}
@@ -437,14 +562,14 @@ export function VideoPlayer({
               )}
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2 mt-0.5">
+            <div className={`flex items-center mt-0.5 min-w-0 ${narrow ? 'gap-0.5' : 'gap-1 sm:gap-2'}`}>
               <button type="button" onClick={toggle} aria-label={playing ? 'Pausar' : 'Reproduzir'} className="p-1.5 rounded-md hover:bg-white/15">
                 {playing ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white" />}
               </button>
-              <button type="button" onClick={() => seekBy(-10)} aria-label="Voltar 10 segundos" className="hidden sm:block p-1.5 rounded-md hover:bg-white/15">
+              <button type="button" onClick={() => seekBy(-10)} aria-label="Voltar 10 segundos" className={`${narrow ? 'hidden' : 'hidden sm:block'} p-1.5 rounded-md hover:bg-white/15`}>
                 <RotateCcw className="w-4 h-4" />
               </button>
-              <button type="button" onClick={() => seekBy(10)} aria-label="Avançar 10 segundos" className="hidden sm:block p-1.5 rounded-md hover:bg-white/15">
+              <button type="button" onClick={() => seekBy(10)} aria-label="Avançar 10 segundos" className={`${narrow ? 'hidden' : 'hidden sm:block'} p-1.5 rounded-md hover:bg-white/15`}>
                 <RotateCw className="w-4 h-4" />
               </button>
 
@@ -460,11 +585,11 @@ export function VideoPlayer({
                   value={muted ? 0 : volume}
                   onChange={(e) => setVol(Number(e.target.value))}
                   aria-label="Volume"
-                  className="hidden sm:block w-0 opacity-0 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:w-20 focus:opacity-100 transition-[width,opacity] duration-200 accent-white h-1 cursor-pointer"
+                  className={`${narrow ? 'hidden' : 'hidden sm:block'} w-0 opacity-0 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:w-20 focus:opacity-100 transition-[width,opacity] duration-200 accent-white h-1 cursor-pointer`}
                 />
               </div>
 
-              <span className="text-xs font-mono tabular-nums text-white/90 ml-1 whitespace-nowrap">
+              <span className={`font-mono tabular-nums text-white/90 whitespace-nowrap ${narrow ? 'text-[11px]' : 'text-xs ml-1'}`}>
                 {fmt(time)} <span className="text-white/50">/ {fmt(duration)}</span>
               </span>
 
@@ -495,7 +620,7 @@ export function VideoPlayer({
                   )}
                 </div>
                 {pipSupported && (
-                  <button type="button" onClick={togglePip} aria-label="Picture-in-picture" className="hidden sm:block p-1.5 rounded-md hover:bg-white/15">
+                  <button type="button" onClick={togglePip} aria-label="Picture-in-picture" className={`${narrow ? 'hidden' : 'hidden sm:block'} p-1.5 rounded-md hover:bg-white/15`}>
                     <PictureInPicture2 className="w-4 h-4" />
                   </button>
                 )}

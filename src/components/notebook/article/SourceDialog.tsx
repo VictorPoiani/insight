@@ -1,5 +1,7 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { SOURCE_TYPES, apaReference, abntReference, sourceType, type Source, type SourceAuthor, type SourceExtra, type SourceField, type SourceType } from '@/lib/notebook/sources';
@@ -72,7 +74,7 @@ export function SourceDialog({
   const preview = useMemo(() => ({ ...(f as Source), id: 'x', profile_id: '', created_at: '', updated_at: '', authors: f.authors.filter((a) => a.family.trim()) }), [f]);
 
   async function save() {
-    if (!f.title.trim()) return alert('Dê um título à fonte.');
+    if (!f.title.trim()) return notify('Dê um título à fonte.');
     setSaving(true);
     const clean: SourceInput = {
       ...f,
@@ -220,8 +222,8 @@ export function SourceDialog({
             {source && (
               <button
                 type="button"
-                onClick={() => {
-                  if (!confirm('Apagar esta fonte da sua biblioteca? Ela sai de todos os artigos.')) return;
+                onClick={async () => {
+                  if (!(await confirmDialog({ message: 'Apagar esta fonte da sua biblioteca? Ela sai de todos os artigos.', danger: true }))) return;
                   void sourcesApi.remove(source.id);
                   onClose();
                 }}

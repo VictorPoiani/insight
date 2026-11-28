@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookMarked, Copy, ListTree, MoreHorizontal, PanelRight, Pencil, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -182,7 +183,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
       }),
   };
 
-  const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => alert('Não foi possível copiar.'));
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => notify('Não foi possível copiar.'));
 
   // ------------------------------------------------------------ métricas
   const text = useMemo(() => mdToText(live.content || ''), [live.content]);
@@ -267,7 +268,7 @@ export function ArticleMode({ item, api, body }: { item: NotebookItem; api: Note
                       const cur = api.items[item.id] || live;
                       await exportArticleDocx(cur.title, cur.content, sourcesApi.sources, articleData(cur.data), cur.source_refs || []);
                     } catch (err) {
-                      alert(err instanceof Error ? `Não foi possível gerar o Word: ${err.message}` : 'Não foi possível gerar o Word.');
+                      notify(err instanceof Error ? `Não foi possível gerar o Word: ${err.message}` : 'Não foi possível gerar o Word.');
                     }
                     setExporting(false);
                   },

@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -281,11 +282,11 @@ export function ReplyComposer({
     if (!file || !loggedUser) return;
     const isVideo = file.type.startsWith('video/');
     if (!file.type.startsWith('image/') && !isVideo) {
-      alert('Escolha uma imagem, GIF ou vídeo.');
+      notify('Escolha uma imagem, GIF ou vídeo.');
       return;
     }
     if (isVideo && mediaCount >= MAX_MEDIA) {
-      alert(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
+      notify(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
       return;
     }
     const id = uid();
@@ -304,7 +305,7 @@ export function ReplyComposer({
         false
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Não foi possível enviar o arquivo.');
+      notify(err instanceof Error ? err.message : 'Não foi possível enviar o arquivo.');
     } finally {
       setUploading(null);
       setUploadLabel('');
@@ -313,7 +314,7 @@ export function ReplyComposer({
 
   function addGif(gif: { url: string; previewUrl: string }) {
     if (mediaCount >= MAX_MEDIA) {
-      alert(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
+      notify(`Até ${MAX_MEDIA} GIFs/vídeos por resposta.`);
       return;
     }
     insertAfter(focused?.id || blocks[blocks.length - 1].id, { id: uid(), type: 'gif', url: gif.url, previewUrl: gif.previewUrl }, false);

@@ -9,6 +9,7 @@
  * - desfazer/refazer, menus por alvo, barra flutuante da seleção;
  * - imagens enviadas sem perda para o R2 (aparecem na hora, sobem por trás).
  */
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookMarked, BringToFront, ChevronRight, ClipboardPaste, Copy, ExternalLink, FileText, Focus, Globe, Group, ImagePlus, LayoutGrid, LayoutTemplate, Lock, LockOpen, Maximize, Paperclip, Scissors, SendToBack, StickyNote, Trash2, Ungroup } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -350,7 +351,7 @@ export function CanvasStudio({
     try {
       pasteText(await navigator.clipboard.readText(), at);
     } catch {
-      alert('O navegador não liberou a área de transferência. Use Ctrl+V.');
+      notify('O navegador não liberou a área de transferência. Use Ctrl+V.');
     }
   };
 
@@ -361,13 +362,13 @@ export function CanvasStudio({
     const media = files.filter((f) => CANVAS_FILE.test(f.type));
     const texts = files.filter((f) => !f.type.startsWith('image/') && !CANVAS_FILE.test(f.type) && (CANVAS_TEXT.test(f.type) || CANVAS_TEXT.test(f.name)));
     const other = files.filter((f) => !imgs.includes(f) && !media.includes(f) && !texts.includes(f));
-    if (other.length) alert(`Este tipo de arquivo ainda não entra no canvas: ${other.map((f) => f.name).join(', ')}.`);
+    if (other.length) notify(`Este tipo de arquivo ainda não entra no canvas: ${other.map((f) => f.name).join(', ')}.`);
     let dy = 0;
     if (texts.length) {
       const made: CanvasNode[] = [];
       for (const [i, f] of texts.slice(0, 20).entries()) {
         if (f.size > 2_000_000) {
-          alert(`${f.name}: texto grande demais para um cartão.`);
+          notify(`${f.name}: texto grande demais para um cartão.`);
           continue;
         }
         const body = (await f.text()).replace(/\r\n/g, '\n').slice(0, 20000);
@@ -430,7 +431,7 @@ export function CanvasStudio({
       } else {
         void idbDel('blobs', blobKey(nodeId));
         silent((d) => ({ nodes: d.nodes.filter((n) => n.id !== nodeId), edges: d.edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId) }));
-        alert(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
+        notify(`${file.name}: ${err instanceof Error ? err.message : 'falha no envio.'}`);
       }
     } finally {
       inFlight.current.delete(nodeId);
@@ -542,7 +543,7 @@ export function CanvasStudio({
       const f = await fetchExternalImage(r.full, r.title);
       await addImages([f], at[0], at[1], r.credit, r.creditUrl);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Não foi possível trazer a imagem.');
+      notify(err instanceof Error ? err.message : 'Não foi possível trazer a imagem.');
     } finally {
       setUploads((u) => u - 1);
     }
@@ -1168,7 +1169,7 @@ export function CanvasStudio({
       );
     if (n.type === 'entry' && n.entryId && entries[n.entryId]) specific.push({ label: 'Abrir o verbete', icon: <BookMarked className="w-3.5 h-3.5" />, run: () => onOpenEntry?.(entries[n.entryId!]) });
     if (n.type === 'link' && n.url) specific.push({ label: n.meta ? 'Atualizar a prévia' : 'Buscar a prévia', run: () => {
-      clipPage(n.url!).then((m) => mapNodes(new Set([n.id]), (x) => ({ ...x, meta: { title: m.title, description: m.description, image: m.image, site: m.site }, height: Math.max(x.height, m.image ? 300 : 150) }))).catch((err) => alert(err instanceof Error ? err.message : 'Falhou.'));
+      clipPage(n.url!).then((m) => mapNodes(new Set([n.id]), (x) => ({ ...x, meta: { title: m.title, description: m.description, image: m.image, site: m.site }, height: Math.max(x.height, m.image ? 300 : 150) }))).catch((err) => notify(err instanceof Error ? err.message : 'Falhou.'));
     } });
     const info = n.type === 'image' ? [n.mime?.replace('image/', '').toUpperCase(), formatSize(n.bytes), n.natW && `${n.natW} × ${n.natH}`].filter(Boolean).join(' · ') : '';
     menu.open(

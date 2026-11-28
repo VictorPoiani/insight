@@ -1,5 +1,8 @@
 'use client';
 
+import { showCopyLink } from '@/lib/ui/feedback';
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify as toast } from '@/lib/ui/feedback';
 import { moderateNow, moderationErrorMessage } from '@/components/moderation/ModerationHost';
 import { loginHref } from '@/lib/account/loginRedirect';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -228,7 +231,7 @@ export default function PostDiscussionPage() {
     const { data, error } = await supabase.from('replies').insert(payload).select().single();
 
     if (error || !data) {
-      alert(moderationErrorMessage(error) || 'Erro ao publicar resposta: ' + (error?.message || 'desconhecido'));
+      toast(moderationErrorMessage(error) || 'Erro ao publicar resposta: ' + (error?.message || 'desconhecido'));
       return false;
     }
 
@@ -306,7 +309,7 @@ export default function PostDiscussionPage() {
 
       if (tableError) {
         applyLocal(wasLiked);
-        alert('Não foi possível registrar a curtida agora. Tente novamente.');
+        toast('Não foi possível registrar a curtida agora. Tente novamente.');
       }
     } finally {
       pendingLikes.current.delete(replyId);
@@ -325,11 +328,11 @@ export default function PostDiscussionPage() {
       node.descendantsCount > 0
         ? `Excluir esta resposta e as ${node.descendantsCount} respostas abaixo dela?`
         : 'Excluir esta resposta?';
-    if (!confirm(msg)) return;
+    if (!(await confirmDialog({ message: msg }))) return;
 
     const { error } = await supabase.from('replies').delete().eq('id', node.id);
     if (error) {
-      alert('Erro ao excluir: ' + error.message);
+      toast('Erro ao excluir: ' + error.message);
       return;
     }
 
@@ -347,7 +350,7 @@ export default function PostDiscussionPage() {
     try {
       await navigator.clipboard.writeText(url);
     } catch {
-      prompt('Copie o link da resposta:', url);
+      void showCopyLink(url, 'Copie o link da resposta');
     }
   }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { askText } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Plus, Search } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -328,7 +330,7 @@ function Overview({
                       setConverting(n.id);
                       const made = await convertWorldNote(w, project, n);
                       setConverting(null);
-                      alert(made ? `${made} ${made === 1 ? 'verbete criado' : 'verbetes criados'} no Codex.` : 'Nenhum item em lista com nome em negrito foi encontrado.');
+                      notify(made ? `${made} ${made === 1 ? 'verbete criado' : 'verbetes criados'} no Codex.` : 'Nenhum item em lista com nome em negrito foi encontrado.');
                     }}
                     className="text-[12px] font-semibold text-[var(--nb-ink-2)] hover:text-[var(--nb-ink)] disabled:opacity-50"
                   >
@@ -464,7 +466,7 @@ function Codex({
               {
                 label: 'Nova subcategoria',
                 run: async () => {
-                  const name = prompt('Nome da subcategoria');
+                  const name = await askText({ title: 'Nova subcategoria', message: 'Nome da subcategoria:', confirmLabel: 'Criar' });
                   if (name?.trim()) await w.codex.create({ project_id: project.id, parent_id: c.id, name, glyph: c.glyph, kind: c.kind, fields: c.fields });
                 },
               },
@@ -524,7 +526,7 @@ function Codex({
           type="button"
           className="nb-codex-addcat"
           onClick={async () => {
-            const name = prompt('Nome da nova categoria');
+            const name = await askText({ title: 'Nova categoria', message: 'Nome da nova categoria:', confirmLabel: 'Criar' });
             if (name?.trim()) {
               const c = await w.codex.create({ project_id: project.id, name, glyph: 'book', kind: 'conceito', fields: [{ key: 'tipo', label: 'Tipo', type: 'text' }] });
               if (c) onCat(c.id);

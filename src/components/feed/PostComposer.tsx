@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useAutoFocusMode } from '@/lib/useAutoFocusMode';
 import { PanZoomSurface, boundsFromPercent } from '@/components/canvas/PanZoom';
 import { MINDMAP_WORLD } from '@/components/canvas/MindMapViewer';
@@ -1322,7 +1323,7 @@ export function PostComposer({
     e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Selecione um arquivo de imagem válido.');
+      notify('Selecione um arquivo de imagem válido.');
       return;
     }
 
@@ -1341,7 +1342,7 @@ export function PostComposer({
       });
       setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
     } catch (err) {
-      alert(uploadErrorMessage(err, 'Erro ao enviar imagem.'));
+      notify(uploadErrorMessage(err, 'Erro ao enviar imagem.'));
     } finally {
       endUpload();
     }
@@ -1355,14 +1356,14 @@ export function PostComposer({
     const all = Array.from(fileList);
     const files = all.filter((f) => f.type.startsWith('image/'));
     if (!files.length) {
-      alert('Selecione arquivos de imagem válidos.');
+      notify('Selecione arquivos de imagem válidos.');
       return;
     }
     if (room <= 0) {
-      alert(`O carrossel aceita até ${CAROUSEL_MAX} fotos.`);
+      notify(`O carrossel aceita até ${CAROUSEL_MAX} fotos.`);
       return;
     }
-    if (files.length > room) alert(`O carrossel aceita até ${CAROUSEL_MAX} fotos: vão entrar só as ${room} primeiras.`);
+    if (files.length > room) notify(`O carrossel aceita até ${CAROUSEL_MAX} fotos: vão entrar só as ${room} primeiras.`);
     const queue = files.slice(0, room);
 
     let budget = remainingBytes;
@@ -1392,7 +1393,7 @@ export function PostComposer({
         );
       }
     } catch (err) {
-      alert(uploadErrorMessage(err, 'Erro ao enviar foto do carrossel.'));
+      notify(uploadErrorMessage(err, 'Erro ao enviar foto do carrossel.'));
     } finally {
       endUpload();
     }
@@ -1433,7 +1434,7 @@ export function PostComposer({
     const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
 
     if (!isVideo && !isGif) {
-      alert('Selecione um arquivo de vídeo (MP4/WebM/MOV) ou GIF válido.');
+      notify('Selecione um arquivo de vídeo (MP4/WebM/MOV) ou GIF válido.');
       return;
     }
 
@@ -1454,7 +1455,7 @@ export function PostComposer({
       });
       setCompressionBadges((prev) => ({ ...prev, [blockId]: compressionBadge(result) }));
     } catch (err) {
-      alert(uploadErrorMessage(err, 'Erro ao processar vídeo/GIF.'));
+      notify(uploadErrorMessage(err, 'Erro ao processar vídeo/GIF.'));
     } finally {
       endUpload();
     }
@@ -1504,7 +1505,7 @@ export function PostComposer({
         })
       );
     } catch (err) {
-      alert(uploadErrorMessage(err, 'Erro ao carregar mídia na Cloudflare R2'));
+      notify(uploadErrorMessage(err, 'Erro ao carregar mídia na Cloudflare R2'));
     } finally {
       endUpload();
     }
@@ -1520,7 +1521,7 @@ export function PostComposer({
     if (!file) return;
 
     if (file.size > remainingBytes) {
-      alert(
+      notify(
         `O arquivo tem ${formatBytes(file.size)} e restam ${formatBytes(remainingBytes)} de anexos neste post (${viewerTier.name}).`
       );
       return;
@@ -1544,7 +1545,7 @@ export function PostComposer({
         mediaBytes: res.compressedSize,
       });
     } catch (err) {
-      alert(uploadErrorMessage(err, 'Erro ao anexar arquivo.'));
+      notify(uploadErrorMessage(err, 'Erro ao anexar arquivo.'));
     } finally {
       endUpload();
     }
@@ -1684,7 +1685,7 @@ export function PostComposer({
     e.preventDefault();
     if (!isAdmin || isSubmitting) return;
     if (overQuota) {
-      alert(
+      notify(
         `Os anexos deste post somam ${formatBytes(usedBytes)} e o limite do seu nível (${viewerTier.name}) é ${formatBytes(uploadLimit)}. Remova alguma mídia para publicar.`
       );
       return;
@@ -1742,9 +1743,10 @@ export function PostComposer({
     };
 
     if (isEditMode && editingPost) {
+      const editedAt = new Date().toISOString();
       let { data: updatedData, error } = await supabase
         .from('posts')
-        .update({ ...basePayload, visibility })
+        .update({ ...basePayload, visibility, edited_at: editedAt })
         .eq('id', editingPost.id)
         .select()
         .single();
@@ -1752,7 +1754,7 @@ export function PostComposer({
       if (error && error.message?.includes('visibility')) {
         const retry = await supabase
           .from('posts')
-          .update(basePayload)
+          .update({ ...basePayload, edited_at: editedAt })
           .eq('id', editingPost.id)
           .select()
           .single();
@@ -1769,7 +1771,7 @@ export function PostComposer({
         const editedId = (updatedData as Post).id || editingPost?.id;
         if (editedId) void moderateNow('post', editedId);
       } else {
-        alert(
+        notify(
           error?.message?.includes('post_media_quota_exceeded')
             ? `Os anexos passam do limite de ${formatBytes(uploadLimit)} por post do seu nível.`
             : moderationErrorMessage(error) || 'Erro ao guardar alterações: ' + (error?.message || 'Erro desconhecido')
@@ -1832,7 +1834,7 @@ export function PostComposer({
       if (createdPost?.id) onPublished?.(createdPost.id);
       onPostCreated?.();
     } else {
-      alert(moderationErrorMessage(error) || 'Erro ao publicar insight: ' + error.message);
+      notify(moderationErrorMessage(error) || 'Erro ao publicar insight: ' + error.message);
     }
   }
 

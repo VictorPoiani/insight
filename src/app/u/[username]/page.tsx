@@ -1,5 +1,7 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -228,18 +230,18 @@ function UserProfileContent() {
   async function handleStaffDeleteProfile() {
     if (!profile || !isStaff) return;
     if (profile.id === FOUNDER_PROFILE_ID) {
-      alert('O perfil fundador não pode ser removido.');
+      notify('O perfil fundador não pode ser removido.');
       return;
     }
 
-    const confirmed = window.confirm(
-      `[MODERAÇÃO DEV] Tem certeza que deseja EXCLUIR permanentemente o perfil @${profile.username} e todas as suas publicações?`
-    );
+    const confirmed = await confirmDialog({ danger: true, message:
+      `[MODERAÇÃO DEV] Tem certeza que deseja EXCLUIR permanentemente o perfil @${profile.username} e todas as suas publicações?`,
+    });
     if (!confirmed) return;
 
     const { error } = await supabase.from('profiles').delete().eq('id', profile.id);
     if (error) {
-      alert('Erro ao remover perfil: ' + error.message);
+      notify('Erro ao remover perfil: ' + error.message);
       return;
     }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -50,7 +51,7 @@ function NitroStatusCard() {
     entitlement.source === 'subscription' && (viewer?.nitro_status === 'active' || viewer?.nitro_status === 'past_due');
 
   async function cancel() {
-    if (!confirm('Cancelar a assinatura do Nitro? Você continua com tudo até o fim do período já pago.')) return;
+    if (!(await confirmDialog({ message: 'Cancelar a assinatura do Nitro? Você continua com tudo até o fim do período já pago.', danger: true }))) return;
     setCanceling(true);
     const res = await fetch('/api/nitro/cancel', { method: 'POST' }).catch(() => null);
     const data = res ? await res.json().catch(() => ({})) : {};

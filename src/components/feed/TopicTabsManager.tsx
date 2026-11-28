@@ -1,5 +1,7 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { sanitizeUserHtml } from '@/lib/security/sanitizeHtml';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
@@ -574,7 +576,7 @@ export function TopicTabsManager({
       setBannerUrl(res.publicUrl);
       setBannerR2Key(res.r2Key || null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem de capa.');
+      notify(err instanceof Error ? err.message : 'Erro ao enviar imagem de capa.');
     } finally {
       setUploadingBanner(false);
     }
@@ -668,7 +670,7 @@ export function TopicTabsManager({
     setSaving(false);
 
     if (error || !data) {
-      alert(
+      notify(
         error?.message?.includes('topic_limit_reached')
           ? limitMessage
           : 'Erro ao criar tópico: ' + (error?.message || 'Erro desconhecido')
@@ -715,9 +717,7 @@ export function TopicTabsManager({
   async function handleDeleteTopic(topicToDelete: FeedTabItem) {
     if (topicToDelete.isDefault) return;
 
-    const confirmed = confirm(
-      `Excluir a página "${topicToDelete.label}" (#${topicToDelete.tag})? Os posts com essa tag continuarão salvos no feed Principal.`
-    );
+    const confirmed = (await confirmDialog({ message: `Excluir a página "${topicToDelete.label}" (#${topicToDelete.tag})? Os posts com essa tag continuarão salvos no feed Principal.`, danger: true }));
     if (!confirmed) return;
 
     if (topicToDelete.bannerR2Key) {
@@ -739,7 +739,7 @@ export function TopicTabsManager({
         onSelectTab(baseDefaultTabs[0]);
       }
     } else {
-      alert('Erro ao excluir tópico: ' + error.message);
+      notify('Erro ao excluir tópico: ' + error.message);
     }
   }
 
@@ -758,7 +758,7 @@ export function TopicTabsManager({
                   type="button"
                   onClick={() => {
                     if (isDev) {
-                      alert(`A aba "${tab.label}" está atualmente em desenvolvimento.`);
+                      notify(`A aba "${tab.label}" está atualmente em desenvolvimento.`);
                       return;
                     }
                     if (tab.id !== currentTab.id) {
@@ -828,7 +828,7 @@ export function TopicTabsManager({
               type="button"
               onClick={() => {
                 if (!canCreateTopics) {
-                  alert(viewer ? limitMessage : 'Entre na sua conta para criar tópicos.');
+                  notify(viewer ? limitMessage : 'Entre na sua conta para criar tópicos.');
                   return;
                 }
                 setSelectedTemplate(null);

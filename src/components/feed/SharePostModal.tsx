@@ -1,5 +1,6 @@
 'use client';
 
+import { showCopyLink } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Download, Link2, Lock, Share2, X } from 'lucide-react';
 import { Post, Profile } from '@/types/database';
@@ -192,7 +193,7 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shortPath,
       }
       return true;
     } catch {
-      if (!silent) prompt('Copie o link:', shareUrl);
+      if (!silent) void showCopyLink(shareUrl);
       return false;
     }
   }
@@ -387,7 +388,7 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shortPath,
                             setStoryCopied(true);
                             setTimeout(() => setStoryCopied(false), 2000);
                           } catch {
-                            prompt('Copie o link:', storyUrl);
+                            void showCopyLink(storyUrl);
                           }
                         }}
                         className="mt-1.5 w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-surface border border-border text-left"

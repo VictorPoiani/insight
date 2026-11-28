@@ -1,5 +1,8 @@
 'use client';
 
+import { askReport } from '@/lib/ui/feedback';
+import { ask as confirmDialog } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { NsfwGate } from '@/components/moderation/NsfwGate';
 import { ModerationBanner } from '@/components/moderation/ModerationBanner';
 import { moderateNow } from '@/components/moderation/ModerationHost';
@@ -183,6 +186,7 @@ export function PostCard({
   const [postSpotifyId, setPostSpotifyId] = useState<string | null>(
     post.spotify_track_id || null
   );
+  const [editedAt, setEditedAt] = useState<string | null>(post.edited_at || null);
 
   // Enquetes
   const [votedOptions, setVotedOptions] = useState<Record<string, string[]>>({});
@@ -228,6 +232,7 @@ export function PostCard({
     setPostVisibility(resolvePostVisibility(post, nextBlocks));
     setPostImageUrl(post.image_url);
     setPostSpotifyId(post.spotify_track_id || null);
+    setEditedAt(post.edited_at || null);
     setLikes(post.likes_count || 0);
     setReposts(post.reposts_count || 0);
     setRepliesCount(post.replies_count || 0);
@@ -460,7 +465,7 @@ export function PostCard({
       if (error || !data) {
         setBlocksState(blocksState);
         setVotedOptions(votedOptions);
-        alert('Não foi possível registrar seu voto. Tente novamente.');
+        notify('Não foi possível registrar seu voto. Tente novamente.');
         return;
       }
 
@@ -560,9 +565,7 @@ export function PostCard({
       return;
     }
 
-    const reason = prompt(
-      'Descreva o motivo da denúncia desta publicação (ex: spam, ofensa, conteúdo impróprio):'
-    );
+    const reason = await askReport();
     if (!reason || !reason.trim()) return;
 
     const { error } = await supabase.from('reports').insert({
@@ -573,15 +576,15 @@ export function PostCard({
     });
 
     if (!error) {
-      alert('Denúncia enviada para a Equipe de Moderação do Insight.');
+      notify('Denúncia enviada para a Equipe de Moderação do Insight.', 'success');
     } else {
-      alert('Erro ao enviar denúncia: ' + error.message);
+      notify('Erro ao enviar denúncia: ' + error.message);
     }
   }
 
   async function handleDelete() {
     if (!isAdmin) return;
-    if (!confirm('Excluir este Insight? Esta ação não pode ser desfeita.')) return;
+    if (!(await confirmDialog({ message: 'Excluir este Insight? Esta ação não pode ser desfeita.', danger: true }))) return;
 
     for (const blk of blocksState) {
       const keys = [blk.r2Key, ...(blk.carouselImages || []).map((img) => img.r2Key)].filter(Boolean);
@@ -1202,7 +1205,17 @@ export function PostCard({
                 <CosmeticTag profile={author} />
               </span>
             </div>
-            <PostTime iso={post.created_at} className="text-[11px] sm:text-xs text-muted block truncate" />
+            <span className="flex items-center gap-1 text-[11px] sm:text-xs text-muted min-w-0">
+              <PostTime iso={post.created_at} className="truncate" />
+              {editedAt && (
+                <span
+                  className="shrink-0"
+                  title={`Editado em ${new Date(editedAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                >
+                  · editado
+                </span>
+              )}
+            </span>
           </div>
         </Link>
         </ProfileHoverCard>
@@ -1281,6 +1294,7 @@ export function PostCard({
               setPostVisibility(resolvePostVisibility(updated, nextBlocks));
               setPostImageUrl(updated.image_url);
               setPostSpotifyId(updated.spotify_track_id || null);
+              setEditedAt(updated.edited_at || new Date().toISOString());
               setIsEditing(false);
             }}
           />
@@ -1372,12 +1386,14 @@ export function PostCard({
       {postTags && postTags.length > 0 && !isEditing && (
         <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
           {postTags.map((tag) => (
-            <span
+            <Link
               key={tag}
-              className="px-2 py-0.5 rounded bg-elevated border border-border font-mono text-[11px] text-accent"
+              href={`/?tag=${encodeURIComponent(tag.toLowerCase())}`}
+              title={`Ver Insights com #${tag}`}
+              className="px-2 py-0.5 rounded bg-elevated border border-border font-mono text-[11px] text-accent hover:border-accent/60 hover:bg-accent/10 transition-colors"
             >
               #{tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}

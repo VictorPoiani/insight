@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, CornerDownRight, Eye, EyeOff, Hand, ImagePlus, Layers, Loader2, Maximize, MapPin, Minus, Pentagon, Plus, Route as RouteIcon, Trash2, X } from 'lucide-react';
 import { useContext } from 'react';
@@ -324,7 +325,7 @@ export function MapStudio({
       );
       setTimeout(fit, 50);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+      notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
     }
     setUploading(false);
   }

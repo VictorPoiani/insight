@@ -1,5 +1,7 @@
 'use client';
 
+import { askText } from '@/lib/ui/feedback';
+import { notify } from '@/lib/ui/feedback';
 import { applyWarmOverlay, PREFS_EVENT } from '@/lib/nightLight';
 
 import { autoFocusModeEnabled, setAutoFocusModeEnabled } from '@/lib/useAutoFocusMode';
@@ -648,30 +650,44 @@ export default function ConfigPage() {
   async function handleSelfDeleteAccount() {
     if (!myProfile) return;
     if (myProfile.id === FOUNDER_PROFILE_ID) {
-      alert('A conta principal do fundador não pode ser autoexcluída.');
+      notify('A conta principal do fundador não pode ser autoexcluída.');
       return;
     }
 
-    const confirmation = prompt(
-      `ATENÇÃO: Para excluir permanentemente seu perfil (@${myProfile.username}) e todas as suas publicações, digite EXCLUIR MINHA CONTA:`
-    );
-    if (confirmation !== 'EXCLUIR MINHA CONTA') return;
-    const pw = prompt('Por segurança, digite sua senha atual:');
+    const confirmation = await askText({
+      title: 'Excluir minha conta',
+      message: `Isto apaga para sempre o perfil @${myProfile.username} e todas as suas publicações.\n\nPara confirmar, digite EXCLUIR MINHA CONTA:`,
+      placeholder: 'EXCLUIR MINHA CONTA',
+      confirmLabel: 'Continuar',
+      danger: true,
+    });
+    if (confirmation === null) return;
+    if (confirmation.trim().toUpperCase() !== 'EXCLUIR MINHA CONTA') {
+      notify('Texto de confirmação diferente: a conta não foi excluída.', 'error');
+      return;
+    }
+    const pw = await askText({
+      title: 'Confirme sua senha',
+      message: 'Por segurança, digite sua senha atual:',
+      password: true,
+      confirmLabel: 'Excluir conta',
+      danger: true,
+    });
     if (!pw) return;
 
     const res = await fetch('/api/account/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw, confirmation }),
+      body: JSON.stringify({ password: pw, confirmation: 'EXCLUIR MINHA CONTA' }),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(d.error || 'Erro ao excluir a conta.');
+      notify(d.error || 'Erro ao excluir a conta.');
       return;
     }
 
     await supabase.auth.signOut();
-    alert('Sua conta e seus dados foram removidos da plataforma.');
+    notify('Sua conta e seus dados foram removidos da plataforma.');
     router.push('/');
     router.refresh();
   }
@@ -699,7 +715,7 @@ export default function ConfigPage() {
       } else {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-          alert('Permita as notificações no cadeado da barra de endereços do navegador.');
+          notify('Permita as notificações no cadeado da barra de endereços do navegador.');
           setLoadingPush(false);
           return;
         }
@@ -725,7 +741,7 @@ export default function ConfigPage() {
         setPushSubscribed(true);
       }
     } catch (err: any) {
-      alert(err?.message || 'Erro ao configurar notificações no navegador.');
+      notify(err?.message || 'Erro ao configurar notificações no navegador.');
     } finally {
       setLoadingPush(false);
     }
@@ -743,7 +759,7 @@ export default function ConfigPage() {
     if (!cleanEmail || savingSub) return;
 
     if (notifyMode === 'tags' && subTags.length === 0) {
-      alert('Selecione pelo menos uma hashtag de seu interesse.');
+      notify('Selecione pelo menos uma hashtag de seu interesse.');
       return;
     }
 
@@ -757,7 +773,7 @@ export default function ConfigPage() {
 
     if (error) {
       setSavingSub(false);
-      alert('Erro ao salvar preferências: ' + error.message);
+      notify('Erro ao salvar preferências: ' + error.message);
       return;
     }
 

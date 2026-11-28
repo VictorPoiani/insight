@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { usePresence, lastSeenLabel } from '@/components/presence/PresenceProvider';
 import { ShareProfileModal } from '@/components/feed/SharePostModal';
 import { FollowListModal, type FollowTab } from '@/components/feed/FollowListModal';
@@ -876,7 +877,7 @@ export function ProfileHeader({
       } else {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-          alert(
+          notify(
             'Permissão negada no navegador. Para receber alertas instantâneos, permita as notificações no cadeado da barra de endereços.'
           );
           setLoadingPush(false);
@@ -912,7 +913,7 @@ export function ProfileHeader({
         await refreshTotalFollowersCount();
       }
     } catch (err: any) {
-      alert(err?.message || 'Não foi possível configurar o Web Push.');
+      notify(err?.message || 'Não foi possível configurar o Web Push.');
     } finally {
       setLoadingPush(false);
     }
@@ -936,12 +937,12 @@ export function ProfileHeader({
       });
       const data = await res.json();
       if (data.sent === 0) {
-        alert(
+        notify(
           'Nenhum dispositivo inscrito ainda. Clique em "Ativar com 1 Clique" ao lado para inscrever o seu dispositivo e testar!'
         );
       }
     } catch {
-      alert('Erro ao disparar notificação de teste.');
+      notify('Erro ao disparar notificação de teste.');
     } finally {
       setTestingPush(false);
     }
@@ -970,7 +971,7 @@ export function ProfileHeader({
       setExpandStatusMenu(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao salvar status: ' + error.message);
+      notify('Erro ao salvar status: ' + error.message);
     }
   }
 
@@ -1006,7 +1007,7 @@ export function ProfileHeader({
     setSavingLinks(false);
 
     if (error) {
-      alert('Erro ao guardar links: ' + error.message);
+      notify('Erro ao guardar links: ' + error.message);
       return;
     }
 
@@ -1063,7 +1064,7 @@ export function ProfileHeader({
       const res = await uploadMediaToInsight(file, { budgetBytes: 50 * 1024 * 1024, asImage: file.type !== 'image/gif' });
       finalPublicUrl = res.publicUrl;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
+      notify(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
       return;
     }
 
@@ -1086,7 +1087,7 @@ export function ProfileHeader({
       const res = await setMyBirthday(profile.id, birthday);
       if (!res.ok) {
         setSavingProfile(false);
-        alert(res.error);
+        notify(res.error || "Não foi possível salvar o aniversário.");
         return;
       }
     }
@@ -1110,7 +1111,7 @@ export function ProfileHeader({
       setExpandEdit(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao atualizar perfil: ' + error.message);
+      notify('Erro ao atualizar perfil: ' + error.message);
     }
   }
 
@@ -1143,7 +1144,7 @@ export function ProfileHeader({
       setExpandTags(false);
       if (onProfileUpdated) onProfileUpdated();
     } else {
-      alert('Erro ao salvar tags: ' + error.message);
+      notify('Erro ao salvar tags: ' + error.message);
     }
   }
 
@@ -1171,7 +1172,7 @@ export function ProfileHeader({
 
     if (error) {
       setSubmittingSub(false);
-      alert('Erro ao realizar inscrição: ' + error.message);
+      notify('Erro ao realizar inscrição: ' + error.message);
       return;
     }
 

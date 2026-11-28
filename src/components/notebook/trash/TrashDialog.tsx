@@ -6,6 +6,7 @@
  * Filtra por projeto, mostra quantos dias faltam e permite restaurar ou
  * excluir para sempre.
  */
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookMarked, FolderTree, Library, RotateCcw, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -91,13 +92,13 @@ export function TrashDialog({ api, profileId, onRestoredEntries, onRestoredCodex
     await load();
   };
   const destroy = async (r: Row, ask = true) => {
-    if (ask && !confirm(`Excluir “${r.title}” para sempre? Não dá para desfazer.`)) return;
+    if (ask && !(await confirmDialog({ message: `Excluir “${r.title}” para sempre? Não dá para desfazer.`, danger: true }))) return;
     if (tab === 'notas') await api.destroy(r.id);
     else await supabase.from(table[tab]).delete().eq('id', r.id);
     if (tab !== 'notas') await load();
   };
   const emptyAll = async () => {
-    if (!rows.length || !confirm(`Excluir para sempre ${rows.length} ${rows.length === 1 ? 'item' : 'itens'} desta lista? Não dá para desfazer.`)) return;
+    if (!rows.length || !(await confirmDialog({ message: `Excluir para sempre ${rows.length} ${rows.length === 1 ? 'item' : 'itens'} desta lista? Não dá para desfazer.`, danger: true }))) return;
     setBusy(true);
     for (const r of rows) await destroy(r, false);
     setBusy(false);

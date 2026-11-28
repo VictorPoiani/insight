@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useState } from 'react';
 import { Heart, MessageCircle, UserPlus, Repeat2, FileText, BarChart3, Loader2, Check, AtSign } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -55,7 +56,7 @@ export function NotificationSettings({ profileId }: { profileId: string }) {
     setSaving(null);
     if (error) {
       setPrefs(prefs);
-      alert('Não foi possível salvar a preferência agora.');
+      notify('Não foi possível salvar a preferência agora.');
       return;
     }
     setSavedAt(Date.now());

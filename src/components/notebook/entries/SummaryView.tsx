@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookMarked, ImagePlus, GripVertical, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { ENTRY_CATEGORIES, ENTRY_KINDS, entryLook, type EntryKind, type NotebookEntry } from '@/lib/notebook/entries';
@@ -359,11 +360,11 @@ function EntryCard({
               type="button"
               aria-label="Apagar menção"
               title="Apagar"
-              onClick={() => {
+              onClick={async () => {
                 const msg = usedIn.length
                   ? `Esta menção aparece em ${usedIn.length} ${usedIn.length === 1 ? 'texto' : 'textos'}. Os trechos continuam, mas o balão some. Apagar?`
                   : 'Apagar esta menção do Sumário?';
-                if (confirm(msg)) void entriesApi.remove(entry.id);
+                if ((await confirmDialog({ message: msg }))) void entriesApi.remove(entry.id);
               }}
               className="p-1.5 rounded-md text-[var(--nb-ink-3)] hover:text-red-400"
             >

@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, GitCompareArrows, Loader2, MoreHorizontal, Pencil, RotateCcw, Trash2, X, Eye, Undo2 } from 'lucide-react';
@@ -56,7 +57,7 @@ export function VersionHistory({ item, api }: { item: NotebookItem; api: Noteboo
   }
 
   async function restoreAll(r: NotebookRevision) {
-    if (!confirm(`Restaurar a versão ${r.label ? `“${r.label}”` : `de ${fmt(r.created_at)}`}? O texto atual é guardado antes como instantâneo.`)) return;
+    if (!(await confirmDialog({ message: `Restaurar a versão ${r.label ? `“${r.label}”` : `de ${fmt(r.created_at)}`}? O texto atual é guardado antes como instantâneo.` }))) return;
     await api.flushAll();
     await api.saveRevisionNow(item.id, 'Antes de restaurar');
     api.update(item.id, { title: r.title, content: r.content, blocks: r.blocks, data: (r.data as NotebookItem['data']) || item.data });
@@ -78,7 +79,7 @@ export function VersionHistory({ item, api }: { item: NotebookItem; api: Noteboo
           icon: <Trash2 className="w-3.5 h-3.5" />,
           danger: true,
           run: async () => {
-            if (!confirm('Apagar esta versão do histórico?')) return;
+            if (!(await confirmDialog({ message: 'Apagar esta versão do histórico?', danger: true }))) return;
             await api.deleteRevision(r.id);
             await refresh();
           },

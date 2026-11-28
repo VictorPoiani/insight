@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { NitroBadge } from '@/components/nitro/Cosmetics';
 import { displaysNitro } from '@/lib/nitro/entitlement';
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -270,7 +271,7 @@ export default function NotificationsPage() {
     if (!myProfile || selected.size === 0) return;
     const ids = Array.from(selected);
     const label = ids.length === 1 ? 'esta notificação' : `estas ${ids.length} notificações`;
-    if (!window.confirm(`Apagar ${label}?`)) return;
+    if (!(await confirmDialog({ message: `Apagar ${label}?`, danger: true }))) return;
     setNotifications((prev) => prev.filter((n) => !selected.has(n.id)));
     exitSelectMode();
     for (let i = 0; i < ids.length; i += 100) {

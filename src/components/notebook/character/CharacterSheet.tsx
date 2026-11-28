@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ImagePlus, Loader2, NotebookPen, Plus, SkipForward, Trash2, X } from 'lucide-react';
 import type { NotebookItem } from '@/lib/notebook/types';
@@ -235,7 +236,7 @@ function Essence({ ch, save, item, api, role, level }: SecProps & Props) {
       await api.registerAsset(item.id, res.r2Key, res.publicUrl);
       save({ avatarUrl: res.publicUrl, avatarR2Key: res.r2Key }, 0);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+      notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
     }
     setUploading(false);
   }

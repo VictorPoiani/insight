@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -623,10 +624,10 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
       try {
         const r = await fetch('/api/notebook/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: full.id, mode: 'prepare' }) });
         const d = await r.json().catch(() => ({}));
-        if (!r.ok) return void alert(d?.error || 'Não foi possível preparar a publicação.');
+        if (!r.ok) return void notify(d?.error || 'Não foi possível preparar a publicação.');
         pub = d;
       } catch {
-        return void alert('Sem conexão: a publicação é preparada no servidor.');
+        return void notify('Sem conexão: a publicação é preparada no servidor.');
       }
       if (!pub) return;
       const uid = () => Math.random().toString(36).slice(2);
@@ -717,7 +718,7 @@ function NotebookWorkspace({ viewer }: { viewer: Viewer }) {
         await api.registerAsset(null, res.r2Key, res.publicUrl);
         return res.publicUrl;
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+        notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
         return null;
       }
     },

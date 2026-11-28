@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ShieldCheck, Loader2, Check, EyeOff, Ban, Trash2, ArrowUpRight, RefreshCw, Lock } from 'lucide-react';
@@ -84,7 +85,7 @@ export default function ModerationPage() {
   }, [isStaff, load]);
 
   async function decide(it: Item, decision: 'approve' | 'approve_nsfw' | 'block' | 'delete') {
-    if (decision === 'delete' && !window.confirm('Excluir definitivamente este conteúdo?')) return;
+    if (decision === 'delete' && !(await confirmDialog({ message: 'Excluir definitivamente este conteúdo?', danger: true }))) return;
     setBusy(`${it.kind}:${it.id}`);
     await fetch('/api/moderation/decide', {
       method: 'POST',

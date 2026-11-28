@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { writeOrQueue } from './localStore';
@@ -56,7 +57,7 @@ export function useCodex(profileId: string | null) {
         .select(COLS)
         .single();
       if (error || !data) {
-        alert('Não foi possível criar a categoria.');
+        notify('Não foi possível criar a categoria.');
         return null;
       }
       const row = data as CodexCategory;
@@ -100,7 +101,7 @@ export function useCodex(profileId: string | null) {
     async (id: string, patch: Partial<Pick<CodexCategory, 'name' | 'glyph' | 'kind' | 'fields' | 'position' | 'parent_id'>>) => {
       setCats((p) => (p[id] ? { ...p, [id]: { ...p[id], ...patch } } : p));
       const { error } = await writeOrQueue(supabase, profileId, { table: 'notebook_codex_categories', op: 'update', id, row: patch as Record<string, unknown> });
-      if (error) alert('Não foi possível salvar a categoria.');
+      if (error) notify('Não foi possível salvar a categoria.');
     },
     [supabase, profileId]
   );

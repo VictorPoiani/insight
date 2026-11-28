@@ -1,5 +1,6 @@
 'use client';
 
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ImagePlus, Loader2, Lock, LockOpen, Plus, Trash2, X } from 'lucide-react';
 import { FIELD_TYPES, slugKey, type CodexCategory, type CodexField, type CodexValue } from '@/lib/notebook/codex';
@@ -436,8 +437,8 @@ export function CategoryDialog({
           <div className="flex items-center gap-2 px-5 py-3 border-t border-[var(--nb-line)]">
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Apagar a categoria “${category.name}”? Os verbetes continuam, sem categoria.`)) {
+              onClick={async () => {
+                if ((await confirmDialog({ message: `Apagar a categoria “${category.name}”? Os verbetes continuam, sem categoria.`, danger: true }))) {
                   onDelete();
                   onClose();
                 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bold,
@@ -247,7 +248,7 @@ export function MarkdownEditor({ item, titles, titleExists, onChange, onOpenLink
         insertAt = cur.indexOf(md) + md.length;
       } catch (err) {
         cur = cur.replace(ph, '');
-        alert(err instanceof Error ? err.message : 'Falha no envio da imagem.');
+        notify(err instanceof Error ? err.message : 'Falha no envio da imagem.');
       }
       commit(cur);
     }

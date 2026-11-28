@@ -10,6 +10,7 @@
  * nunca as tags do HTML), verbetes do Sumário (nome e resumo) e cartões de
  * texto dos canvases. Endereços de links e identificadores ficam de fora.
  */
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useMemo, useState } from 'react';
 import { BookMarked, Check, Loader2, Replace, Undo2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -159,7 +160,7 @@ export function ReplacePanel({ api, entriesApi, projectId, onOpen }: { api: Note
 
   const apply = async () => {
     if (!docs || !chosen) return;
-    if (!confirm(`Trocar ${chosen} ${chosen === 1 ? 'ocorrência' : 'ocorrências'} de “${find}” por “${rep}”? Um instantâneo de cada nota fica no histórico.`)) return;
+    if (!(await confirmDialog({ message: `Trocar ${chosen} ${chosen === 1 ? 'ocorrência' : 'ocorrências'} de “${find}” por “${rep}”? Um instantâneo de cada nota fica no histórico.` }))) return;
     setBusy('Substituindo…');
     const restore: (() => Promise<void>)[] = [];
     const snapshot = new Set<string>();

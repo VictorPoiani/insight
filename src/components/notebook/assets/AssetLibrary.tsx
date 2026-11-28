@@ -8,6 +8,7 @@
  * Mover para a lixeira não apaga na hora: o arquivo sai do R2 depois de 30 dias
  * (rotina diária), e pode ser restaurado até lá.
  */
+import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, FileAudio, FileText, FileVideo, ImageIcon, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -203,7 +204,7 @@ export function AssetLibrary({
               <option value="nenhum">Sem projeto</option>
             </select>
             {view === 'orfas' && shown.length > 0 && (
-              <button type="button" className="nb-lib-clean" disabled={busy} onClick={() => confirm(`Mover ${shown.length} ${shown.length === 1 ? 'arquivo sem uso' : 'arquivos sem uso'} para a lixeira? Saem do armazenamento em 30 dias.`) && void setDeleted(shown.map((a) => a.id), true)}>
+              <button type="button" className="nb-lib-clean" disabled={busy} onClick={async () => (await confirmDialog({ message: `Mover ${shown.length} ${shown.length === 1 ? 'arquivo sem uso' : 'arquivos sem uso'} para a lixeira? Saem do armazenamento em 30 dias.`, danger: true })) && void setDeleted(shown.map((a) => a.id), true)}>
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Limpar {shown.length}
               </button>
             )}
@@ -266,7 +267,7 @@ export function AssetLibrary({
                             <RotateCcw className="w-3.5 h-3.5" /> Restaurar
                           </button>
                         ) : (
-                          <button type="button" className="nb-lib-danger" onClick={() => (!u.length || confirm(`Este arquivo é usado em ${u.length} ${u.length === 1 ? 'lugar' : 'lugares'}. Mover para a lixeira mesmo assim?`)) && void setDeleted([a.id], true)}>
+                          <button type="button" className="nb-lib-danger" onClick={async () => (!u.length || (await confirmDialog({ message: `Este arquivo é usado em ${u.length} ${u.length === 1 ? 'lugar' : 'lugares'}. Mover para a lixeira mesmo assim?`, danger: true }))) && void setDeleted([a.id], true)}>
                             <Trash2 className="w-3.5 h-3.5" /> Lixeira
                           </button>
                         )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/ui/feedback';
 import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useState } from 'react';
 import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
@@ -192,7 +193,7 @@ export function NewsCard({
               if (navigator.share) await navigator.share({ title: item.title, url: item.url });
               else {
                 await navigator.clipboard.writeText(item.url);
-                alert('Link copiado!');
+                notify('Link copiado!', 'success');
               }
             } catch {
               /* cancelado */

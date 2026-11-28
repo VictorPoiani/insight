@@ -344,6 +344,8 @@ export interface Post {
   views_count: number;
   created_at: string;
   updated_at?: string;
+  /** quando o autor editou o conteúdo ("editado") */
+  edited_at?: string | null;
   profiles?: Profile;
   replies_count?: number;
   /** Repost com comentário: Insight citado. */

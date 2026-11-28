@@ -4,6 +4,7 @@
  * Usa a busca segura (proteção contra SSRF) e fica no cache da CDN por um dia,
  * então o mesmo link é buscado uma vez só, não a cada pessoa que vê o post.
  */
+import { rateLimit } from '@/lib/net/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';
 import { ClipError, IMAGE_TYPES, readMeta, safeFetch } from '@/lib/net/safeFetch';
 
@@ -15,6 +16,8 @@ const memo = new Map<string, { at: number; data: unknown }>();
 const MEMO_MS = 30 * 60_000;
 
 export async function GET(req: NextRequest) {
+  const limited = await rateLimit(req, 'link-preview', 60, 60);
+  if (limited) return limited;
   const raw = (req.nextUrl.searchParams.get('url') || '').trim();
   if (!raw || raw.length > 2000 || !/^https?:\/\//i.test(raw)) {
     return NextResponse.json({ error: 'Endereço inválido.' }, { status: 400 });

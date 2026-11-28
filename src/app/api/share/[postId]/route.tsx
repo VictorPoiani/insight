@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/net/rateLimit';
 import { ImageResponse } from 'next/og';
 import { firstPostImage } from '@/lib/postMedia';
 import { createClient } from '@supabase/supabase-js';
@@ -19,6 +20,8 @@ import { Asterisk, VerifiedTick, clip, loadFonts, plain, toDataUrl } from '@/lib
 export const revalidate = 300;
 
 export async function GET(req: Request, ctx: { params: Promise<{ postId: string }> }) {
+  const limited = await rateLimit(req, 'share-post', 40, 60);
+  if (limited) return limited;
   const { postId } = await ctx.params;
   const url = new URL(req.url);
   const format = (['story', 'square', 'og'].includes(url.searchParams.get('format') || '')

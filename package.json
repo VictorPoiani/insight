@@ -28,6 +28,8 @@
     "@tiptap/react": "3.33.0",
     "@tiptap/starter-kit": "3.33.0",
     "@tiptap/suggestion": "3.33.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.1",
     "docx": "9.15.3",
     "fflate": "0.7.5",
     "isomorphic-dompurify": "4.7.0",

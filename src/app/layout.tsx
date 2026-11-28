@@ -1,3 +1,5 @@
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { MentionAutocomplete } from '@/components/mentions/MentionAutocomplete';
 import { GlobalShortcuts } from '@/components/layout/GlobalShortcuts';
 import { QuickCapture } from '@/components/notebook/QuickCapture';
@@ -8,9 +10,29 @@ import { NAME_FONT_VARIABLES } from '@/components/nitro/nameFonts';
 import { AppShell } from '../components/layout/AppShell';
 import { ReleaseNotesModal } from '@/components/layout/ReleaseNotesModal';
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.insight.app.br').replace(/\/$/, '');
+const SITE_DESCRIPTION = 'Rede social autoral e comunitária de ideias, projetos e notícias. Publique, converse e acompanhe quem você admira.';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  // sem modelo de título: as páginas de post/perfil já trazem o nome do site
   title: 'Insight — Plataforma Comunitária de Ideias & Projetos',
-  description: 'Microblog autoral e comunitário de ideias, engenharia de software e projetos.',
+  description: SITE_DESCRIPTION,
+  applicationName: 'Insight',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: 'Insight',
+    locale: 'pt_BR',
+    url: SITE_URL,
+    title: 'Insight — Plataforma Comunitária de Ideias & Projetos',
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Insight — Plataforma Comunitária de Ideias & Projetos',
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {
@@ -105,6 +127,9 @@ export default function RootLayout({
         />
 
         <ReleaseNotesModal />
+        {/* métricas de visitas e de velocidade real (painel da Vercel) */}
+        <Analytics />
+        <SpeedInsights />
         <GlobalShortcuts />
         <QuickCapture />
         <MentionAutocomplete />

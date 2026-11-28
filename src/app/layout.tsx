@@ -1,3 +1,4 @@
+import { publicSiteUrl } from '@/lib/publicSiteUrl';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { MentionAutocomplete } from '@/components/mentions/MentionAutocomplete';
@@ -10,7 +11,7 @@ import { NAME_FONT_VARIABLES } from '@/components/nitro/nameFonts';
 import { AppShell } from '../components/layout/AppShell';
 import { ReleaseNotesModal } from '@/components/layout/ReleaseNotesModal';
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.insight.app.br').replace(/\/$/, '');
+const SITE_URL = publicSiteUrl();
 const SITE_DESCRIPTION = 'Rede social autoral e comunitária de ideias, projetos e notícias. Publique, converse e acompanhe quem você admira.';
 
 export const metadata: Metadata = {

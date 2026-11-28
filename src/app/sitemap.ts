@@ -1,7 +1,8 @@
+import { publicSiteUrl } from '@/lib/publicSiteUrl';
 import type { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.insight.app.br').replace(/\/$/, '');
+const SITE = publicSiteUrl();
 
 // regenera no máximo a cada hora
 export const revalidate = 3600;

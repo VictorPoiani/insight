@@ -1,6 +1,7 @@
+import { publicSiteUrl } from '@/lib/publicSiteUrl';
 import type { MetadataRoute } from 'next';
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.insight.app.br').replace(/\/$/, '');
+const SITE = publicSiteUrl();
 
 export default function robots(): MetadataRoute.Robots {
   return {

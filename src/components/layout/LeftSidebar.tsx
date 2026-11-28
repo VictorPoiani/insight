@@ -1,5 +1,6 @@
 'use client';
 
+import { useVisiblePolling } from '@/lib/useVisiblePolling';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { InsightLogo } from '@/components/brand/InsightLogo';
@@ -187,6 +188,9 @@ export function LeftSidebar() {
 
     setUnreadCount(count || 0);
   }, [currentUser?.id, supabase]);
+
+  // o tempo real pode não estar ligado para notificações: confere a cada minuto
+  useVisiblePolling(() => void fetchUnreadCount(), 60_000, Boolean(currentUser?.id));
 
   useEffect(() => {
     fetchUnreadCount();

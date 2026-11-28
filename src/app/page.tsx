@@ -36,6 +36,10 @@ import {
 } from 'lucide-react';
 
 const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
+/** posts por página do feed */
+const POSTS_PAGE = 30;
+/** membros carregados de início (os mais ativos); a busca vai ao servidor */
+const MEMBERS_PAGE = 60;
 
 /**
  * Animação de Carregamento Oficial do Asterisco de 8 pontas (*) do Insight
@@ -110,6 +114,25 @@ function AsteriskLoader({
   );
 }
 
+/** Ponto no fim do feed: quando aparece na tela, pede a próxima página. */
+function LoadMoreSentinel({ onVisible, loading }: { onVisible: () => void; loading: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cb = useRef(onVisible);
+  cb.current = onVisible;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && cb.current(), { rootMargin: '800px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="py-8 flex justify-center" aria-live="polite">
+      {loading && <AsteriskLoader size="sm" label="Carregando mais Insights..." />}
+    </div>
+  );
+}
+
 function CommunityHomeFeed() {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -130,6 +153,11 @@ function CommunityHomeFeed() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showQuickComposer, setShowQuickComposer] = useState(false);
   const [loading, setLoading] = useState(true);
+  // feed em páginas: busca mais ao chegar no fim (não para mais em 80 posts)
+  const [postsHasMore, setPostsHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const [membersTotal, setMembersTotal] = useState<number | null>(null);
 
   const carouselRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -171,6 +199,20 @@ function CommunityHomeFeed() {
     });
   }
 
+  /** Busca (por id) os autores que ainda não estão no mapa. */
+  const fillAuthors = useCallback(
+    async (list: Post[], map: Record<string, Profile>) => {
+      const missing = Array.from(
+        new Set(list.map((p) => p.profile_id || p.author_id).filter((id): id is string => Boolean(id) && !map[id as string]))
+      );
+      for (let i = 0; i < missing.length; i += 100) {
+        const { data } = await supabase.from('profiles').select('*').in('id', missing.slice(i, i + 100));
+        for (const prof of (data as Profile[] | null) || []) map[prof.id] = prof;
+      }
+    },
+    [supabase]
+  );
+
   const loadExploreData = useCallback(async () => {
     setLoading(true);
 
@@ -211,38 +253,66 @@ function CommunityHomeFeed() {
       setFollowingIds(new Set());
     }
 
-    const [{ data: profilesData }, { data: postsData }] = await Promise.all([
+    // membros: só os mais ativos (o carrossel e a aba Membros), com o total à parte;
+    // autores dos posts são buscados por id logo abaixo
+    const [{ data: profilesData }, { count: totalMembers }, { data: postsData }] = await Promise.all([
       supabase
         .from('profiles')
         .select('*')
-        .order('created_at', { ascending: false }),
+        .order('last_seen_at', { ascending: false, nullsFirst: false })
+        .limit(MEMBERS_PAGE),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase
         .from('posts')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(80),
+        .limit(POSTS_PAGE),
     ]);
 
+    const typedProfiles = (profilesData as Profile[] | null) || [];
+    setProfiles(typedProfiles);
+    setMembersTotal(totalMembers ?? typedProfiles.length);
     const map: Record<string, Profile> = {};
-    if (profilesData) {
-      const typedProfiles = profilesData as Profile[];
-      setProfiles(typedProfiles);
-      typedProfiles.forEach((p) => {
-        map[p.id] = p;
-      });
-    }
-    setProfilesMap(map);
+    typedProfiles.forEach((p) => {
+      map[p.id] = p;
+    });
+    if (currentLogged) map[currentLogged.id] = currentLogged;
 
-    if (postsData) {
-      const publicPosts = (postsData as Post[]).filter(
-        (p) => resolvePostVisibility(p) === 'public'
-      );
-      setPosts(publicPosts);
-    }
+    const pagePosts = (postsData as Post[] | null) || [];
+    await fillAuthors(pagePosts, map);
+    setProfilesMap(map);
+    setPosts(pagePosts.filter((p) => resolvePostVisibility(p) === 'public'));
+    setPostsHasMore(pagePosts.length === POSTS_PAGE);
 
     setLoading(false);
     setTimeout(updateCarouselButtons, 150);
-  }, [supabase, updateCarouselButtons]);
+  }, [supabase, updateCarouselButtons, fillAuthors]);
+
+  /** Próxima página do feed (a partir do post mais antigo carregado). */
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMoreRef.current || !postsHasMore) return;
+    const oldest = posts.reduce<string | null>((m, p) => (!m || p.created_at < m ? p.created_at : m), null);
+    if (!oldest) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const { data } = await supabase
+      .from('posts')
+      .select('*')
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(POSTS_PAGE);
+    const page = (data as Post[] | null) || [];
+    const map = { ...profilesMap };
+    await fillAuthors(page, map);
+    setProfilesMap(map);
+    setPosts((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      return [...prev, ...page.filter((p) => !seen.has(p.id) && resolvePostVisibility(p) === 'public')];
+    });
+    setPostsHasMore(page.length === POSTS_PAGE);
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+  }, [posts, postsHasMore, profilesMap, supabase, fillAuthors]);
 
   // Insight publicado fora do compositor (ex.: repost com comentário) recarrega o feed
   useEffect(() => {
@@ -443,6 +513,49 @@ function CommunityHomeFeed() {
     };
   }, [posts, loading, activeTab, followingIds, loggedProfile?.id, supabase]);
 
+  // com filtro (tema, Seguindo, busca) sobram poucos posts: busca mais páginas sozinho (até 10)
+  const autoFill = useRef<{ key: string; pages: number }>({ key: '', pages: 0 });
+  useEffect(() => {
+    if (loading || loadingMore || !postsHasMore) return;
+    const filtered = Boolean(selectedTag || query || activeTab === 'following');
+    if (!filtered || filteredPosts.length >= 8) return;
+    const key = `${activeTab}|${selectedTag}|${query}`;
+    if (autoFill.current.key !== key) autoFill.current = { key, pages: 0 };
+    if (autoFill.current.pages >= 10) return;
+    autoFill.current.pages++;
+    void loadMorePosts();
+  }, [loading, loadingMore, postsHasMore, selectedTag, query, activeTab, filteredPosts.length, loadMorePosts]);
+
+  // aba Membros com busca: procura no servidor (só os mais ativos vêm de início)
+  useEffect(() => {
+    if (activeTab !== 'members' || query.length < 2) return;
+    const term = query.replace(/[%,()*\\]/g, ' ').trim();
+    if (!term) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`username.ilike.%${term}%,display_name.ilike.%${term}%,full_name.ilike.%${term}%,nickname.ilike.%${term}%`)
+        .limit(50);
+      if (!alive || !data) return;
+      const found = data as Profile[];
+      setProfiles((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...found.filter((p) => !seen.has(p.id))];
+      });
+      setProfilesMap((prev) => {
+        const next = { ...prev };
+        for (const p of found) next[p.id] = p;
+        return next;
+      });
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [activeTab, query, supabase]);
+
   const syncFollow = (id: string, on: boolean) =>
     setFollowingIds((prev) => {
       const next = new Set(prev);
@@ -535,7 +648,7 @@ function CommunityHomeFeed() {
               {tabSwitching && activeTab === 'members' && <AsteriskLoader size="xs" />}
               <span>Membros</span>
               <span className="px-1.5 py-0.2 rounded-full bg-elevated border border-border text-[10px] font-mono text-muted">
-                {filteredProfiles.length}
+                {query ? filteredProfiles.length : (membersTotal ?? filteredProfiles.length)}
               </span>
               {activeTab === 'members' && (
                 <span className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full bg-accent" />
@@ -986,7 +1099,7 @@ function CommunityHomeFeed() {
                 }
                 const post = entry.post;
                 const ownerId = post.profile_id || post.author_id;
-                const postAuthor = profilesMap[ownerId] || profiles[0];
+                const postAuthor = profilesMap[ownerId];
                 if (!postAuthor) return null;
 
                 const canManagePost =
@@ -1005,6 +1118,11 @@ function CommunityHomeFeed() {
                 );
               })}
               {progressiveFeed.hasMore && <div ref={progressiveFeed.sentinelRef} className="h-24" aria-hidden />}
+              {/* acabou o que está carregado: busca a próxima página no servidor */}
+              {!progressiveFeed.hasMore && postsHasMore && <LoadMoreSentinel onVisible={() => void loadMorePosts()} loading={loadingMore} />}
+              {!progressiveFeed.hasMore && !postsHasMore && posts.length > POSTS_PAGE && (
+                <p className="py-10 text-center text-xs text-muted">Você chegou ao começo do Insight.</p>
+              )}
             </div>
           )}
         </div>

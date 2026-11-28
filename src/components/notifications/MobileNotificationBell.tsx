@@ -1,5 +1,6 @@
 'use client';
 
+import { useVisiblePolling } from '@/lib/useVisiblePolling';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -31,6 +32,8 @@ export function MobileNotificationBell() {
   useEffect(() => {
     void refresh();
   }, [refresh, pathname]);
+  // o tempo real pode não estar ligado para notificações: confere a cada minuto
+  useVisiblePolling(() => void refresh(), 60_000, Boolean(meId));
 
   useEffect(() => {
     window.addEventListener('insight-notifications-updated', refresh);

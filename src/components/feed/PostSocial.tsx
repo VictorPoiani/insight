@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SmilePlus } from 'lucide-react';
-import { InsightIcon } from '@/components/icons/InsightIcon';
 import { relativeTime } from './PostTime';
 import { REACTIONS, REACTION_BY_ID, type MiniProfile, type PostSocial, type ReactionId, type TopReply } from '@/lib/postSocial';
 
@@ -97,9 +96,7 @@ export function ReactionChips({
               mine ? 'border-accent/60 bg-accent/10 text-primary' : 'border-border text-secondary hover:border-secondary/60'
             }`}
           >
-            <span style={{ color: r.color }} className="inline-flex">
-              <InsightIcon name={r.icon} className="w-4 h-4" />
-            </span>
+            <span className="text-[15px] leading-none">{r.emoji}</span>
             <span key={social.reactions[r.id]} className="insight-count-roll">{social.reactions[r.id]}</span>
           </button>
         );
@@ -124,9 +121,7 @@ export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onR
         className={`flex items-center gap-1.5 py-1 transition-colors ${current ? 'text-primary' : 'hover:text-primary'}`}
       >
         {current ? (
-          <span style={{ color: current.color }} className="inline-flex">
-            <InsightIcon name={current.icon} className="w-[18px] h-[18px]" />
-          </span>
+          <span className="text-base leading-none">{current.emoji}</span>
         ) : (
           <SmilePlus className="w-4 h-4" />
         )}
@@ -149,12 +144,11 @@ export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onR
                   setOpen(false);
                   onReact(r.id);
                 }}
-                style={{ color: r.color }}
                 className={`w-9 h-9 grid place-items-center rounded-full transition-transform hover:scale-125 hover:-translate-y-0.5 ${
                   mine === r.id ? 'bg-accent/15' : ''
                 }`}
               >
-                <InsightIcon name={r.icon} className="w-6 h-6" />
+                <span className="text-[22px] leading-none">{r.emoji}</span>
               </button>
             ))}
           </div>

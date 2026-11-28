@@ -3,8 +3,7 @@
  *
  * Estilo: grade 24×24, traço de 2 com pontas e junções arredondadas, cantos
  * generosos e curvas no lugar de quinas — redondinhos, mas mínimos. Herdam a
- * cor do texto (`currentColor`). As reações têm um preenchimento suave na
- * mesma cor do traço.
+ * cor do texto (`currentColor`).
  *
  * Regra da casa: um desenho = um significado. Nada aqui repete o desenho de
  * outro ícone com outro propósito (ex.: o coração da interface é só curtida/
@@ -189,61 +188,6 @@ const ICONS = {
         <path d="M5 10.25h14l-1.55 9.6a1.3 1.3 0 01-1.3 1.15H7.85a1.3 1.3 0 01-1.3-1.15z" />
         <path d="M9.75 10.25l.6 10.75M14.25 10.25l-.6 10.75" />
         <path d="M5.5 10.25a2.4 2.4 0 012.1-3.5 2.7 2.7 0 015-1.35 2.55 2.55 0 014.35 1.5 2.35 2.35 0 011.55 3.35" />
-      </>
-    ),
-  },
-
-  // ------------------------------------------------------------ reações (traço + preenchimento suave)
-  /** Reação "Boa ideia": lâmpada */
-  'react-idea': {
-    tinted: true,
-    body: (
-      <>
-        <path {...soft} d="M12 3.25a6 6 0 00-3.55 10.85c.65.5 1.05 1.25 1.05 2.05v.35h5v-.35c0-.8.4-1.55 1.05-2.05A6 6 0 0012 3.25z" />
-        <path d="M10 19.25h4M10.75 21.5h2.5" />
-      </>
-    ),
-  },
-  /** Reação "Incrível": chama */
-  'react-fire': {
-    tinted: true,
-    body: (
-      <path
-        {...soft}
-        d="M12 21.25c-3.6 0-6.25-2.55-6.25-6 0-2.6 1.35-4.3 2.6-5.85.35-.45 1.05-.3 1.2.25.3 1.05.9 1.85 1.7 2.3-.15-2.95 1.05-5.6 3.25-7.4.45-.35 1.1-.05 1.15.5.3 3.2 4.1 5.25 4.1 9.6v.6c0 3.45-2.6 6-6.25 6z"
-      />
-    ),
-  },
-  /** Reação "Engraçado": rosto rindo */
-  'react-laugh': {
-    tinted: true,
-    body: (
-      <>
-        <circle {...soft} cx="12" cy="12" r="8.75" />
-        <path d="M7.75 10.25c.5-.85 1.6-.85 2.1 0M14.15 10.25c.5-.85 1.6-.85 2.1 0" />
-        <path {...soft} fillOpacity={0.5} d="M7.75 13.5h8.5c0 2.35-1.9 4-4.25 4s-4.25-1.65-4.25-4z" />
-      </>
-    ),
-  },
-  /** Reação "Me fez pensar": rosto pensativo */
-  'react-think': {
-    tinted: true,
-    body: (
-      <>
-        <circle {...soft} cx="12" cy="12" r="8.75" />
-        <path d="M8.5 8.75l1.75-.6M14.75 9.25h.01M9.25 10.5h.01" strokeWidth="2.25" />
-        <path d="M9.5 15.25c1.25-.75 3-.9 4.75-.5" />
-      </>
-    ),
-  },
-  /** Reação "Uau": rosto surpreso */
-  'react-wow': {
-    tinted: true,
-    body: (
-      <>
-        <circle {...soft} cx="12" cy="12" r="8.75" />
-        <path d="M9.25 9.75h.01M14.75 9.75h.01" strokeWidth="2.75" />
-        <ellipse cx="12" cy="15" rx="1.9" ry="2.25" />
       </>
     ),
   },

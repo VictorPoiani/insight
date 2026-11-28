@@ -1,5 +1,6 @@
 'use client';
 
+import { SupportImpact } from '@/components/apoie/SupportImpact';
 import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -1039,6 +1040,8 @@ export default function ApoiePage() {
       {/* ====================================================================
           1. SEÇÃO SUPERIOR: DOAÇÃO COM PIX AUTOMÁTICO + WEBHOOK TEMPO REAL
           ==================================================================== */}
+      <SupportImpact />
+
       <section className="relative px-4 sm:px-6 py-7 border-b border-border overflow-hidden">
         <div
           aria-hidden="true"

@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
+import { ProfileHoverCard } from '@/components/feed/ProfileHoverCard';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
 import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/components/news/useNews';
@@ -408,12 +409,6 @@ function CommunityHomeFeed() {
 
   const { isOnline } = usePresence();
 
-  // Quem está online agora (sem contar quem está vendo)
-  const onlineNow = useMemo(
-    () => profiles.filter((p) => p.id !== loggedProfile?.id && isOnline(p.id, p.last_seen_at)),
-    [profiles, loggedProfile?.id, isOnline]
-  );
-
   // "Novos posts ↑": confere de tempos em tempos se chegou algo depois do mais recente carregado
   const [freshPosts, setFreshPosts] = useState<{ id: string; author: string }[]>([]);
   useEffect(() => {
@@ -447,6 +442,14 @@ function CommunityHomeFeed() {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [posts, loading, activeTab, followingIds, loggedProfile?.id, supabase]);
+
+  const syncFollow = (id: string, on: boolean) =>
+    setFollowingIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   const showFreshPosts = async () => {
     setFreshPosts([]);
@@ -736,7 +739,7 @@ function CommunityHomeFeed() {
                   href={profileHref}
                   className="px-4 sm:px-6 py-4 hover:bg-surface/40 transition-colors flex items-start justify-between gap-3 group"
                 >
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <ProfileHoverCard profile={prof} className="flex items-start gap-3 min-w-0 flex-1" onFollowChange={(on) => syncFollow(prof.id, on)}>
                     <span className="relative shrink-0">
                       <CosmeticAvatar profile={prof} size={44}>
                         <img
@@ -783,7 +786,7 @@ function CommunityHomeFeed() {
                         </p>
                       )}
                     </div>
-                  </div>
+                  </ProfileHoverCard>
 
                   {!isMe ? (
                     <button
@@ -820,37 +823,6 @@ function CommunityHomeFeed() {
         </div>
       ) : (
         <div>
-          {/* Online agora: quem está no Insight neste momento */}
-          {activeTab === 'for_you' && !selectedTag && onlineNow.length > 0 && (
-            <section className="px-4 sm:px-6 py-2.5 border-b border-border flex items-center gap-3 min-w-0" aria-label="Online agora">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-secondary shrink-0">
-                <span className="relative flex w-2 h-2">
-                  <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-500 opacity-60 animate-ping" />
-                  <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
-                </span>
-                {onlineNow.length} online agora
-              </span>
-              <div className="flex items-center -space-x-2 min-w-0 overflow-hidden py-0.5">
-                {onlineNow.slice(0, 12).map((prof) => (
-                  <Link
-                    key={prof.id}
-                    href={`/u/${encodeURIComponent(prof.username)}`}
-                    title={prof.display_name || prof.full_name || prof.username}
-                    className="shrink-0 transition-transform hover:-translate-y-0.5 hover:z-10"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={prof.avatar_url || '/assets/net/default-perfil'}
-                      alt={prof.display_name || prof.full_name || prof.username}
-                      className="w-7 h-7 rounded-full object-cover ring-2 ring-background bg-elevated"
-                    />
-                  </Link>
-                ))}
-              </div>
-              {onlineNow.length > 12 && <span className="text-xs text-muted shrink-0">+{onlineNow.length - 12}</span>}
-            </section>
-          )}
-
           {activeTab === 'for_you' && !selectedTag && carouselMembers.length > 0 && (
             <section className="px-4 sm:px-6 py-3 border-b border-border bg-surface/20 relative">
               <div className="flex items-center justify-between mb-2.5 gap-2">
@@ -907,7 +879,7 @@ function CommunityHomeFeed() {
                       href={profileHref}
                       className="w-[240px] sm:w-[272px] shrink-0 p-2.5 rounded-xl bg-surface border border-border hover:border-accent/60 transition-all flex items-center justify-between gap-2 group"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <ProfileHoverCard profile={prof} className="flex items-center gap-2.5 min-w-0 flex-1" onFollowChange={(on) => syncFollow(prof.id, on)}>
                         <span className="relative shrink-0">
                           <CosmeticAvatar profile={prof} size={36}>
                             <img
@@ -928,7 +900,7 @@ function CommunityHomeFeed() {
                           <p className="text-[11px] text-muted truncate">@{prof.username}</p>
                           <CosmeticTag profile={prof} className="mt-0.5 max-w-full" />
                         </div>
-                      </div>
+                      </ProfileHoverCard>
 
                       {!isMe ? (
                         <button

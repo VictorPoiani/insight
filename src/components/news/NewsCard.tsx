@@ -4,6 +4,7 @@ import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useState } from 'react';
 import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
 import { TOPIC_BY_ID } from '@/lib/news/topics';
+import { decodeEntities } from '@/lib/news/rss';
 import { PostTime } from '@/components/feed/PostTime';
 import { trackNews, type NewsItem } from './useNews';
 
@@ -118,10 +119,10 @@ export function NewsCard({
       >
         <div className="flex-1 min-w-0">
           <h3 className={`font-extrabold text-primary leading-snug group-hover:text-accent transition-colors ${compact ? 'text-sm' : 'text-[15px] sm:text-base lg:text-xl lg:leading-tight'} ${item.seen ? 'opacity-75' : ''}`}>
-            {item.title}
+            {decodeEntities(item.title)}
           </h3>
           {item.summary && !compact && (
-            <p className="mt-1 lg:mt-2 text-[13px] lg:text-[15px] text-secondary leading-relaxed line-clamp-2 lg:line-clamp-3">{item.summary}</p>
+            <p className="mt-1 lg:mt-2 text-[13px] lg:text-[15px] text-secondary leading-relaxed line-clamp-2 lg:line-clamp-3">{decodeEntities(item.summary)}</p>
           )}
           {!compact && (
             <span className="hidden lg:inline-flex mt-2 text-xs font-bold text-accent group-hover:underline underline-offset-2">

@@ -318,3 +318,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .insight-toast-in, .insight-dialog-in { animation: none; }
 }
+/* atalho J/K: realce do post em destaque */
+.insight-kbd-focus { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); transition: box-shadow 0.2s, background 0.2s; }

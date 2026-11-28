@@ -560,6 +560,32 @@ function CommunityHomeFeed() {
     };
   }, [activeTab, query, supabase]);
 
+  // há rascunho de post guardado? (aparece no botão Publicar enquanto o compositor está fechado)
+  const [hasDraft, setHasDraft] = useState(false);
+  useEffect(() => {
+    if (!loggedProfile?.id || showQuickComposer) return;
+    let alive = true;
+    let local = false;
+    try {
+      local = Boolean(localStorage.getItem(`insight-draft:${loggedProfile.id}:post:new`));
+    } catch {
+      /* modo privado */
+    }
+    if (local) {
+      setHasDraft(true);
+      return;
+    }
+    void supabase
+      .from('drafts')
+      .select('scope', { count: 'exact', head: true })
+      .eq('profile_id', loggedProfile.id)
+      .eq('scope', 'post:new')
+      .then(({ count }) => alive && setHasDraft((count || 0) > 0));
+    return () => {
+      alive = false;
+    };
+  }, [loggedProfile?.id, showQuickComposer, supabase]);
+
   const syncFollow = (id: string, on: boolean) =>
     setFollowingIds((prev) => {
       const next = new Set(prev);
@@ -710,7 +736,10 @@ function CommunityHomeFeed() {
                 }`}
               >
                 <PenSquare className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Publicar Insight</span>
+                <span className="hidden sm:inline">{hasDraft && !showQuickComposer ? 'Continuar rascunho' : 'Publicar Insight'}</span>
+                {hasDraft && !showQuickComposer && (
+                  <span className="sm:hidden w-2 h-2 rounded-full bg-amber-300 ring-2 ring-accent" aria-label="Você tem um rascunho" />
+                )}
               </button>
             )}
           </div>

@@ -15,8 +15,33 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['Ctrl', 'B'], label: 'Negrito (com texto selecionado)' },
   { keys: ['Ctrl', 'I'], label: 'Itálico (com texto selecionado)' },
   { keys: ['Ctrl', 'Alt', 'N'], label: 'Capturar uma ideia na Caixa de entrada do Notebook' },
+  { keys: ['J'], label: 'Próximo Insight do feed' },
+  { keys: ['K'], label: 'Insight anterior' },
+  { keys: ['L'], label: 'Curtir o Insight em destaque' },
   { keys: ['?'], label: 'Mostrar esta lista de atalhos' },
 ];
+
+/** Posts na tela (cartões do feed/perfil), na ordem. */
+function postCards(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('article[data-post-view]'));
+}
+
+/** Post "em destaque": o primeiro cujo topo passou da faixa do cabeçalho fixo. */
+function currentIndex(cards: HTMLElement[]) {
+  const line = 90;
+  let idx = -1;
+  cards.forEach((c, i) => {
+    if (c.getBoundingClientRect().top <= line + 4) idx = i;
+  });
+  return idx;
+}
+
+function focusCard(card: HTMLElement) {
+  const top = card.getBoundingClientRect().top + window.scrollY - 64;
+  window.scrollTo({ top, behavior: 'smooth' });
+  card.classList.add('insight-kbd-focus');
+  window.setTimeout(() => card.classList.remove('insight-kbd-focus'), 900);
+}
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -81,6 +106,26 @@ export function GlobalShortcuts() {
         if (on) document.documentElement.setAttribute('data-reading', 'comfortable');
         else document.documentElement.removeAttribute('data-reading');
         setToast(on ? 'Modo leitura ativado' : 'Modo leitura desativado');
+        return;
+      }
+      // J / K / L: navegar e curtir no feed (sem modificadores, fora de campos de texto)
+      if (!mod && !e.altKey && !e.shiftKey && !isTyping(e.target) && (key === 'j' || key === 'k' || key === 'l')) {
+        if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+        const cards = postCards();
+        if (!cards.length) return;
+        e.preventDefault();
+        const cur = currentIndex(cards);
+        if (key === 'j') focusCard(cards[Math.min(cards.length - 1, cur + 1)]);
+        else if (key === 'k') focusCard(cards[Math.max(0, cur - 1)]);
+        else {
+          const card = cards[Math.max(0, cur)];
+          const like = card.querySelector<HTMLButtonElement>('button[aria-label="Curtir Insight"], button[aria-label="Descurtir Insight"]');
+          if (like) {
+            like.click();
+            card.classList.add('insight-kbd-focus');
+            window.setTimeout(() => card.classList.remove('insight-kbd-focus'), 900);
+          }
+        }
         return;
       }
       if (e.key === '?' && !mod && !isTyping(e.target)) {

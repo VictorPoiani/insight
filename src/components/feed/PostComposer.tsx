@@ -730,6 +730,7 @@ export function PostComposer({
         b.videoUrl ||
         b.fileUrl ||
         b.spotifyTrackId ||
+        (b.carouselImages && b.carouselImages.length > 0) ||
         b.type === 'chart' ||
         b.type === 'poll' ||
         b.type === 'table' ||
@@ -738,6 +739,15 @@ export function PostComposer({
     )
   );
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  // contador discreto do texto (todas as caixas de texto do post)
+  const textStats = (() => {
+    const text = blocks
+      .map((b) => (b.html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&[a-z#0-9]+;/gi, 'x'))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return { chars: text.length, words: text ? text.split(' ').length : 0 };
+  })();
   const initialSnapshot = useRef<PostDraft | null>(null);
   const restoredOnce = useRef(false);
 
@@ -4291,9 +4301,15 @@ export function PostComposer({
           </button>
         </div>
       )}
-      {draftStatusLabel(draft.status, draft.savedAt) && (
-        <p className="text-[10px] text-muted font-mono" aria-live="polite">
-          {draftStatusLabel(draft.status, draft.savedAt)}
+      {(draftStatusLabel(draft.status, draft.savedAt) || textStats.chars > 0) && (
+        <p className="flex items-center justify-between gap-3 text-[10px] text-muted font-mono" aria-live="polite">
+          <span>{draftStatusLabel(draft.status, draft.savedAt)}</span>
+          {textStats.chars > 0 && (
+            <span className="tabular-nums" title="Tamanho do texto do Insight">
+              {textStats.chars.toLocaleString('pt-BR')} {textStats.chars === 1 ? 'caractere' : 'caracteres'} · {textStats.words.toLocaleString('pt-BR')}{' '}
+              {textStats.words === 1 ? 'palavra' : 'palavras'}
+            </span>
+          )}
         </p>
       )}
 

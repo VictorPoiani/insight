@@ -41,6 +41,7 @@ import {
   patchPostSocial,
   subscribePostSocial,
   setMyReaction,
+  rememberReaction,
   type PostSocial,
   type ReactionId,
 } from '@/lib/postSocial';
@@ -300,6 +301,7 @@ export function PostCard({
     }
     const prev = social;
     const next: ReactionId | null = social?.myReaction === r ? null : r;
+    if (next) rememberReaction(next);
     patchPostSocial(post.id, viewer.id, (s) => {
       const counts = { ...s.reactions };
       if (s.myReaction) counts[s.myReaction] = Math.max(0, (counts[s.myReaction] || 0) - 1);

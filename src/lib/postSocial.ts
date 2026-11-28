@@ -8,16 +8,40 @@ import { createClient } from '@/lib/supabase/client';
  * mesmo instante viram poucas consultas com `in(...)`.
  */
 
-// reações com os emojis comuns (no seletor e nos chips de contagem)
-export const REACTIONS = [
-  { id: 'idea', emoji: '💡', label: 'Boa ideia' },
-  { id: 'fire', emoji: '🔥', label: 'Incrível' },
-  { id: 'laugh', emoji: '😂', label: 'Engraçado' },
-  { id: 'think', emoji: '🤔', label: 'Me fez pensar' },
-  { id: 'wow', emoji: '😮', label: 'Uau' },
+// reação = o próprio emoji (qualquer um). Estes cinco são os padrões do seletor.
+export const DEFAULT_REACTIONS = [
+  { emoji: '💡', label: 'Boa ideia' },
+  { emoji: '🔥', label: 'Incrível' },
+  { emoji: '😂', label: 'Engraçado' },
+  { emoji: '🤔', label: 'Me fez pensar' },
+  { emoji: '😮', label: 'Uau' },
 ] as const;
-export type ReactionId = (typeof REACTIONS)[number]['id'];
-export const REACTION_BY_ID = new Map<string, (typeof REACTIONS)[number]>(REACTIONS.map((r) => [r.id, r]));
+export type ReactionId = string;
+export const REACTION_LABEL = new Map<string, string>(DEFAULT_REACTIONS.map((r) => [r.emoji, r.label]));
+
+/** Emoji válido como reação (o banco confere de novo). */
+export function isReactionEmoji(v: string) {
+  return v.length > 0 && v.length <= 16 && !/[A-Za-z0-9<>&"'\s]/.test(v);
+}
+
+// últimos emojis usados neste aparelho (aparecem no seletor)
+const RECENT_KEY = 'insight:recent-reactions';
+export function recentReactions(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && isReactionEmoji(x)).slice(0, 16) : [];
+  } catch {
+    return [];
+  }
+}
+export function rememberReaction(emoji: string) {
+  try {
+    const next = [emoji, ...recentReactions().filter((e) => e !== emoji)].slice(0, 16);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* modo privado */
+  }
+}
 
 export interface MiniProfile {
   id: string;
@@ -38,7 +62,8 @@ export interface PostSocial {
   /** quem curtiu por último (até 3) */
   likers: MiniProfile[];
   topReply: TopReply | null;
-  reactions: Partial<Record<ReactionId, number>>;
+  /** emoji → quantidade */
+  reactions: Record<string, number>;
   myReaction: ReactionId | null;
 }
 
@@ -155,10 +180,10 @@ async function flush() {
         name: top.author_name || top.author_handle || 'Membro do Insight',
         avatar_url: top.avatar_url,
       });
-    const counts: Partial<Record<ReactionId, number>> = {};
+    const counts: Record<string, number> = {};
     let mine: ReactionId | null = null;
     for (const r of reactions) {
-      if (r.post_id !== postId || !REACTION_BY_ID.has(r.reaction)) continue;
+      if (r.post_id !== postId || !isReactionEmoji(r.reaction)) continue;
       const id = r.reaction as ReactionId;
       counts[id] = (counts[id] || 0) + 1;
       if (viewer && r.profile_id === viewer) mine = id;

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { SmilePlus } from 'lucide-react';
+import { Plus, SmilePlus } from 'lucide-react';
 import { relativeTime } from './PostTime';
-import { REACTIONS, REACTION_BY_ID, type MiniProfile, type PostSocial, type ReactionId, type TopReply } from '@/lib/postSocial';
+import { DEFAULT_REACTIONS, REACTION_LABEL, recentReactions, type MiniProfile, type PostSocial, type ReactionId, type TopReply } from '@/lib/postSocial';
+import { EmojiGallery } from './EmojiGallery';
 
 const avatarSrc = (url: string | null | undefined) => url || '/assets/net/default-perfil';
 
@@ -71,7 +72,7 @@ export function ReplyPreview({ reply, total, postId }: { reply: TopReply; total:
   );
 }
 
-/** Chips das reações que o post já recebeu (ícone + número). Clicar usa a mesma reação. */
+/** Chips das reações que o post já recebeu (emoji + número). Clicar usa a mesma reação. */
 export function ReactionChips({
   social,
   onReact,
@@ -79,25 +80,29 @@ export function ReactionChips({
   social: PostSocial;
   onReact: (r: ReactionId) => void;
 }) {
-  const entries = REACTIONS.filter((r) => (social.reactions[r.id] || 0) > 0);
+  // mais usadas primeiro
+  const entries = Object.entries(social.reactions)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
   if (!entries.length) return null;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      {entries.map((r) => {
-        const mine = social.myReaction === r.id;
+      {entries.map(([emoji, n]) => {
+        const mine = social.myReaction === emoji;
+        const label = REACTION_LABEL.get(emoji) || emoji;
         return (
           <button
-            key={r.id}
+            key={emoji}
             type="button"
-            onClick={() => onReact(r.id)}
-            title={mine ? `Você reagiu: ${r.label} (clique para tirar)` : r.label}
+            onClick={() => onReact(emoji)}
+            title={mine ? `Você reagiu ${emoji} (clique para tirar)` : label}
             aria-pressed={mine}
             className={`inline-flex items-center gap-1 h-7 px-2 rounded-full border text-[13px] tabular-nums transition-colors ${
               mine ? 'border-accent/60 bg-accent/10 text-primary' : 'border-border text-secondary hover:border-secondary/60'
             }`}
           >
-            <span className="text-[15px] leading-none">{r.emoji}</span>
-            <span key={social.reactions[r.id]} className="insight-count-roll">{social.reactions[r.id]}</span>
+            <span className="text-[15px] leading-none">{emoji}</span>
+            <span key={n} className="insight-count-roll">{n}</span>
           </button>
         );
       })}
@@ -105,56 +110,93 @@ export function ReactionChips({
   );
 }
 
-/** Botão da barra de ações que abre as reações rápidas. */
+/**
+ * Botão de reagir: os 5 padrões, os últimos emojis usados neste aparelho e o
+ * "+" que abre a galeria completa.
+ */
 export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onReact: (r: ReactionId) => void }) {
   const [open, setOpen] = useState(false);
-  const current = mine ? REACTION_BY_ID.get(mine) : null;
+  const [gallery, setGallery] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+  const defaults = DEFAULT_REACTIONS.map((r) => r.emoji) as string[];
+
+  const openPicker = () => {
+    setRecent(recentReactions());
+    setOpen((v) => !v);
+  };
+  const pick = (emoji: string) => {
+    setOpen(false);
+    setGallery(false);
+    onReact(emoji);
+  };
+  const recentExtra = recent.filter((e) => !defaults.includes(e)).slice(0, 6);
+  const label = mine ? `Sua reação: ${REACTION_LABEL.get(mine) || mine}` : 'Reagir';
+
   return (
     <div className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={current ? `Sua reação: ${current.label}` : 'Reagir'}
-        title={current ? `Sua reação: ${current.label}` : 'Reagir'}
+        onClick={openPicker}
+        aria-label={label}
+        title={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex items-center gap-1.5 py-1 transition-colors ${current ? 'text-primary' : 'hover:text-primary'}`}
+        className={`flex items-center gap-1.5 py-1 transition-colors ${mine ? 'text-primary' : 'hover:text-primary'}`}
       >
-        {current ? (
-          <span className="text-base leading-none">{current.emoji}</span>
-        ) : (
-          <SmilePlus className="w-4 h-4" />
-        )}
+        {mine ? <span className="text-base leading-none">{mine}</span> : <SmilePlus className="w-4 h-4" />}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-0.5 p-1 rounded-full bg-elevated border border-border shadow-2xl insight-pop-in"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 p-1 rounded-3xl bg-elevated border border-border shadow-2xl insight-pop-in"
           >
-            {REACTIONS.map((r) => (
+            <div className="flex items-center gap-0.5">
+              {defaults.map((emoji) => (
+                <PickerEmoji key={emoji} emoji={emoji} label={REACTION_LABEL.get(emoji) || emoji} active={mine === emoji} onPick={pick} />
+              ))}
               <button
-                key={r.id}
                 type="button"
                 role="menuitem"
-                title={r.label}
-                aria-label={r.label}
+                title="Todos os emojis"
+                aria-label="Abrir todos os emojis"
                 onClick={() => {
                   setOpen(false);
-                  onReact(r.id);
+                  setGallery(true);
                 }}
-                className={`w-9 h-9 grid place-items-center rounded-full transition-transform hover:scale-125 hover:-translate-y-0.5 ${
-                  mine === r.id ? 'bg-accent/15' : ''
-                }`}
+                className="w-9 h-9 grid place-items-center rounded-full text-secondary hover:text-primary hover:bg-surface transition-colors"
               >
-                <span className="text-[22px] leading-none">{r.emoji}</span>
+                <Plus className="w-5 h-5" />
               </button>
-            ))}
+            </div>
+            {recentExtra.length > 0 && (
+              <div className="flex items-center gap-0.5 mt-0.5 pt-0.5 border-t border-border">
+                {recentExtra.map((emoji) => (
+                  <PickerEmoji key={emoji} emoji={emoji} label={`Recente: ${emoji}`} active={mine === emoji} onPick={pick} />
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
+      {gallery && <EmojiGallery recent={recent} onPick={pick} onClose={() => setGallery(false)} />}
     </div>
+  );
+}
+
+function PickerEmoji({ emoji, label, active, onPick }: { emoji: string; label: string; active: boolean; onPick: (e: string) => void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      title={label}
+      aria-label={label}
+      onClick={() => onPick(emoji)}
+      className={`w-9 h-9 grid place-items-center rounded-full transition-transform hover:scale-125 hover:-translate-y-0.5 ${active ? 'bg-accent/15' : ''}`}
+    >
+      <span className="text-[22px] leading-none">{emoji}</span>
+    </button>
   );
 }
 

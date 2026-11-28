@@ -1,5 +1,6 @@
 'use client';
 
+import { ProfileMediaGrid } from '@/components/feed/ProfileMediaGrid';
 import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
@@ -505,7 +506,7 @@ function UserProfileContent() {
       )}
 
       {/* 4. Editor de Blocos (Exibido para o dono do perfil) */}
-      {canManageProfile && activeTab.id !== 'reposts' && (
+      {canManageProfile && activeTab.id !== 'reposts' && activeTab.id !== 'midia' && (
         <PostComposer
           authorId={profile.id}
           isAdmin={canManageProfile}
@@ -523,6 +524,8 @@ function UserProfileContent() {
         />
       ) : tabSwitching ? (
         <ProfileAsteriskLoader size="md" color={activeTab.color} />
+      ) : activeTab.id === 'midia' ? (
+        <ProfileMediaGrid posts={visiblePosts} />
       ) : visiblePosts.length === 0 ? (
         <div className="py-16 text-center text-xs text-muted">
           Nenhuma publicação encontrada nesta aba.

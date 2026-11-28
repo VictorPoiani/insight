@@ -103,6 +103,7 @@ export interface FeedTabItem {
 /** Abas padrão de todo perfil: Principal · Coleção (em desenvolvimento) · Reposts. */
 export const DEFAULT_TABS: FeedTabItem[] = [
   { id: 'principal', label: 'Principal', tag: null, color: '#2563eb', isDefault: true },
+  { id: 'midia', label: 'Mídia', tag: null, color: '#ec4899', isDefault: true },
   { id: 'colecao', label: 'Coleção', tag: null, color: '#71717a', isDefault: true, inDevelopment: true },
   { id: 'reposts', label: 'Reposts', tag: null, color: '#1DB954', isDefault: true },
 ];

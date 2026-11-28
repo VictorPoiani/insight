@@ -27,6 +27,8 @@ export function ActivityTracker() {
     let lastInput = Date.now();
     let lastTick = Date.now();
     const seen = new Set<string>();
+    // ids vistos ainda não enviados (contador de visualizações de cada post)
+    let viewedIds: string[] = [];
 
     const touch = () => {
       lastInput = Date.now();
@@ -39,6 +41,11 @@ export function ActivityTracker() {
     };
     const flush = () => {
       tick();
+      if (signedIn && viewedIds.length) {
+        const ids = viewedIds.slice(0, 100);
+        viewedIds = viewedIds.slice(100);
+        void supabase.rpc('record_post_views', { p_ids: ids });
+      }
       if (!signedIn || (seconds < 1 && !views && !videos)) return;
       const payload = { p_seconds: seconds, p_views: views, p_videos: videos };
       seconds = 0;
@@ -60,6 +67,7 @@ export function ActivityTracker() {
               window.setTimeout(() => {
                 seen.add(id);
                 views++;
+                viewedIds.push(id);
               }, 1500)
             );
           } else {

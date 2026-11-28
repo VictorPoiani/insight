@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Post, Profile } from '@/types/database';
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { ProfileHoverCard } from '@/components/feed/ProfileHoverCard';
+import { useMyBlocks } from '@/lib/blocks';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsFeed, NewsTopicPicker } from '@/components/news/NewsFeed';
 import { useNewsFeed, useNewsFollows, useNewsSearch, type NewsItem } from '@/components/news/useNews';
@@ -410,10 +411,13 @@ function CommunityHomeFeed() {
     });
   }, [profiles, query]);
 
+  const myBlocks = useMyBlocks(loggedProfile?.id ?? null);
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
       const ownerId = post.profile_id || post.author_id;
       const author = profilesMap[ownerId];
+      // contas silenciadas ou bloqueadas não aparecem no feed
+      if (myBlocks.has(ownerId)) return false;
 
       if (activeTab === 'following') {
         if (!followingIds.has(ownerId) && ownerId !== loggedProfile?.id) {
@@ -436,7 +440,7 @@ function CommunityHomeFeed() {
         author?.display_name?.toLowerCase().includes(query)
       );
     });
-  }, [posts, profilesMap, activeTab, followingIds, loggedProfile, selectedTag, query]);
+  }, [posts, profilesMap, activeTab, followingIds, loggedProfile, selectedTag, query, myBlocks]);
 
   // ---------------------------------------------------- notícias no Para você
   // Só temas que a pessoa segue; a aba Notícias mostra todos.

@@ -1,5 +1,6 @@
 'use client';
 
+import { BlockedAccounts } from '@/components/account/BlockedAccounts';
 import { askText } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
 import { applyWarmOverlay, PREFS_EVENT } from '@/lib/nightLight';
@@ -1617,6 +1618,8 @@ export default function ConfigPage() {
                   </button>
                 </div>
               </form>
+
+              {myProfile && <BlockedAccounts viewerId={myProfile.id} />}
 
               {/* Dados, Backup e Documentos Legais */}
               <div className="px-6 py-6 space-y-5">

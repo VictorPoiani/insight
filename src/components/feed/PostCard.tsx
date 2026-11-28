@@ -1,6 +1,7 @@
 'use client';
 
 import { askReport } from '@/lib/ui/feedback';
+import { useMyBlocks, setProfileBlock } from '@/lib/blocks';
 import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
 import { NsfwGate } from '@/components/moderation/NsfwGate';
@@ -34,6 +35,7 @@ import { CosmeticAvatar, CosmeticName, CosmeticTag } from '@/components/nitro/Co
 import { PostTime } from './PostTime';
 import { LikedBy, ReplyPreview, ReactionChips, ReactionButton, HeartBurst } from './PostSocial';
 import { ProfileHoverCard } from './ProfileHoverCard';
+import { LinkPreview, firstLinkIn } from './LinkPreview';
 import {
   getPostSocial,
   patchPostSocial,
@@ -63,6 +65,10 @@ import {
   Network,
   Flag,
   AtSign,
+  MoreHorizontal,
+  VolumeX,
+  Ban,
+  Eye,
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -303,6 +309,21 @@ export function PostCard({
     const { error } = await setMyReaction(post.id, viewer.id, next);
     if (error && prev) patchPostSocial(post.id, viewer.id, () => prev);
   }
+
+  // Prévia do primeiro link do texto — só quando o post não tem mídia própria
+  const previewUrl = useMemo(() => {
+    const hasMedia =
+      Boolean(postImageUrl) ||
+      blocksState.some((b) => ['image', 'video', 'gif', 'carousel', 'spotify', 'mindmap'].includes(b.type));
+    if (hasMedia) return null;
+    const texts = blocksState.length ? blocksState.map((b) => b.html || '') : [postContent || ''];
+    return firstLinkIn(texts);
+  }, [blocksState, postContent, postImageUrl]);
+
+  const blocks = useMyBlocks(viewer?.id ?? null);
+  const blockKind = !isPostOwner ? blocks.get(author.id) : undefined;
+  const [revealBlocked, setRevealBlocked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Menciona quem está vendo (e não é o autor)
   const mentionsViewer = useMemo(() => {
@@ -559,7 +580,53 @@ export function PostCard({
     }
   }
 
+  async function handleBlock(kind: 'mute' | 'block' | null) {
+    setMoreOpen(false);
+    if (!viewer) {
+      window.location.href = loginHref();
+      return;
+    }
+    const handle = `@${author.username}`;
+    if (kind === 'block') {
+      const ok = await confirmDialog({
+        title: `Bloquear ${handle}?`,
+        message: 'Os posts dessa conta somem do seu feed, e ela não vai conseguir seguir você, responder nem reagir aos seus posts. Vocês deixam de se seguir.',
+        confirmLabel: 'Bloquear',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    const done = await setProfileBlock(viewer.id, author.id, kind);
+    if (!done) {
+      notify('Não foi possível concluir agora. Tente de novo.', 'error');
+      return;
+    }
+    notify(
+      kind === 'block' ? `${handle} foi bloqueado.` : kind === 'mute' ? `${handle} foi silenciado. Os posts dessa conta não aparecem mais no seu feed.` : `${handle} voltou a aparecer no seu feed.`,
+      'success'
+    );
+  }
+
+  async function handleTogglePin() {
+    if (!isAdmin) return;
+    const next = !isPostPinned;
+    setIsPostPinned(next);
+    const ownerId = post.profile_id || post.author_id;
+    // um fixado por perfil: desafixa os outros
+    if (next && ownerId) {
+      await supabase.from('posts').update({ is_pinned: false }).eq('is_pinned', true).neq('id', post.id).or(`profile_id.eq.${ownerId},author_id.eq.${ownerId}`);
+    }
+    const { error } = await supabase.from('posts').update({ is_pinned: next }).eq('id', post.id);
+    if (error) {
+      setIsPostPinned(!next);
+      notify('Não foi possível fixar agora.', 'error');
+    } else {
+      notify(next ? 'Fixado no topo do seu perfil.' : 'Insight desafixado.', 'success');
+    }
+  }
+
   async function handleReportPost() {
+    setMoreOpen(false);
     if (!loggedUserProfile) {
       window.location.href = loginHref();
       return;
@@ -657,6 +724,22 @@ export function PostCard({
 
   if (!isAdmin && postVisibility === 'private') {
     return null;
+  }
+  // autor silenciado/bloqueado por quem vê: post recolhido (dá para mostrar)
+  if (blockKind && !revealBlocked && variant === 'feed') {
+    return (
+      <div className="px-4 sm:px-6 py-3 border-b border-border flex items-center justify-between gap-3 text-xs text-muted">
+        <span className="flex items-center gap-1.5 min-w-0">
+          {blockKind === 'block' ? <Ban className="w-3.5 h-3.5 shrink-0" /> : <VolumeX className="w-3.5 h-3.5 shrink-0" />}
+          <span className="truncate">
+            Post de @{author.username} · você {blockKind === 'block' ? 'bloqueou' : 'silenciou'} esta conta
+          </span>
+        </span>
+        <button type="button" onClick={() => setRevealBlocked(true)} className="shrink-0 font-semibold text-secondary hover:text-primary">
+          Mostrar
+        </button>
+      </div>
+    );
   }
 
   const displayedRepliesCount = repliesCountOverride ?? repliesCount;
@@ -1256,6 +1339,20 @@ export function PostCard({
               <Pencil className="w-4 h-4" />
             </button>
 
+            {isPostOwner && (
+              <button
+                type="button"
+                onClick={() => void handleTogglePin()}
+                title={isPostPinned ? 'Desafixar do perfil' : 'Fixar no topo do perfil'}
+                aria-pressed={isPostPinned}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isPostPinned ? 'text-accent bg-accent/10' : 'text-muted hover:text-accent hover:bg-elevated'
+                }`}
+              >
+                <Pin className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleDelete}
@@ -1379,6 +1476,8 @@ export function PostCard({
       {isPostOwner && !isEditing && (
         <ModerationBanner kind="post" id={post.id} status={modStatus} reason={modReason} onAppealed={() => setModStatus('appealed')} />
       )}
+
+      {previewUrl && !isEditing && !(isNsfw && !isPostOwner) && <LinkPreview url={previewUrl} />}
 
       {post.quoted_post_id && !isEditing && <QuotedPostCard postId={post.quoted_post_id} />}
 
@@ -1520,17 +1619,52 @@ export function PostCard({
           </button>
         </div>
 
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={handleReportPost}
-            title="Denunciar Insight à moderação"
-            aria-label="Denunciar Insight"
-            className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-elevated transition-colors"
-          >
-            <Flag className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {(post.views_count || 0) > 0 && (
+            <span
+              className="flex items-center gap-1 text-muted tabular-nums"
+              title={`${post.views_count} ${post.views_count === 1 ? 'pessoa viu' : 'pessoas viram'} este Insight`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              {post.views_count}
+            </span>
+          )}
+          {!isPostOwner && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                title="Mais opções"
+                aria-label="Mais opções"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-elevated transition-colors"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+              {moreOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+                  <div role="menu" className="absolute bottom-full right-0 mb-2 z-50 w-60 py-1 rounded-xl bg-elevated border border-border shadow-2xl">
+                    <button type="button" role="menuitem" onClick={() => void handleBlock(blockKind === 'mute' ? null : 'mute')} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left">
+                      <VolumeX className="w-4 h-4 text-secondary" />
+                      {blockKind === 'mute' ? `Deixar de silenciar @${author.username}` : `Silenciar @${author.username}`}
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => void handleBlock(blockKind === 'block' ? null : 'block')} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-primary hover:bg-surface text-left">
+                      <Ban className="w-4 h-4 text-secondary" />
+                      {blockKind === 'block' ? `Desbloquear @${author.username}` : `Bloquear @${author.username}`}
+                    </button>
+                    <div className="my-1 border-t border-border" />
+                    <button type="button" role="menuitem" onClick={() => void handleReportPost()} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger hover:bg-surface text-left">
+                      <Flag className="w-4 h-4" />
+                      Denunciar à moderação
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {social && !isEditing && (

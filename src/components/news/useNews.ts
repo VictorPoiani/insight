@@ -77,7 +77,8 @@ export function useNewsFeed(
 
 /** Sinais para o algoritmo: abrir, curtir, ocultar. */
 export function trackNews(id: string, kind: 'open' | 'like' | 'hide', on = true) {
-  return createClient().rpc('news_track', { p_news_id: id, p_kind: kind, p_on: on });
+  // aguardar é o que envia: o construtor do supabase-js só dispara no .then()
+  return createClient().rpc('news_track', { p_news_id: id, p_kind: kind, p_on: on }).then(() => {});
 }
 
 /** Temas que a pessoa segue. */

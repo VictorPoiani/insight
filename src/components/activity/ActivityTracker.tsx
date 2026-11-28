@@ -44,14 +44,14 @@ export function ActivityTracker() {
       if (signedIn && viewedIds.length) {
         const ids = viewedIds.slice(0, 100);
         viewedIds = viewedIds.slice(100);
-        void supabase.rpc('record_post_views', { p_ids: ids });
+        void supabase.rpc('record_post_views', { p_ids: ids }).then(() => {}); // .then() dispara a requisição
       }
       if (!signedIn || (seconds < 1 && !views && !videos)) return;
       const payload = { p_seconds: seconds, p_views: views, p_videos: videos };
       seconds = 0;
       views = 0;
       videos = 0;
-      void supabase.rpc('track_activity', payload);
+      void supabase.rpc('track_activity', payload).then(() => {}); // .then() dispara a requisição
     };
 
     // post visto = pelo menos metade dele na tela por 1,5 s

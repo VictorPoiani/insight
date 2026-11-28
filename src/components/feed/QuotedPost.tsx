@@ -171,7 +171,7 @@ export function QuoteComposerModal({
         post_id: post.id,
         content_preview: clean.slice(0, 110),
         message: `citou seu Insight: ${clean.slice(0, 90)}`,
-      });
+      }).then(() => {}); // .then() dispara a requisição
     }
     const body = JSON.stringify({ action: 'new_post', postId: (data as Post).id });
     fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {});

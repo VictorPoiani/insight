@@ -71,7 +71,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     if (!meId || !visible) return;
     let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
     const beat = () => {
-      if (document.visibilityState === 'visible') void supabase.rpc('touch_presence');
+      // .then() dispara a requisição (o construtor do supabase-js é preguiçoso)
+      if (document.visibilityState === 'visible') void supabase.rpc('touch_presence').then(() => {});
     };
     beat();
     const interval = setInterval(beat, 60_000);

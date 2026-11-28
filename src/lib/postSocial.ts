@@ -8,12 +8,13 @@ import { createClient } from '@/lib/supabase/client';
  * mesmo instante viram poucas consultas com `in(...)`.
  */
 
+// ícones autorais (InsightIcon `react-*`) com a cor de cada reação
 export const REACTIONS = [
-  { id: 'idea', emoji: '💡', label: 'Boa ideia' },
-  { id: 'fire', emoji: '🔥', label: 'Incrível' },
-  { id: 'laugh', emoji: '😂', label: 'Engraçado' },
-  { id: 'think', emoji: '🤔', label: 'Me fez pensar' },
-  { id: 'wow', emoji: '😮', label: 'Uau' },
+  { id: 'idea', icon: 'react-idea', color: '#f59e0b', label: 'Boa ideia' },
+  { id: 'fire', icon: 'react-fire', color: '#f97316', label: 'Incrível' },
+  { id: 'laugh', icon: 'react-laugh', color: '#eab308', label: 'Engraçado' },
+  { id: 'think', icon: 'react-think', color: '#a78bfa', label: 'Me fez pensar' },
+  { id: 'wow', icon: 'react-wow', color: '#38bdf8', label: 'Uau' },
 ] as const;
 export type ReactionId = (typeof REACTIONS)[number]['id'];
 export const REACTION_BY_ID = new Map<string, (typeof REACTIONS)[number]>(REACTIONS.map((r) => [r.id, r]));
@@ -61,7 +62,7 @@ function replyText(r: { content?: string | null; blocks?: unknown }): string {
       if (s) t += (t ? ' ' : '') + s;
       if (t.length > 200) break;
     }
-    if (!t && (r.blocks as { type?: string }[]).some((b) => b?.type === 'image' || b?.type === 'gif' || b?.type === 'video')) t = '📷 mídia';
+    if (!t && (r.blocks as { type?: string }[]).some((b) => b?.type === 'image' || b?.type === 'gif' || b?.type === 'video')) t = 'enviou uma mídia';
   }
   if (!t) t = (r.content || '').trim();
   return t.replace(/\s+/g, ' ').slice(0, 200);

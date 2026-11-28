@@ -171,7 +171,7 @@ export default function ModerationPage() {
       ) : !items ? (
         <Spinner />
       ) : items.length === 0 ? (
-        <p className="py-16 text-center text-xs text-muted">Nada por aqui. 🎉</p>
+        <p className="py-16 text-center text-xs text-muted">Nada por aqui.</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {items.map((it) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { useState } from 'react';
 import { Heart, EyeOff, Share2, Newspaper, Plus, Check } from 'lucide-react';
 import { TOPIC_BY_ID } from '@/lib/news/topics';
@@ -82,7 +83,7 @@ export function NewsCard({
                 background: `linear-gradient(140deg, ${mainTopic?.color || sourceColor(item.source_name)}, color-mix(in srgb, ${mainTopic?.color || '#334155'} 35%, #0b0b0f))`,
               }}
             >
-              <span className="text-4xl drop-shadow">{mainTopic?.emoji || '📰'}</span>
+              <InsightIcon name={mainTopic?.id || 'newspaper'} className="w-10 h-10 drop-shadow" />
               <span className="text-xs font-bold tracking-wide opacity-90">{item.source_name}</span>
             </span>
           )}
@@ -147,7 +148,7 @@ export function NewsCard({
           if (!topic) return null;
           return (
             <span key={t} className={`${idx > 0 ? 'hidden sm:inline-flex' : 'inline-flex'} px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border text-secondary`}>
-              {topic.emoji} {topic.label}
+              <InsightIcon name={topic.id} className="w-3 h-3 mr-1" /> {topic.label}
             </span>
           );
         })}

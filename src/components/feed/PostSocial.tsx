@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SmilePlus } from 'lucide-react';
+import { InsightIcon } from '@/components/icons/InsightIcon';
 import { relativeTime } from './PostTime';
 import { REACTIONS, REACTION_BY_ID, type MiniProfile, type PostSocial, type ReactionId, type TopReply } from '@/lib/postSocial';
 
@@ -71,7 +72,7 @@ export function ReplyPreview({ reply, total, postId }: { reply: TopReply; total:
   );
 }
 
-/** Chips das reações que o post já recebeu ("💡 3  🔥 1"). Clicar usa a mesma reação. */
+/** Chips das reações que o post já recebeu (ícone + número). Clicar usa a mesma reação. */
 export function ReactionChips({
   social,
   onReact,
@@ -96,7 +97,9 @@ export function ReactionChips({
               mine ? 'border-accent/60 bg-accent/10 text-primary' : 'border-border text-secondary hover:border-secondary/60'
             }`}
           >
-            <span className="text-[15px] leading-none">{r.emoji}</span>
+            <span style={{ color: r.color }} className="inline-flex">
+              <InsightIcon name={r.icon} className="w-4 h-4" />
+            </span>
             <span key={social.reactions[r.id]} className="insight-count-roll">{social.reactions[r.id]}</span>
           </button>
         );
@@ -110,7 +113,7 @@ export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onR
   const [open, setOpen] = useState(false);
   const current = mine ? REACTION_BY_ID.get(mine) : null;
   return (
-    <div className="relative">
+    <div className="relative inline-flex">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -120,7 +123,13 @@ export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onR
         aria-expanded={open}
         className={`flex items-center gap-1.5 py-1 transition-colors ${current ? 'text-primary' : 'hover:text-primary'}`}
       >
-        {current ? <span className="text-base leading-none">{current.emoji}</span> : <SmilePlus className="w-4 h-4" />}
+        {current ? (
+          <span style={{ color: current.color }} className="inline-flex">
+            <InsightIcon name={current.icon} className="w-[18px] h-[18px]" />
+          </span>
+        ) : (
+          <SmilePlus className="w-4 h-4" />
+        )}
       </button>
       {open && (
         <>
@@ -140,11 +149,12 @@ export function ReactionButton({ mine, onReact }: { mine: ReactionId | null; onR
                   setOpen(false);
                   onReact(r.id);
                 }}
-                className={`w-9 h-9 grid place-items-center rounded-full text-xl transition-transform hover:scale-125 hover:-translate-y-0.5 ${
+                style={{ color: r.color }}
+                className={`w-9 h-9 grid place-items-center rounded-full transition-transform hover:scale-125 hover:-translate-y-0.5 ${
                   mine === r.id ? 'bg-accent/15' : ''
                 }`}
               >
-                {r.emoji}
+                <InsightIcon name={r.icon} className="w-6 h-6" />
               </button>
             ))}
           </div>

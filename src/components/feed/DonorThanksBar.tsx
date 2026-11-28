@@ -92,7 +92,7 @@ export function DonorThanksBar() {
     >
       <Heart className="w-4 h-4 text-rose-500 fill-rose-500 shrink-0 animate-pulse" />
       <p className="flex-1 min-w-0 text-xs sm:text-sm text-primary leading-snug">
-        Obrigado, {who}, por apoiar o Insight! Cada doação mantém a comunidade no ar. 💙{' '}
+        Obrigado, {who}, por apoiar o Insight! Cada doação mantém a comunidade no ar.{' '}
         <Link href="/apoie" className="text-accent font-bold hover:underline whitespace-nowrap">
           Apoie também
         </Link>

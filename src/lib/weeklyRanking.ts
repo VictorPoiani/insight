@@ -39,11 +39,11 @@ export function headline(data: WeeklyRanking): string | null {
   while (byWeek.get(streak)?.key === cur.key) streak++;
 
   const prev = byWeek.get(1);
-  if (!prev) return `${leaderName} inaugura o ranking de contribuição no topo! 🏁`;
+  if (!prev) return `${leaderName} inaugura o ranking de contribuição no topo!`;
 
   if (streak >= 2) {
-    if (streak === 2) return `${leaderName} segura o topo pela segunda semana seguida! 🔥`;
-    return `${leaderName} está há ${streak} semanas no topo do ranking! 👑`;
+    if (streak === 2) return `${leaderName} segura o topo pela segunda semana seguida!`;
+    return `${leaderName} está há ${streak} semanas no topo do ranking!`;
   }
 
   // troca de líder nesta semana
@@ -54,12 +54,12 @@ export function headline(data: WeeklyRanking): string | null {
 
   if (ledBefore) {
     return prevStreak >= 2
-      ? `${leaderName} recuperou o pódio e encerrou ${plural(prevStreak, 'semana', 'semanas')} de reinado de ${prevName}! ⚔️`
-      : `${leaderName} recuperou o pódio! ⚔️`;
+      ? `${leaderName} recuperou o pódio e encerrou ${plural(prevStreak, 'semana', 'semanas')} de reinado de ${prevName}!`
+      : `${leaderName} recuperou o pódio!`;
   }
   return prevStreak >= 2
-    ? `${leaderName} quebrou a hegemonia de ${plural(prevStreak, 'semana', 'semanas')} de ${prevName}! 💥`
-    : `${leaderName} tomou o topo de ${prevName}! 💥`;
+    ? `${leaderName} quebrou a hegemonia de ${plural(prevStreak, 'semana', 'semanas')} de ${prevName}!`
+    : `${leaderName} tomou o topo de ${prevName}!`;
 }
 
 /** Frase curta de movimento para cada posição. */

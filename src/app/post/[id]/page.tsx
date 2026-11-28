@@ -82,7 +82,9 @@ export default function PostDiscussionPage() {
         .from('replies')
         .select('*')
         .eq('post_id', postId)
-        .order('created_at', { ascending: true }),
+        .order('created_at', { ascending: true })
+        // teto de segurança para posts virais (a conversa raramente passa disso)
+        .limit(1000),
     ]);
 
     const typedPost = (postData as Post) || null;

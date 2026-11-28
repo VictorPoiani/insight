@@ -1,9 +1,10 @@
 'use client';
 
+import { LoadMoreSentinel } from '@/components/ui/LoadMoreSentinel';
 import { ProfileMediaGrid } from '@/components/feed/ProfileMediaGrid';
 import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { notify } from '@/lib/ui/feedback';
-import { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -19,6 +20,8 @@ import {
 import dynamic from 'next/dynamic';
 import { useProgressiveList } from '@/lib/useProgressiveList';
 // o editor (pesado) só é baixado por quem pode publicar neste perfil
+/** posts por página no perfil */
+const PROFILE_PAGE = 30;
 const PostComposer = dynamic(() => import('@/components/feed/PostComposer').then((m) => m.PostComposer), { ssr: false });
 import { PostCard, resolvePostVisibility } from '@/components/feed/PostCard';
 import { ProfileReposts } from '@/components/feed/ProfileReposts';
@@ -117,6 +120,11 @@ function UserProfileContent() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<FeedTabItem>(DEFAULT_TABS[0]);
+  // posts do perfil em páginas (antes vinham até 500 de uma vez)
+  const [postsHasMore, setPostsHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const ownerFilterRef = useRef<string | null>(null);
   const [tabSwitching, setTabSwitching] = useState(false);
 
   const [adminVisibilityFilter, setAdminVisibilityFilter] = useState<
@@ -204,7 +212,9 @@ function UserProfileContent() {
       .or(ownerFilter)
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(PROFILE_PAGE);
+    ownerFilterRef.current = ownerFilter;
+    setPostsHasMore((allPostsData?.length || 0) === PROFILE_PAGE);
 
     if (allPostsData) {
       const belongingToThisProfile = (allPostsData as Post[]).filter((p) => {
@@ -226,6 +236,35 @@ function UserProfileContent() {
   useEffect(() => {
     loadProfileAndPosts();
   }, [loadProfileAndPosts]);
+
+  /** Próxima página do perfil (só não fixados, a partir do mais antigo já carregado). */
+  const loadMorePosts = useCallback(async () => {
+    const filter = ownerFilterRef.current;
+    if (loadingMoreRef.current || !postsHasMore || !filter) return;
+    const oldest = posts.filter((p) => !p.is_pinned).reduce<string | null>((m, p) => (!m || p.created_at < m ? p.created_at : m), null);
+    if (!oldest) {
+      setPostsHasMore(false);
+      return;
+    }
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const { data } = await supabase
+      .from('posts')
+      .select('*')
+      .or(filter)
+      .or('is_pinned.is.null,is_pinned.eq.false')
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(PROFILE_PAGE);
+    const page = (data as Post[] | null) || [];
+    setPosts((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      return [...prev, ...page.filter((p) => !seen.has(p.id))];
+    });
+    setPostsHasMore(page.length === PROFILE_PAGE);
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+  }, [posts, postsHasMore, supabase]);
 
   // Ação de Moderação: Excluir perfil tóxico
   async function handleStaffDeleteProfile() {
@@ -317,6 +356,17 @@ function UserProfileContent() {
       },
     };
   }, [posts, canManageProfile, activeTab.tag, tagParam, queryFilter, adminVisibilityFilter]);
+  // aba de tema com poucos posts carregados: busca mais páginas sozinho (até 10)
+  const autoFill = useRef<{ key: string; pages: number }>({ key: '', pages: 0 });
+  useEffect(() => {
+    if (loading || loadingMore || !postsHasMore || !activeTab.tag || visiblePosts.length >= 6) return;
+    const key = `${activeTab.id}|${tagParam}`;
+    if (autoFill.current.key !== key) autoFill.current = { key, pages: 0 };
+    if (autoFill.current.pages >= 10) return;
+    autoFill.current.pages++;
+    void loadMorePosts();
+  }, [loading, loadingMore, postsHasMore, activeTab.id, activeTab.tag, tagParam, visiblePosts.length, loadMorePosts]);
+
   const progressive = useProgressiveList(visiblePosts, 6, 6, `${activeTab.id}|${queryFilter}|${tagParam}|${adminVisibilityFilter}`);
 
   if (loading) {
@@ -525,7 +575,14 @@ function UserProfileContent() {
       ) : tabSwitching ? (
         <ProfileAsteriskLoader size="md" color={activeTab.color} />
       ) : activeTab.id === 'midia' ? (
-        <ProfileMediaGrid posts={visiblePosts} />
+        <>
+          <ProfileMediaGrid posts={visiblePosts} />
+          {postsHasMore && (
+            <LoadMoreSentinel onVisible={() => void loadMorePosts()} loading={loadingMore}>
+              <ProfileAsteriskLoader size="sm" color={activeTab.color} />
+            </LoadMoreSentinel>
+          )}
+        </>
       ) : visiblePosts.length === 0 ? (
         <div className="py-16 text-center text-xs text-muted">
           Nenhuma publicação encontrada nesta aba.
@@ -544,6 +601,11 @@ function UserProfileContent() {
             />
           ))}
           {progressive.hasMore && <div ref={progressive.sentinelRef} className="h-24" aria-hidden />}
+          {!progressive.hasMore && postsHasMore && (
+            <LoadMoreSentinel onVisible={() => void loadMorePosts()} loading={loadingMore}>
+              <ProfileAsteriskLoader size="sm" color={activeTab.color} />
+            </LoadMoreSentinel>
+          )}
         </div>
       )}
     </div>

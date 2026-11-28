@@ -507,7 +507,7 @@ function CommunityHomeFeed() {
         .filter((p) => activeTab !== 'following' || followingIds.has(p.author));
       setFreshPosts(fresh);
     };
-    const t = setInterval(() => void check(), 45_000);
+    const t = setInterval(() => void check(), 60_000);
     const onVisible = () => void check();
     document.addEventListener('visibilitychange', onVisible);
     return () => {

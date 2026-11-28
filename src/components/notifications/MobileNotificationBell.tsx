@@ -37,16 +37,8 @@ export function MobileNotificationBell() {
 
   useEffect(() => {
     window.addEventListener('insight-notifications-updated', refresh);
-    if (!meId) return () => window.removeEventListener('insight-notifications-updated', refresh);
-    const channel = supabase
-      .channel(`mobile-bell-${meId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${meId}` }, () => void refresh())
-      .subscribe();
-    return () => {
-      window.removeEventListener('insight-notifications-updated', refresh);
-      void supabase.removeChannel(channel);
-    };
-  }, [meId, refresh, supabase]);
+    return () => window.removeEventListener('insight-notifications-updated', refresh);
+  }, [refresh]);
 
   if (!meId) return null;
   const active = pathname.startsWith('/notificacoes');

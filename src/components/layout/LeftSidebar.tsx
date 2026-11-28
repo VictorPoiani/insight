@@ -203,25 +203,9 @@ export function LeftSidebar() {
       };
     }
 
-    const channel = supabase
-      .channel(`sidebar-notifs-${currentUser.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `recipient_id=eq.${currentUser.id}`,
-        },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
+    // sem canal de tempo real (a tabela não está publicada nele): a checagem periódica cuida disso
     return () => {
       window.removeEventListener('insight-notifications-updated', fetchUnreadCount);
-      supabase.removeChannel(channel);
     };
   }, [currentUser?.id, pathname, fetchUnreadCount, supabase]);
 

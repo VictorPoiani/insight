@@ -79,19 +79,6 @@ function key(viewer: string | null, postId: string) {
   return `${viewer || 'anon'}:${postId}`;
 }
 
-function replyText(r: { content?: string | null; blocks?: unknown }): string {
-  let t = '';
-  if (Array.isArray(r.blocks)) {
-    for (const b of r.blocks as { html?: string; type?: string }[]) {
-      const s = (b?.html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').trim();
-      if (s) t += (t ? ' ' : '') + s;
-      if (t.length > 200) break;
-    }
-    if (!t && (r.blocks as { type?: string }[]).some((b) => b?.type === 'image' || b?.type === 'gif' || b?.type === 'video')) t = 'enviou uma mídia';
-  }
-  if (!t) t = (r.content || '').trim();
-  return t.replace(/\s+/g, ' ').slice(0, 200);
-}
 
 async function flush() {
   const batch = pending;
@@ -103,96 +90,31 @@ async function flush() {
   if (!ids.length) return;
   const supabase = createClient();
 
-  type LikeRow = { post_id: string; profile_id: string; created_at: string };
-  type ReplyRow = {
-    id: string;
-    post_id: string;
-    profile_id: string;
-    content: string | null;
-    blocks: unknown;
-    likes_count: number | null;
-    created_at: string;
-    author_name: string | null;
-    author_handle: string | null;
-    avatar_url: string | null;
+  // uma chamada já resumida no banco (post_social_batch): 3 curtidas, resposta
+  // em destaque e contagem de reações por post
+  type Row = {
+    likers: MiniProfile[];
+    topReply: (Omit<TopReply, 'text'> & { text: string; has_media?: boolean }) | null;
+    reactions: Record<string, number>;
+    myReaction: string | null;
   };
-  type ReactionRow = { post_id: string; profile_id: string; reaction: string };
-
-  const likes: LikeRow[] = [];
-  const replies: ReplyRow[] = [];
-  const reactions: ReactionRow[] = [];
-
+  const rows: Record<string, Row> = {};
   for (let i = 0; i < ids.length; i += 100) {
-    const chunk = ids.slice(i, i + 100);
-    const [l, r, re] = await Promise.all([
-      supabase.from('post_likes').select('post_id, profile_id, created_at').in('post_id', chunk).order('created_at', { ascending: false }).limit(800),
-      supabase
-        .from('replies')
-        .select('id, post_id, profile_id, content, blocks, likes_count, created_at, author_name, author_handle, avatar_url')
-        .in('post_id', chunk)
-        .is('parent_reply_id', null)
-        .order('created_at', { ascending: false })
-        .limit(500),
-      supabase.from('post_reactions').select('post_id, profile_id, reaction').in('post_id', chunk).limit(2000),
-    ]);
-    likes.push(...((l.data as LikeRow[]) || []));
-    replies.push(...((r.data as ReplyRow[]) || []));
-    reactions.push(...((re.data as ReactionRow[]) || [])); // sem a tabela: só não mostra reações
-  }
-
-  // até 3 curtidas por post (as mais recentes) e a melhor resposta (mais curtida; empate → mais recente)
-  const likersByPost = new Map<string, string[]>();
-  for (const row of likes) {
-    const list = likersByPost.get(row.post_id) || [];
-    if (list.length < 3 && !list.includes(row.profile_id)) list.push(row.profile_id);
-    likersByPost.set(row.post_id, list);
-  }
-  const topByPost = new Map<string, ReplyRow>();
-  for (const row of replies) {
-    const cur = topByPost.get(row.post_id);
-    if (!cur || (row.likes_count || 0) > (cur.likes_count || 0)) topByPost.set(row.post_id, row);
-  }
-
-  const profileIds = new Set<string>();
-  likersByPost.forEach((l) => l.forEach((id) => profileIds.add(id)));
-  topByPost.forEach((r) => profileIds.add(r.profile_id));
-  const profiles = new Map<string, MiniProfile>();
-  const pidList = [...profileIds];
-  for (let i = 0; i < pidList.length; i += 150) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, full_name, avatar_url')
-      .in('id', pidList.slice(i, i + 150));
-    for (const p of (data as { id: string; username: string; display_name: string | null; full_name: string | null; avatar_url: string | null }[]) || []) {
-      profiles.set(p.id, { id: p.id, username: p.username, name: p.display_name || p.full_name || p.username, avatar_url: p.avatar_url });
-    }
+    const { data } = await supabase.rpc('post_social_batch', { p_ids: ids.slice(i, i + 100) });
+    Object.assign(rows, (data as Record<string, Row> | null) || {});
   }
 
   for (const [postId, cbs] of batch) {
-    const likers = (likersByPost.get(postId) || []).map((id) => profiles.get(id)).filter(Boolean) as MiniProfile[];
-    const top = topByPost.get(postId);
-    const text = top ? replyText(top) : '';
-    const author =
-      top &&
-      (profiles.get(top.profile_id) || {
-        id: top.profile_id,
-        username: top.author_handle || 'membro',
-        name: top.author_name || top.author_handle || 'Membro do Insight',
-        avatar_url: top.avatar_url,
-      });
-    const counts: Record<string, number> = {};
-    let mine: ReactionId | null = null;
-    for (const r of reactions) {
-      if (r.post_id !== postId || !isReactionEmoji(r.reaction)) continue;
-      const id = r.reaction as ReactionId;
-      counts[id] = (counts[id] || 0) + 1;
-      if (viewer && r.profile_id === viewer) mine = id;
-    }
+    const r = rows[postId];
+    const top = r?.topReply;
+    const text = top ? (top.text || (top.has_media ? 'enviou uma mídia' : '')).replace(/\s+/g, ' ').trim() : '';
+    const reactions: Record<string, number> = {};
+    for (const [emoji, n] of Object.entries(r?.reactions || {})) if (isReactionEmoji(emoji) && n > 0) reactions[emoji] = n;
     const social: PostSocial = {
-      likers,
-      topReply: top && author && text ? { id: top.id, author, text, likes: top.likes_count || 0, created_at: top.created_at } : null,
-      reactions: counts,
-      myReaction: mine,
+      likers: r?.likers || [],
+      topReply: top && text ? { id: top.id, author: top.author, text, likes: top.likes || 0, created_at: top.created_at } : null,
+      reactions,
+      myReaction: viewer && r?.myReaction && isReactionEmoji(r.myReaction) ? r.myReaction : null,
     };
     cache.set(key(viewer, postId), social);
     for (const cb of cbs) cb(social);

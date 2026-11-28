@@ -40,7 +40,7 @@ const FOUNDER_PROFILE_ID = '96d271a9-9102-49b1-b593-9279c5dfe3f4';
 /** posts por página do feed */
 const POSTS_PAGE = 30;
 /** membros carregados de início (os mais ativos); a busca vai ao servidor */
-const MEMBERS_PAGE = 60;
+const MEMBERS_PAGE = 24;
 
 /**
  * Animação de Carregamento Oficial do Asterisco de 8 pontas (*) do Insight
@@ -261,6 +261,7 @@ function CommunityHomeFeed() {
         .from('profiles')
         .select('*')
         .order('last_seen_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
         .limit(MEMBERS_PAGE),
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase
@@ -585,6 +586,30 @@ function CommunityHomeFeed() {
       alive = false;
     };
   }, [loggedProfile?.id, showQuickComposer, supabase]);
+
+  // aba Membros: próximos perfis (a lista começa com os mais ativos)
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const loadMoreMembers = async () => {
+    if (loadingMembers) return;
+    setLoadingMembers(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('last_seen_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .range(profiles.length, profiles.length + 47);
+    const found = (data as Profile[] | null) || [];
+    setProfiles((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      return [...prev, ...found.filter((p) => !seen.has(p.id))];
+    });
+    setProfilesMap((prev) => {
+      const next = { ...prev };
+      for (const p of found) next[p.id] = p;
+      return next;
+    });
+    setLoadingMembers(false);
+  };
 
   const syncFollow = (id: string, on: boolean) =>
     setFollowingIds((prev) => {
@@ -965,6 +990,18 @@ function CommunityHomeFeed() {
                 </Link>
               );
             })
+          )}
+          {!query && membersTotal !== null && profiles.length < membersTotal && (
+            <div className="py-5 flex justify-center">
+              <button
+                type="button"
+                disabled={loadingMembers}
+                onClick={() => void loadMoreMembers()}
+                className="px-4 py-2 rounded-full border border-border text-xs font-semibold text-secondary hover:text-primary disabled:opacity-50"
+              >
+                {loadingMembers ? 'Carregando...' : `Ver mais membros (${membersTotal - profiles.length})`}
+              </button>
+            </div>
           )}
         </div>
       ) : (

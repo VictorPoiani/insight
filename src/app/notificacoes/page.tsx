@@ -1,5 +1,6 @@
 'use client';
 
+import { useVisiblePolling } from '@/lib/useVisiblePolling';
 import { ask as confirmDialog } from '@/lib/ui/feedback';
 import { NitroBadge } from '@/components/nitro/Cosmetics';
 import { displaysNitro } from '@/lib/nitro/entitlement';
@@ -185,30 +186,8 @@ export default function NotificationsPage() {
     loadAllNotifications();
   }, [loadAllNotifications]);
 
-  // Subscrição Realtime para novas notificações chegarem ao vivo
-  useEffect(() => {
-    if (!myProfile) return;
-
-    const channel = supabase
-      .channel(`realtime-notifs-${myProfile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `recipient_id=eq.${myProfile.id}`,
-        },
-        () => {
-          loadAllNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [myProfile, supabase, loadAllNotifications]);
+  // novas notificações: confere a cada minuto com a aba visível (sem canal de tempo real)
+  useVisiblePolling(() => void loadAllNotifications(), 60_000, Boolean(myProfile));
 
   async function handleMarkAllRead() {
     if (mainTab === 'official') {

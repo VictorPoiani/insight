@@ -1386,7 +1386,7 @@ export function ProfileHeader({
                 </button>
 
                 {isAdmin && expandStatusMenu && (
-                  <div className="absolute left-0 top-full mt-2 z-30 w-64 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
+                  <div className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] max-h-[70vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:w-72 p-3 rounded-2xl bg-surface border border-border shadow-2xl space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">
                         Definir Status
@@ -1498,7 +1498,7 @@ export function ProfileHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3 ml-auto shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto lg:ml-auto min-w-0">
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-secondary whitespace-nowrap">
               <button type="button" onClick={() => setFollowList('following')} className="hover:underline underline-offset-2" title="Ver quem este perfil segue">
                 <b className="text-primary font-bold">{followingCount}</b> Seguindo

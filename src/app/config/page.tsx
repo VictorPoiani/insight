@@ -833,8 +833,8 @@ export default function ConfigPage() {
     <div className="w-full min-h-screen bg-background">
       {/* CABEÇALHO FIXO MINIMALISTA COM ABAS */}
       <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border">
-        <div className="px-6 pt-4 pb-3 flex items-center justify-between gap-3">
-          <div>
+        <div className="px-4 sm:px-6 pt-4 pb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-extrabold text-primary">
               Configurações
             </h1>
@@ -846,14 +846,15 @@ export default function ConfigPage() {
           {myProfile && (
             <Link
               href={`/u/${encodeURIComponent(myProfile.username)}`}
-              className="px-3 py-1.5 rounded-full bg-surface border border-border hover:border-accent text-xs font-bold text-primary flex items-center gap-2 transition-colors"
+              title={`@${myProfile.username}`}
+              className="shrink-0 max-w-[45%] sm:max-w-none p-1 sm:px-3 sm:py-1.5 rounded-full bg-surface border border-border hover:border-accent text-xs font-bold text-primary flex items-center gap-2 transition-colors"
             >
               <img
                 src={myProfile.avatar_url || '/assets/net/default-perfil'}
                 alt={myProfile.full_name}
-                className="w-5 h-5 rounded-full object-cover"
+                className="w-7 h-7 sm:w-5 sm:h-5 rounded-full object-cover shrink-0"
               />
-              <span>@{myProfile.username}</span>
+              <span className="hidden sm:inline truncate">@{myProfile.username}</span>
             </Link>
           )}
         </div>

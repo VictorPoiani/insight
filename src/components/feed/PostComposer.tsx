@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchPostQuota, quotaBlock, type PostQuota } from '@/lib/postQuota';
+import { PostQuotaNotice } from './PostQuotaNotice';
 import { notify } from '@/lib/ui/feedback';
 import { useAutoFocusMode } from '@/lib/useAutoFocusMode';
 import { PanZoomSurface, boundsFromPercent } from '@/components/canvas/PanZoom';
@@ -576,6 +578,29 @@ export function PostComposer({
   onPublished,
 }: PostComposerProps) {
   const isEditMode = Boolean(editingPost);
+
+  // limites de publicação (3/hora, 10/dia, vira às 03:00 de Brasília); o banco é quem trava de verdade
+  const [postQuota, setPostQuota] = useState<PostQuota | null>(null);
+  const [quotaNow, setQuotaNow] = useState(() => Date.now());
+  const refreshQuota = useCallback(() => {
+    void fetchPostQuota().then((q) => {
+      setPostQuota(q);
+      setQuotaNow(Date.now());
+    });
+  }, []);
+  useEffect(() => {
+    if (isEditMode || !isAdmin) return;
+    refreshQuota();
+    // relógio do aviso; ao chegar a hora de liberar, confere de novo no banco
+    const t = setInterval(() => setQuotaNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [isEditMode, isAdmin, refreshQuota]);
+  const quotaBlocked = isEditMode ? null : quotaBlock(postQuota, quotaNow);
+  useEffect(() => {
+    if (!postQuota || quotaBlocked) return;
+    // passou do horário de liberar: atualiza do banco
+    if (postQuota.hourCount >= postQuota.hourLimit || postQuota.dayCount >= postQuota.dayLimit) refreshQuota();
+  }, [quotaBlocked, postQuota, refreshQuota]);
   const isEmbedded = Boolean(embedded);
   // Notebook já tem tela cheia própria; no feed e na edição o foco é automático
   const autoFocus = useAutoFocusMode(!isEmbedded);
@@ -1843,6 +1868,11 @@ export function PostComposer({
       setCompressionBadges({});
       if (createdPost?.id) onPublished?.(createdPost.id);
       onPostCreated?.();
+      refreshQuota();
+    } else if (/post_rate_(hour|day)/.test(error.message || '')) {
+      // o banco recusou pelo limite: mostra o aviso com o horário certo
+      refreshQuota();
+      notify(error.message.includes('post_rate_day') ? 'Limite diário de publicações alcançado.' : 'Limite de 3 posts por hora atingido.', 'error');
     } else {
       notify(moderationErrorMessage(error) || 'Erro ao publicar insight: ' + error.message);
     }
@@ -4343,6 +4373,8 @@ export function PostComposer({
       )}
 
       {!isEmbedded && (<>
+      {quotaBlocked && postQuota && <PostQuotaNotice quota={postQuota} block={quotaBlocked} now={quotaNow} />}
+
       {/* RODAPÉ DO COMPOSITOR */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
         <div className="flex items-center gap-2 flex-1 min-w-[180px]">
@@ -4412,7 +4444,8 @@ export function PostComposer({
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || Boolean(quotaBlocked)}
+            title={quotaBlocked ? 'Limite de publicações atingido' : undefined}
             className="flex items-center gap-2 px-5 py-2 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover disabled:opacity-50 transition-colors"
           >
             <Send className="w-3.5 h-3.5" />

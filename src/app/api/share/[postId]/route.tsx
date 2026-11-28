@@ -208,7 +208,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ postId: string 
         fontWeight: 700,
       }}
     >
-      Leia no {host}
+      {format === 'og' ? `Leia no ${host}` : (
+        <span style={{ display: 'flex', alignItems: 'center' }}>
+          {/* elo de corrente desenhado: o link curto leva direto ao post */}
+          <svg width={30 * S} height={30 * S} viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 12 * S }}>
+            <path d="M10 13.5a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1.2 1.2" />
+            <path d="M14 10.5a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1.2-1.2" />
+          </svg>
+          {host}/s/{String(post.id).slice(0, 8)}
+        </span>
+      )}
     </div>
   );
 

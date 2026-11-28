@@ -85,6 +85,7 @@ export function SharePostModal({ isOpen, onClose, post, author }: SharePostModal
       title="Compartilhar Insight"
       imageBase={`/api/share/${post.id}`}
       path={`/post/${post.id}`}
+      shortPath={`/s/${post.id.slice(0, 8)}`}
       shareTitle={`${name} no Insight*`}
       shareText={shareText}
       fileName={`insight-post-${post.id.slice(0, 8)}`}
@@ -119,13 +120,15 @@ interface ShareSheetProps {
   imageBase: string;
   /** caminho público (ex.: /post/<id>) */
   path: string;
+  /** link curto para Stories/imagem (ex.: /s/<código>); sem ele usa `path` */
+  shortPath?: string;
   shareTitle: string;
   shareText: string;
   fileName: string;
   isPrivate: boolean;
 }
 
-export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle, shareText, fileName, isPrivate }: ShareSheetProps) {
+export function ShareSheet({ isOpen, onClose, title, imageBase, path, shortPath, shareTitle, shareText, fileName, isPrivate }: ShareSheetProps) {
   const [format, setFormat] = useState<ShareFormat>('story');
   const [themeId, setThemeId] = useState(SHARE_THEMES[0].id);
   const [imgState, setImgState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -136,6 +139,9 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
   const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}${path}`;
+  // link que vai junto da imagem (figurinha "Link" dos Stories): o curto, que leva direto ao post
+  const storyUrl = typeof window === 'undefined' ? '' : `${window.location.origin}${shortPath || path}`;
+  const [storyCopied, setStoryCopied] = useState(false);
   const imageUrl = `${imageBase}?format=${format}&theme=${themeId}`;
   const name = shareTitle;
 
@@ -208,7 +214,7 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle
     // o link vai junto na área de transferência para a figurinha "Link" dos Stories
     // (sem await: no iPhone a gaveta de compartilhar precisa abrir no mesmo toque)
     let linkCopied = false;
-    navigator.clipboard?.writeText(shareUrl).then(() => (linkCopied = true)).catch(() => {});
+    navigator.clipboard?.writeText(storyUrl).then(() => (linkCopied = true)).catch(() => {});
     const file = new File([blob], `${fileName}-${format}.png`, { type: 'image/png' });
     try {
       if (navigator.canShare?.({ files: [file] })) {
@@ -217,7 +223,7 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle
         if (linkCopied) flash('Link copiado — nos Stories, use a figurinha “Link” e cole.');
       } else {
         download(blob);
-        flash('Imagem baixada — o link do post foi copiado.');
+        flash(linkCopied ? 'Imagem baixada — o link do post foi copiado.' : 'Imagem baixada.');
       }
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') {
@@ -361,10 +367,44 @@ export function ShareSheet({ isOpen, onClose, title, imageBase, path, shareTitle
                 </button>
               )}
               {format === 'story' && (
-                <p className="text-[11px] text-muted text-center leading-snug">
-                  No celular, escolha <strong className="text-secondary">Instagram → Stories</strong>. O link do post já vai
-                  copiado: adicione a figurinha <strong className="text-secondary">“Link”</strong> e cole.
-                </p>
+                <ol className="rounded-2xl bg-elevated border border-border p-3.5 space-y-2.5 text-xs text-secondary leading-snug">
+                  <li className="flex gap-2.5">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">1</span>
+                    <span>
+                      Toque em <strong className="text-primary">Compartilhar nos Stories</strong> e escolha{' '}
+                      <strong className="text-primary">Instagram → Stories</strong>.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">2</span>
+                    <span className="min-w-0 flex-1">
+                      No story, toque em <strong className="text-primary">Figurinhas → Link</strong> e cole. O link já vai copiado:
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(storyUrl);
+                            setStoryCopied(true);
+                            setTimeout(() => setStoryCopied(false), 2000);
+                          } catch {
+                            prompt('Copie o link:', storyUrl);
+                          }
+                        }}
+                        className="mt-1.5 w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-surface border border-border text-left"
+                      >
+                        <Link2 className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-primary">{storyUrl.replace(/^https?:\/\//, '')}</span>
+                        <span className={`text-[11px] font-bold shrink-0 ${storyCopied ? 'text-emerald-400' : 'text-accent'}`}>
+                          {storyCopied ? 'Copiado' : 'Copiar de novo'}
+                        </span>
+                      </button>
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">3</span>
+                    <span>Quem tocar na figurinha abre o post direto no Insight. O link também aparece escrito na imagem.</span>
+                  </li>
+                </ol>
               )}
             </>
           )}
